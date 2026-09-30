@@ -109,7 +109,7 @@ const getSuggestionItems = (): CommandItem[] => [
   {
     title: "Divider",
     badge: "hr",
-    aliases: ["hr", "divider", "line", "rule", "ruler", "separator"],
+    aliases: ["hr", "divider", "line", "rule", "ruler", "separator", "cross", "crossline"],
     icon: <Minus size={13} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).setHorizontalRule().run();
@@ -172,7 +172,7 @@ const getSuggestionItems = (): CommandItem[] => [
   {
     title: "Strikethrough",
     badge: "strike",
-    aliases: ["strike", "strikethrough", "del"],
+    aliases: ["strike", "strikethrough", "del", "cross", "crossout"],
     icon: <Strikethrough size={13} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleStrike().run();

@@ -116,6 +116,7 @@ fn setup_macos_panel(app: &tauri::App) {
     panel.set_level(1000);
     panel.show_and_make_key();
 
+    #[cfg(debug_assertions)]
     unsafe {
         if let Some(ns_panel) = ns_window_ptr.as_ref() {
             let current_behavior: usize = msg_send![ns_panel, collectionBehavior];
@@ -129,17 +130,55 @@ fn setup_macos_panel(app: &tauri::App) {
     }
 }
 
+pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri_nspanel::ManagerExt;
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+
+        if let Ok(panel) = manager.get_webview_panel("main") {
+            panel.show_and_make_key();
+        }
+
+        if let Some(win) = manager.get_webview_window("main") {
+            if let Ok(ptr) = win.ns_window() {
+                unsafe {
+                    let app_class = objc2::class!(NSApplication);
+                    let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+                    let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
+
+                    if let Some(ns_panel) = (ptr as *mut AnyObject).as_ref() {
+                        let _: () = msg_send![ns_panel, orderFrontRegardless];
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(window) = manager.get_webview_window("main") {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init());
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_and_focus_main_panel(app);
+        }));
 
     #[cfg(target_os = "macos")]
     {
         builder = builder.plugin(tauri_nspanel::init());
     }
 
-    builder
+    let app = builder
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
@@ -152,7 +191,7 @@ pub fn run() {
                                 if panel.is_visible() {
                                     panel.hide();
                                 } else {
-                                    panel.show_and_make_key();
+                                    show_and_focus_main_panel(app);
                                 }
                             }
                         }
@@ -164,8 +203,7 @@ pub fn run() {
                                     if is_visible {
                                         let _ = window.hide();
                                     } else {
-                                        let _ = window.show();
-                                        let _ = window.set_focus();
+                                        show_and_focus_main_panel(app);
                                     }
                                 }
                             }
@@ -255,8 +293,18 @@ pub fn run() {
             start_native_drag,
             get_drag_diagnostics,
             hide_window,
-            save_window_size
+            save_window_size,
+            quit_app
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running NoteFast");
+        .build(tauri::generate_context!())
+        .expect("error while building NoteFast");
+
+    app.run(|app_handle, event| {
+        match event {
+            tauri::RunEvent::Reopen { .. } => {
+                show_and_focus_main_panel(app_handle);
+            }
+            _ => {}
+        }
+    });
 }

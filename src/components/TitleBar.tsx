@@ -1,4 +1,4 @@
-import { Command, Copy, Plus, Trash2, X } from "lucide-react";
+import { Command, Copy, Plus, Trash2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 
@@ -88,6 +88,8 @@ export function TitleBar({
     });
   };
 
+  const [isCloseHovered, setIsCloseHovered] = useState(false);
+
   return (
     <div
       ref={titleBarRef}
@@ -106,13 +108,34 @@ export function TitleBar({
       }}
     >
       {/* Left: Single enlarged red X button */}
-      <div className="title-bar-left">
+      <div
+        className="title-bar-left"
+        onMouseEnter={() => setIsCloseHovered(true)}
+        onMouseLeave={() => setIsCloseHovered(false)}
+      >
         <button
           onClick={handleClose}
-          className="close-btn-x"
+          onMouseEnter={() => setIsCloseHovered(true)}
+          onMouseLeave={() => setIsCloseHovered(false)}
+          className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
           title="Hide (⌘W)"
+          aria-label="Hide NoteFast"
         >
-          <X size={10} strokeWidth={2.8} className="close-x-icon" />
+          <svg
+            width="8"
+            height="8"
+            viewBox="0 0 8 8"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="close-x-icon"
+          >
+            <path
+              d="M1.2 1.2L6.8 6.8M6.8 1.2L1.2 6.8"
+              stroke="#000000"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       </div>
 

@@ -40,3 +40,11 @@ export async function togglePin(id: string): Promise<boolean> {
 export async function saveWindowSize(width: number, height: number): Promise<void> {
   return invoke("save_window_size", { width, height });
 }
+
+export async function hideWindow(): Promise<void> {
+  return invoke("hide_window");
+}
+
+export async function quitApp(): Promise<void> {
+  return invoke("quit_app");
+}

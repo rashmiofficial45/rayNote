@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Note } from "../lib/db";
+import { Note, hideWindow, quitApp } from "../lib/db";
 import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
@@ -21,6 +21,8 @@ import {
   ArrowUp,
   ArrowDown,
   Sparkles,
+  X,
+  Power,
 } from "lucide-react";
 
 interface CommandPaletteProps {
@@ -337,6 +339,28 @@ export function CommandPalette({
       action: () => {
         onClose();
         onShowShortcuts?.();
+      },
+    },
+    {
+      id: "hide-window",
+      label: "Hide Window (Run in Background)",
+      icon: <X size={14} />,
+      shortcut: ["⌘", "W"],
+      keywords: ["hide", "close", "minimize", "background", "dismiss"],
+      action: () => {
+        onClose();
+        hideWindow().catch(console.error);
+      },
+    },
+    {
+      id: "quit-app",
+      label: "Quit NoteFast Completely",
+      icon: <Power size={14} />,
+      shortcut: ["⌘", "Q"],
+      keywords: ["quit", "exit", "close app", "terminate", "kill"],
+      action: () => {
+        onClose();
+        quitApp().catch(console.error);
       },
     },
   ];

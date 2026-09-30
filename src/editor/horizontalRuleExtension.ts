@@ -178,7 +178,16 @@ export const HorizontalRuleExtension = Node.create({
         const { $from } = state.selection;
         const text = $from.parent.textContent.trim();
         // If current line content is exactly three dashes or similar dividers
-        if (text === "---" || text === "—-" || text === "——" || text === "***" || text === "___") {
+        if (
+          text === "---" ||
+          text === "—-" ||
+          text === "——" ||
+          text === "—" ||
+          text === "***" ||
+          text === "___" ||
+          text === "- - -" ||
+          text === "* * *"
+        ) {
           return insertHorizontalRuleSmart(state, editor.view.dispatch);
         }
         return false;
@@ -189,7 +198,7 @@ export const HorizontalRuleExtension = Node.create({
   addInputRules() {
     return [
       new InputRule({
-        find: /^(?:---|—-|___|\*\*\*)\s?$/,
+        find: /^(?:---|—-|——|—|___|\*\*\*|- - -|\* \* \*)\s?$/,
         handler: ({ state, range }) => {
           insertHorizontalRuleSmart(state, this.editor.view.dispatch, range);
         },

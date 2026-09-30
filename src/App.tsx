@@ -17,6 +17,8 @@ import {
   deleteNote,
   togglePin,
   saveWindowSize,
+  hideWindow,
+  quitApp,
   Note,
 } from "./lib/db";
 import {
@@ -384,6 +386,22 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmd = e.metaKey || e.ctrlKey;
 
+      // ⌘W: Hide NoteFast window (same as clicking the red close button)
+      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "w") {
+        e.preventDefault();
+        e.stopPropagation();
+        hideWindow().catch(console.error);
+        return;
+      }
+
+      // ⌘Q: Quit the whole app completely
+      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        e.stopPropagation();
+        quitApp().catch(console.error);
+        return;
+      }
+
       // ⌘K: Toggle Command Palette (actions)
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
@@ -548,8 +566,8 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     activeNoteId,
     handleNewNote,

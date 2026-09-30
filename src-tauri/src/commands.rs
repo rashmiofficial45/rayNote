@@ -62,13 +62,15 @@ pub fn start_native_drag(window: tauri::WebviewWindow) -> Result<(), String> {
             if let Some(ns_win) = ns_window_ptr.as_ref() {
                 let screen_loc: NSPoint = msg_send![objc2::class!(NSEvent), mouseLocation];
                 let window_loc: NSPoint = msg_send![ns_win, convertPointFromScreen: screen_loc];
-                let frame: NSRect = msg_send![ns_win, frame];
-                let scale: f64 = msg_send![ns_win, backingScaleFactor];
-
-                eprintln!(
-                    "=== DRAG DIAGNOSTICS: Screen=({:.1}, {:.1}), WindowLoc=({:.1}, {:.1}), Frame=({:.1}, {:.1}, {:.1}x{:.1}), Scale={:.1} ===",
-                    screen_loc.x, screen_loc.y, window_loc.x, window_loc.y, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, scale
-                );
+                #[cfg(debug_assertions)]
+                {
+                    let frame: NSRect = msg_send![ns_win, frame];
+                    let scale: f64 = msg_send![ns_win, backingScaleFactor];
+                    eprintln!(
+                        "=== DRAG DIAGNOSTICS: Screen=({:.1}, {:.1}), WindowLoc=({:.1}, {:.1}), Frame=({:.1}, {:.1}, {:.1}x{:.1}), Scale={:.1} ===",
+                        screen_loc.x, screen_loc.y, window_loc.x, window_loc.y, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, scale
+                    );
+                }
 
                 let app_class = objc2::class!(NSApplication);
                 let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
@@ -103,6 +105,7 @@ pub fn start_native_drag(window: tauri::WebviewWindow) -> Result<(), String> {
                 let _: () = msg_send![ns_win, performWindowDragWithEvent: drag_event];
 
                 let after_frame: NSRect = msg_send![ns_win, frame];
+                #[cfg(debug_assertions)]
                 eprintln!(
                     "=== AFTER DRAG: Frame=({:.1}, {:.1}, {:.1}x{:.1}) ===",
                     after_frame.origin.x, after_frame.origin.y, after_frame.size.width, after_frame.size.height
@@ -143,6 +146,11 @@ pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
         window.hide().map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 #[tauri::command]
