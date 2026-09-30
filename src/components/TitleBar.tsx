@@ -1,0 +1,179 @@
+import { Command, Copy, Plus, Trash2, X } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
+
+interface TitleBarProps {
+  title: string;
+  onNewNote: () => void;
+  onOpenCommandPalette: () => void;
+  onDuplicateNote: () => void;
+  onDeleteNote: () => void;
+}
+
+export function TitleBar({
+  title,
+  onNewNote,
+  onOpenCommandPalette,
+  onDuplicateNote,
+  onDeleteNote,
+}: TitleBarProps) {
+  const titleBarRef = useRef<HTMLDivElement>(null);
+  const [commandMenuOpen, setCommandMenuOpen] = useState(false);
+  const commandMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close command menu on outside click
+  useEffect(() => {
+    if (!commandMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (
+        commandMenuRef.current &&
+        !commandMenuRef.current.contains(e.target as Node)
+      ) {
+        setCommandMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [commandMenuOpen]);
+
+  // Native drag on mousedown (skip if clicking buttons or the command menu)
+  useEffect(() => {
+    const titleBar = titleBarRef.current;
+    if (!titleBar) return;
+
+    const handleMouseDown = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest("button") ||
+        target.closest(".command-popover")
+      ) {
+        return;
+      }
+
+      // Prevent WebKit from initiating text selection on click, double-click or drag
+      e.preventDefault();
+      window.getSelection()?.removeAllRanges();
+
+      if (e.button === 0) {
+        invoke("start_native_drag").catch((err) => {
+          console.error("start_native_drag error:", err);
+        });
+      }
+    };
+
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const handleDblClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.getSelection()?.removeAllRanges();
+    };
+
+    titleBar.addEventListener("mousedown", handleMouseDown);
+    titleBar.addEventListener("selectstart", handleSelectStart);
+    titleBar.addEventListener("dblclick", handleDblClick);
+    return () => {
+      titleBar.removeEventListener("mousedown", handleMouseDown);
+      titleBar.removeEventListener("selectstart", handleSelectStart);
+      titleBar.removeEventListener("dblclick", handleDblClick);
+    };
+  }, []);
+
+  // Hide the panel (Cmd+W behavior — stays alive in background)
+  const handleClose = () => {
+    invoke("hide_window").catch((err) => {
+      console.error("hide_window error:", err);
+    });
+  };
+
+  return (
+    <div
+      ref={titleBarRef}
+      className="title-bar"
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (!target.closest("button") && !target.closest(".command-popover")) {
+          e.preventDefault();
+          window.getSelection()?.removeAllRanges();
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.getSelection()?.removeAllRanges();
+      }}
+    >
+      {/* Left: Single enlarged red X button */}
+      <div className="title-bar-left">
+        <button
+          onClick={handleClose}
+          className="close-btn-x"
+          title="Hide (⌘W)"
+        >
+          <X size={10} strokeWidth={2.8} className="close-x-icon" />
+        </button>
+      </div>
+
+      {/* Center: Note title */}
+      <div className="title-text">{title || "Untitled"}</div>
+
+      {/* Right: Delete + Command (Command opens popover) */}
+      <div className="title-bar-right">
+        <button
+          className="title-bar-btn liquid-btn delete-btn"
+          onClick={onDeleteNote}
+          title="Delete Note (⇧⌘⌫)"
+        >
+          <Trash2 size={13} />
+        </button>
+        <div style={{ position: "relative" }} ref={commandMenuRef}>
+          <button
+            className="title-bar-btn liquid-btn"
+            onClick={() => setCommandMenuOpen(!commandMenuOpen)}
+            title="Actions"
+          >
+            <Command size={14} />
+          </button>
+          {commandMenuOpen && (
+            <div className="command-popover">
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  onDuplicateNote();
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <Copy size={13} />
+                <span>Duplicate</span>
+              </button>
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  onNewNote();
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <Plus size={13} />
+                <span>New Note</span>
+              </button>
+              <div className="command-popover-divider" />
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  onOpenCommandPalette();
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <Command size={13} />
+                <span>Command Palette</span>
+                <kbd className="popover-kbd">⌘K</kbd>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
