@@ -23,6 +23,7 @@ import {
   Note,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
+import { broadcastSync, listenToSettingsSync } from "./lib/settingsSync";
 import {
   Check,
   Copy,
@@ -56,29 +57,37 @@ function App() {
     return 1.2; // 120% default
   });
 
+  const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
+    return localStorage.getItem("notefast_esc_loses_focus") === "true";
+  });
+
+  const [commandsConfig, setCommandsConfig] = useState<any[]>(() => {
+    const saved = localStorage.getItem("notefast_commands_config");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   useEffect(() => {
     localStorage.setItem("notefast_zoom_level", zoomLevel.toString());
   }, [zoomLevel]);
 
-  // Synchronize settings changes from Settings window
+  // Synchronize settings changes across the entire app immediately
   useEffect(() => {
-    const handleZoomEvent = (e: any) => {
-      if (typeof e.detail?.zoom === "number") {
-        setZoomLevel(e.detail.zoom);
-      }
-    };
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "notefast_zoom_level" && e.newValue) {
-        const val = parseFloat(e.newValue);
-        if (!isNaN(val)) setZoomLevel(val);
-      }
-    };
-    window.addEventListener("notefast_zoom_changed", handleZoomEvent);
-    window.addEventListener("storage", handleStorage);
-    return () => {
-      window.removeEventListener("notefast_zoom_changed", handleZoomEvent);
-      window.removeEventListener("storage", handleStorage);
-    };
+    return listenToSettingsSync({
+      onZoomChange: (val) => setZoomLevel(val),
+      onEscLosesFocusChange: (val) => setEscLosesFocus(val),
+      onCommandsConfigChange: (val) => setCommandsConfig(val),
+      onNotesCleared: () => {
+        setNotes([]);
+        setActiveNoteId(null);
+      },
+    });
   }, []);
 
   // Persist window dimensions across restarts
@@ -90,7 +99,7 @@ function App() {
         const width = window.innerWidth;
         const height = window.innerHeight;
         if (width >= 320 && height >= 400) {
-          saveWindowSize(width, height).catch(() => {});
+          saveWindowSize(width, height).catch(() => { });
         }
       }, 200);
     };
@@ -388,6 +397,7 @@ function App() {
     setZoomLevel((prev) => {
       const next = Math.min(Math.round((prev + 0.1) * 10) / 10, 2.0);
       showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomIn size={14} />);
+      broadcastSync({ type: "zoom", value: next });
       return next;
     });
   }, [showToast]);
@@ -396,6 +406,7 @@ function App() {
     setZoomLevel((prev) => {
       const next = Math.max(Math.round((prev - 0.1) * 10) / 10, 0.6);
       showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomOut size={14} />);
+      broadcastSync({ type: "zoom", value: next });
       return next;
     });
   }, [showToast]);
@@ -403,6 +414,7 @@ function App() {
   const handleResetZoom = useCallback(() => {
     setZoomLevel(1.2);
     showToast("Zoom: 120% (Default)", <RotateCcw size={14} />);
+    broadcastSync({ type: "zoom", value: 1.2 });
   }, [showToast]);
 
   // Master Keyboard Shortcuts listener
@@ -410,8 +422,15 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmd = e.metaKey || e.ctrlKey;
 
+      const isCmdEnabled = (id: string) => {
+        if (!commandsConfig || commandsConfig.length === 0) return true;
+        const found = commandsConfig.find((c: any) => c.id === id);
+        return found ? found.enabled !== false : true;
+      };
+
       // ⌘W: Hide NoteFast window (same as clicking the red close button)
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "w") {
+        if (!isCmdEnabled("hide")) return;
         e.preventDefault();
         e.stopPropagation();
         hideWindow().catch(console.error);
@@ -420,6 +439,7 @@ function App() {
 
       // ⌘Q: Quit the whole app completely
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "q") {
+        if (!isCmdEnabled("quit")) return;
         e.preventDefault();
         e.stopPropagation();
         quitApp().catch(console.error);
@@ -428,6 +448,7 @@ function App() {
 
       // ⌘K: Toggle Command Palette (actions)
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "k") {
+        if (!isCmdEnabled("search")) return;
         e.preventDefault();
         setPaletteInitialView("actions");
         setIsCommandPaletteOpen((prev) => !prev);
@@ -436,6 +457,7 @@ function App() {
 
       // ⌘P: Quick Open / Browse Notes
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "p") {
+        if (!isCmdEnabled("search")) return;
         e.preventDefault();
         setPaletteInitialView("browse");
         setIsCommandPaletteOpen(true);
@@ -444,6 +466,7 @@ function App() {
 
       // ⌘N: New Note
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "n") {
+        if (!isCmdEnabled("create")) return;
         e.preventDefault();
         handleNewNote();
         return;
@@ -451,6 +474,7 @@ function App() {
 
       // ⌘D: Duplicate Note
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "d") {
+        if (!isCmdEnabled("duplicate")) return;
         e.preventDefault();
         handleDuplicateNote();
         return;
@@ -458,6 +482,7 @@ function App() {
 
       // ⌘F: Find in Note
       if (isCmd && !e.shiftKey && e.key.toLowerCase() === "f") {
+        if (!isCmdEnabled("find")) return;
         e.preventDefault();
         setIsFindOpen(true);
         return;
@@ -495,6 +520,7 @@ function App() {
 
       // ⇧⌘⌫ (Cmd+Shift+Backspace): Delete current note
       if (isCmd && e.shiftKey && e.key === "Backspace") {
+        if (!isCmdEnabled("delete")) return;
         e.preventDefault();
         if (activeNoteId) {
           promptDeleteNote(activeNoteId);
@@ -504,6 +530,7 @@ function App() {
 
       // ⌘⌫ (Cmd+Backspace): Delete note only if not currently typing in text/inputs
       if (isCmd && !e.shiftKey && e.key === "Backspace") {
+        if (!isCmdEnabled("delete")) return;
         const active = document.activeElement;
         const isEditingText =
           active?.tagName === "INPUT" ||
@@ -575,12 +602,13 @@ function App() {
 
       // ⌘, : Open Settings
       if (isCmd && e.key === ",") {
+        if (!isCmdEnabled("settings")) return;
         e.preventDefault();
         openSettingsWindow().catch(console.error);
         return;
       }
 
-      // Escape: Close overlays in order of hierarchy
+      // Escape: Close overlays in order of hierarchy, or unfocus editor if escLosesFocus enabled
       if (e.key === "Escape") {
         if (isShortcutsModalOpen) {
           setIsShortcutsModalOpen(false);
@@ -594,6 +622,19 @@ function App() {
           setIsFindOpen(false);
           return;
         }
+        if (escLosesFocus) {
+          const active = document.activeElement as HTMLElement | null;
+          if (
+            active &&
+            (active.tagName === "INPUT" ||
+              active.tagName === "TEXTAREA" ||
+              active.isContentEditable ||
+              Boolean(active.closest(".tiptap")))
+          ) {
+            active.blur();
+            return;
+          }
+        }
       }
     };
 
@@ -601,6 +642,8 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [
     activeNoteId,
+    commandsConfig,
+    escLosesFocus,
     handleNewNote,
     handleDuplicateNote,
     handleDeleteNote,

@@ -112,18 +112,24 @@ pub fn start_native_drag(window: tauri::WebviewWindow) -> Result<(), String> {
                 );
 
                 use tauri::Manager;
-                if let Ok(app_dir) = window.app_handle().path().app_data_dir() {
-                    let state_file = app_dir.join("window_state.json");
-                    let json = serde_json::json!({
-                        "x": after_frame.origin.x,
-                        "y": after_frame.origin.y,
-                        "width": after_frame.size.width,
-                        "height": after_frame.size.height
-                    });
-                    let _ = std::fs::write(state_file, json.to_string());
+                if window.label() == "main" {
+                    if let Ok(app_dir) = window.app_handle().path().app_data_dir() {
+                        let state_file = app_dir.join("window_state.json");
+                        let json = serde_json::json!({
+                            "x": after_frame.origin.x,
+                            "y": after_frame.origin.y,
+                            "width": after_frame.size.width,
+                            "height": after_frame.size.height
+                        });
+                        let _ = std::fs::write(state_file, json.to_string());
+                    }
                 }
             }
         }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = window.start_dragging();
     }
     Ok(())
 }
@@ -266,6 +272,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
             let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
             if let Ok(ptr) = win.ns_window() {
                 if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                    let _: () = msg_send![ns_win, setMovableByWindowBackground: true];
                     let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
                 }
             }
@@ -282,9 +289,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .inner_size(580.0, 720.0)
     .min_inner_size(500.0, 520.0)
     .resizable(true)
-    .decorations(true)
-    .title_bar_style(tauri::TitleBarStyle::Overlay)
-    .hidden_title(true)
+    .decorations(false)
     .transparent(true)
     .shadow(true)
     .build()
@@ -302,11 +307,39 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
         if let Ok(ptr) = settings_window.ns_window() {
             if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                let _: () = msg_send![ns_win, setMovableByWindowBackground: true];
                 let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
             }
         }
     }
 
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_always_on_top(app: tauri::AppHandle, always_on_top: bool) -> Result<(), String> {
+    use tauri::Manager;
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        if let Some(win) = app.get_webview_window("main") {
+            if let Ok(ptr) = win.ns_window() {
+                unsafe {
+                    if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                        let level: isize = if always_on_top { 1000 } else { 0 };
+                        let _: () = msg_send![ns_win, setLevel: level];
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(win) = app.get_webview_window("main") {
+            let _ = win.set_always_on_top(always_on_top);
+        }
+    }
     Ok(())
 }
 

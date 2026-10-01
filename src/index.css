@@ -109,18 +109,19 @@
   --color-accent-text: #BE185D;
 }
 
-/* ── iOS 26 Liquid Glass Design System: Dark & Light Themes ─ */
+/* ── iOS 26 Liquid Glass Design System: Solid Opaque Themes (No Desktop Transparency) ─ */
 :root, .dark {
   color-scheme: dark;
-  --app-bg: #141417;
-  --app-bg-glass: rgba(20, 20, 24, 0.82);
-  --app-border: rgba(255, 255, 255, 0.12);
-  --app-inner-highlight: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.22);
+  --app-bg: #16161a;
+  --app-bg-glass: #16161a;
+  --liquid-card-bg: #16161a;
+  --app-border: rgba(255, 255, 255, 0.10);
+  --app-inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12);
 
-  --surface-glass: rgba(28, 28, 34, 0.65);
-  --surface-glass-elevated: rgba(32, 32, 38, 0.78);
-  --surface-glass-border: rgba(255, 255, 255, 0.12);
-  --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+  --surface-glass: #1d1d23;
+  --surface-glass-elevated: #24242c;
+  --surface-glass-border: rgba(255, 255, 255, 0.08);
+  --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.10);
   --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 
   --text-primary: #f4f4f5;
@@ -129,21 +130,21 @@
   --text-subtle: #71717a;
   --placeholder: #52525b;
 
-  --btn-liquid-bg: rgba(255, 255, 255, 0.08);
-  --btn-liquid-bg-hover: rgba(255, 255, 255, 0.15);
-  --btn-liquid-border: rgba(255, 255, 255, 0.13);
-  --btn-liquid-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22), 0 2px 8px rgba(0, 0, 0, 0.25);
+  --btn-liquid-bg: #272730;
+  --btn-liquid-bg-hover: #32323e;
+  --btn-liquid-border: rgba(255, 255, 255, 0.10);
+  --btn-liquid-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(0, 0, 0, 0.25);
 
-  --separator: rgba(255, 255, 255, 0.09);
-  --code-inline-bg: rgba(255, 255, 255, 0.08);
-  --code-block-bg: #121215;
-  --code-block-border: rgba(255, 255, 255, 0.10);
-  --table-header-bg: rgba(36, 36, 42, 0.75);
+  --separator: rgba(255, 255, 255, 0.08);
+  --code-inline-bg: #212128;
+  --code-block-bg: #111114;
+  --code-block-border: rgba(255, 255, 255, 0.08);
+  --table-header-bg: #22222a;
   --table-cell-border: rgba(255, 255, 255, 0.08);
   --table-zebra-bg: rgba(255, 255, 255, 0.02);
-  --modal-bg: rgba(24, 24, 28, 0.88);
-  --modal-border: rgba(255, 255, 255, 0.14);
-  --modal-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22), 0 24px 60px rgba(0, 0, 0, 0.7);
+  --modal-bg: #1c1c22;
+  --modal-border: rgba(255, 255, 255, 0.12);
+  --modal-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
   --overlay-dim: rgba(0, 0, 0, 0.65);
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
@@ -151,16 +152,17 @@
 
 .light {
   color-scheme: light;
-  --app-bg: #f8f8fb;
-  --app-bg-glass: rgba(248, 248, 251, 0.88);
-  --app-border: rgba(0, 0, 0, 0.09);
-  --app-inner-highlight: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
+  --app-bg: #f5f5f7;
+  --app-bg-glass: #f5f5f7;
+  --liquid-card-bg: #f5f5f7;
+  --app-border: rgba(0, 0, 0, 0.10);
+  --app-inner-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
 
-  --surface-glass: rgba(255, 255, 255, 0.76);
-  --surface-glass-elevated: rgba(255, 255, 255, 0.92);
+  --surface-glass: #eaebee;
+  --surface-glass-elevated: #ffffff;
   --surface-glass-border: rgba(0, 0, 0, 0.08);
-  --surface-glass-inner: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95);
-  --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.09);
+  --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 
   --text-primary: #111113;
   --text-secondary: #27272a;
@@ -168,22 +170,22 @@
   --text-subtle: #94a3b8;
   --placeholder: #94a3b8;
 
-  --btn-liquid-bg: rgba(255, 255, 255, 0.82);
-  --btn-liquid-bg-hover: rgba(255, 255, 255, 1);
-  --btn-liquid-border: rgba(0, 0, 0, 0.09);
-  --btn-liquid-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --btn-liquid-bg: #ffffff;
+  --btn-liquid-bg-hover: #f1f2f5;
+  --btn-liquid-border: rgba(0, 0, 0, 0.10);
+  --btn-liquid-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 1px 3px rgba(0, 0, 0, 0.06);
 
   --separator: rgba(0, 0, 0, 0.08);
-  --code-inline-bg: rgba(0, 0, 0, 0.06);
-  --code-block-bg: #f1f1f5;
+  --code-inline-bg: #ebebf0;
+  --code-block-bg: #ffffff;
   --code-block-border: rgba(0, 0, 0, 0.08);
-  --table-header-bg: rgba(238, 238, 244, 0.85);
+  --table-header-bg: #eaebee;
   --table-cell-border: rgba(0, 0, 0, 0.08);
   --table-zebra-bg: rgba(0, 0, 0, 0.02);
-  --modal-bg: rgba(255, 255, 255, 0.94);
-  --modal-border: rgba(0, 0, 0, 0.1);
-  --modal-shadow: inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.95), 0 24px 60px rgba(0, 0, 0, 0.16);
-  --overlay-dim: rgba(0, 0, 0, 0.3);
+  --modal-bg: #ffffff;
+  --modal-border: rgba(0, 0, 0, 0.12);
+  --modal-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
+  --overlay-dim: rgba(0, 0, 0, 0.35);
   --scrollbar-thumb: rgba(0, 0, 0, 0.2);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 }
@@ -279,15 +281,13 @@ html, body, #root {
   width: 100vw;
   display: flex;
   flex-direction: column;
-  background: var(--app-bg-glass);
-  backdrop-filter: blur(36px) saturate(200%);
-  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  background: var(--app-bg);
   border-radius: 28px;
   border: 1.5px solid var(--app-border);
   overflow: hidden;
   position: relative;
   contain: layout size;
-  box-shadow: var(--app-inner-highlight);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
   color: var(--text-primary);
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
@@ -1987,9 +1987,7 @@ html[data-smooth-caret="false"] .tiptap {
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--liquid-card-bg);
-  backdrop-filter: blur(48px) saturate(210%);
-  -webkit-backdrop-filter: blur(48px) saturate(210%);
+  background: var(--app-bg);
   color: var(--text-primary);
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
@@ -1998,24 +1996,41 @@ html[data-smooth-caret="false"] .tiptap {
   box-shadow: inset 0 1px 1px 0 var(--app-inner-highlight);
 }
 
-/* Header bar with traffic lights integration */
+/* Header bar with custom red close button and draggable top bar */
 .settings-header-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px 10px 80px; /* 80px left padding reserves space for native macOS traffic lights */
+  padding: 10px 16px;
+  height: 48px;
   border-bottom: 1px solid var(--separator);
   background: var(--surface-glass);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   flex-shrink: 0;
-  gap: 12px;
+  -webkit-app-region: drag;
+  user-select: none;
+  position: relative;
+}
+
+.settings-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  -webkit-app-region: drag;
+  min-width: 90px;
+}
+
+.settings-header-left .title-bar-left {
+  position: static;
+  display: flex;
+  align-items: center;
+  margin-right: 4px;
 }
 
 .settings-nav-controls {
   display: flex;
   align-items: center;
   gap: 4px;
+  -webkit-app-region: drag;
 }
 
 .settings-nav-btn {
@@ -2030,6 +2045,7 @@ html[data-smooth-caret="false"] .tiptap {
   color: var(--text-primary);
   cursor: pointer;
   transition: all 0.12s ease;
+  -webkit-app-region: no-drag;
 }
 
 .settings-nav-btn:hover:not(:disabled) {
@@ -2050,6 +2066,7 @@ html[data-smooth-caret="false"] .tiptap {
   padding: 3px;
   border-radius: 10px;
   border: 1px solid var(--border-primary);
+  -webkit-app-region: no-drag;
 }
 
 .settings-tab-pill {
@@ -2065,6 +2082,7 @@ html[data-smooth-caret="false"] .tiptap {
   border: none;
   cursor: pointer;
   transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  -webkit-app-region: no-drag;
 }
 
 .settings-tab-pill:hover:not(.is-active) {
@@ -2078,29 +2096,11 @@ html[data-smooth-caret="false"] .tiptap {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0.5px 0 var(--app-inner-highlight);
 }
 
-.settings-header-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.settings-close-btn {
-  width: 26px;
+.settings-header-right-spacer {
+  min-width: 90px;
   height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.12s ease;
-}
-
-.settings-close-btn:hover {
-  background: var(--btn-liquid-bg-hover);
-  color: var(--text-primary);
+  pointer-events: none;
+  -webkit-app-region: drag;
 }
 
 /* Settings Body & Scrollable Content */
@@ -2120,6 +2120,8 @@ html[data-smooth-caret="false"] .tiptap {
   align-items: center;
   text-align: center;
   margin-bottom: 24px;
+  -webkit-app-region: drag;
+  user-select: none;
 }
 
 .settings-hero-icon-wrapper {

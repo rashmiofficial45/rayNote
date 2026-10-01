@@ -71,3 +71,8 @@ export async function getStorageStats(): Promise<StorageStats> {
   return invoke<StorageStats>("get_storage_stats");
 }
 
+export async function setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
+  return invoke("set_always_on_top", { alwaysOnTop });
+}
+
+

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,7 +17,6 @@ import {
   Moon,
   Sun,
   Monitor,
-  X,
   Sparkles,
 } from "lucide-react";
 import {
@@ -39,7 +39,9 @@ import {
   StorageStats,
   getAllNotes,
   deleteNote,
+  setAlwaysOnTop as setAlwaysOnTopNative,
 } from "./lib/db";
+import { broadcastSync, listenToSettingsSync } from "./lib/settingsSync";
 import { downloadFile, noteContentToMarkdown } from "./lib/utils";
 
 type SettingsPane = "general" | "commands" | "storage" | "about";
@@ -125,10 +127,72 @@ export default function SettingsApp() {
   const [clearAgreed, setClearAgreed] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Initialize theme on mount
+  // Header drag ref & single red close button hover state
+  const headerRef = useRef<HTMLElement>(null);
+  const [isCloseHovered, setIsCloseHovered] = useState(false);
+
+  // Initialize theme, storage stats, and real-time sync listeners on mount
   useEffect(() => {
     initTheme();
     loadStorageStats();
+
+    return listenToSettingsSync({
+      onThemeModeChange: setThemeMode,
+      onAccentChange: setAccent,
+      onFontChange: setFontFamily,
+      onZoomChange: setZoomLevel,
+      onEscLosesFocusChange: setEscLosesFocus,
+      onAlwaysOnTopChange: setAlwaysOnTop,
+      onCommandsConfigChange: setCommands,
+    });
+  }, []);
+
+  // Native window drag on mousedown for top header bar (identical to Note window)
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+
+    const handleMouseDown = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.closest("button") ||
+        target.closest("input") ||
+        target.closest("select") ||
+        target.closest("textarea") ||
+        target.closest("label") ||
+        target.closest(".settings-tab-pill")
+      ) {
+        return;
+      }
+
+      e.preventDefault();
+      window.getSelection()?.removeAllRanges();
+
+      if (e.button === 0) {
+        invoke("start_native_drag").catch((err) => {
+          console.error("start_native_drag error:", err);
+        });
+      }
+    };
+
+    const handleSelectStart = (e: Event) => {
+      e.preventDefault();
+    };
+
+    const handleDblClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      window.getSelection()?.removeAllRanges();
+    };
+
+    header.addEventListener("mousedown", handleMouseDown);
+    header.addEventListener("selectstart", handleSelectStart);
+    header.addEventListener("dblclick", handleDblClick);
+    return () => {
+      header.removeEventListener("mousedown", handleMouseDown);
+      header.removeEventListener("selectstart", handleSelectStart);
+      header.removeEventListener("dblclick", handleDblClick);
+    };
   }, []);
 
   const loadStorageStats = async () => {
@@ -215,20 +279,16 @@ export default function SettingsApp() {
   const handleThemeModeChange = (mode: ThemeMode) => {
     setThemeMode(mode);
     setStoredThemeMode(mode);
-    // Notify other webviews
-    window.dispatchEvent(new CustomEvent("notefast_theme_mode_changed", { detail: { mode } }));
   };
 
   const handleAccentChange = (acc: AccentColor) => {
     setAccent(acc);
     setStoredAccent(acc);
-    window.dispatchEvent(new CustomEvent("notefast_accent_changed", { detail: { accent: acc } }));
   };
 
   const handleFontChange = (font: string) => {
     setFontFamily(font);
     setStoredFont(font);
-    window.dispatchEvent(new CustomEvent("notefast_font_changed", { detail: { font } }));
   };
 
   // Zoom handlers
@@ -236,6 +296,7 @@ export default function SettingsApp() {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(level * 10) / 10));
     setZoomLevel(clamped);
     localStorage.setItem("notefast_zoom_level", clamped.toString());
+    broadcastSync({ type: "zoom", value: clamped });
     window.dispatchEvent(new CustomEvent("notefast_zoom_changed", { detail: { zoom: clamped } }));
   };
 
@@ -250,12 +311,15 @@ export default function SettingsApp() {
     const val = !escLosesFocus;
     setEscLosesFocus(val);
     localStorage.setItem("notefast_esc_loses_focus", val ? "true" : "false");
+    broadcastSync({ type: "esc_loses_focus", value: val });
   };
 
   const handleToggleAlwaysOnTop = () => {
     const val = !alwaysOnTop;
     setAlwaysOnTop(val);
     localStorage.setItem("notefast_always_on_top", val ? "true" : "false");
+    setAlwaysOnTopNative(val).catch(console.error);
+    broadcastSync({ type: "always_on_top", value: val });
   };
 
   // Toggle command row enabled
@@ -263,6 +327,7 @@ export default function SettingsApp() {
     setCommands((prev) => {
       const next = prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c));
       localStorage.setItem("notefast_commands_config", JSON.stringify(next));
+      broadcastSync({ type: "commands_config", value: next });
       return next;
     });
   };
@@ -303,6 +368,7 @@ export default function SettingsApp() {
       loadStorageStats();
       setActionMessage("All notes cleared.");
       setTimeout(() => setActionMessage(null), 3000);
+      broadcastSync({ type: "notes_cleared" });
     } catch (err) {
       console.error(err);
       setActionMessage("Failed to clear notes.");
@@ -310,28 +376,92 @@ export default function SettingsApp() {
   };
 
   return (
-    <div className="settings-window-root">
+    <div
+      className="settings-window-root"
+      onMouseDown={(e) => {
+        const target = e.target as HTMLElement;
+        if (
+          !target.closest("button") &&
+          !target.closest("input") &&
+          !target.closest("select") &&
+          !target.closest("textarea") &&
+          !target.closest(".settings-tab-pill")
+        ) {
+          e.preventDefault();
+          window.getSelection()?.removeAllRanges();
+          if (e.button === 0) {
+            invoke("start_native_drag").catch(console.error);
+          }
+        }
+      }}
+    >
       {/* Top Header Bar with Navigation and Tabs (macOS Draggable) */}
-      <header className="settings-header-bar" data-tauri-drag-region>
-        <div className="settings-nav-controls" data-tauri-drag-region>
-          <button
-            type="button"
-            className="settings-nav-btn"
-            disabled={historyIndex <= 0}
-            onClick={handleBack}
-            title="Back (⌘[)"
+      <header
+        ref={headerRef}
+        className="settings-header-bar"
+        data-tauri-drag-region
+        onMouseDown={(e) => {
+          const target = e.target as HTMLElement;
+          if (!target.closest("button") && !target.closest(".settings-tab-pill")) {
+            e.preventDefault();
+            window.getSelection()?.removeAllRanges();
+          }
+        }}
+      >
+        {/* Left: Single red (⌘W) button totally similar to the note tab, plus navigation */}
+        <div className="settings-header-left" data-tauri-drag-region>
+          <div
+            className="title-bar-left"
+            onMouseEnter={() => setIsCloseHovered(true)}
+            onMouseLeave={() => setIsCloseHovered(false)}
           >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            type="button"
-            className="settings-nav-btn"
-            disabled={historyIndex >= paneHistory.length - 1}
-            onClick={handleForward}
-            title="Forward (⌘])"
-          >
-            <ChevronRight size={14} />
-          </button>
+            <button
+              type="button"
+              onClick={closeSettingsWindow}
+              onMouseEnter={() => setIsCloseHovered(true)}
+              onMouseLeave={() => setIsCloseHovered(false)}
+              className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
+              title="Close Settings (⌘W)"
+              aria-label="Close Settings"
+            >
+              <svg
+                width="8"
+                height="8"
+                viewBox="0 0 8 8"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="close-x-icon"
+              >
+                <path
+                  d="M1.2 1.2L6.8 6.8M6.8 1.2L1.2 6.8"
+                  stroke="#000000"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <div className="settings-nav-controls" data-tauri-drag-region>
+            <button
+              type="button"
+              className="settings-nav-btn"
+              disabled={historyIndex <= 0}
+              onClick={handleBack}
+              title="Back (⌘[)"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              type="button"
+              className="settings-nav-btn"
+              disabled={historyIndex >= paneHistory.length - 1}
+              onClick={handleForward}
+              title="Forward (⌘])"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
 
         {/* Tab Pills */}
@@ -370,22 +500,14 @@ export default function SettingsApp() {
           </button>
         </div>
 
-        <div className="settings-header-right" data-tauri-drag-region>
-          <button
-            type="button"
-            className="settings-close-btn"
-            onClick={closeSettingsWindow}
-            title="Close Settings (⌘W)"
-          >
-            <X size={13} />
-          </button>
-        </div>
+        {/* Right spacer for symmetrical centering */}
+        <div className="settings-header-right-spacer" data-tauri-drag-region />
       </header>
 
       {/* Main Settings Body */}
       <main className="settings-body-content">
         {/* App Hero Branding (Raycast Style) */}
-        <div className="settings-hero">
+        <div className="settings-hero" data-tauri-drag-region>
           <div className="settings-hero-icon-wrapper">
             <div className="settings-hero-icon">
               <span className="settings-hero-icon-letter">T</span>

@@ -298,7 +298,8 @@ pub fn run() {
             open_settings_window,
             close_settings_window,
             open_app_data_folder,
-            get_storage_stats
+            get_storage_stats,
+            set_always_on_top
         ])
         .build(tauri::generate_context!())
         .expect("error while building NoteFast");

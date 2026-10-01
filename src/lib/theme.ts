@@ -52,6 +52,8 @@ export function getStoredThemeMode(): ThemeMode {
   return "dark";
 }
 
+import { broadcastSync } from "./settingsSync";
+
 export function applyThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -68,6 +70,7 @@ export function setStoredThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
   localStorage.setItem("notefast_theme_mode", mode);
   applyThemeMode(mode);
+  broadcastSync({ type: "theme_mode", value: mode });
   window.dispatchEvent(new CustomEvent("notefast_theme_changed", { detail: { mode } }));
 }
 
@@ -80,10 +83,16 @@ export function getStoredAccent(): AccentColor {
   return "violet";
 }
 
+export function applyAccent(accent: AccentColor): void {
+  if (typeof window === "undefined") return;
+  document.documentElement.dataset.accent = accent;
+}
+
 export function setStoredAccent(accent: AccentColor): void {
   if (typeof window === "undefined") return;
   localStorage.setItem("notefast_accent_color", accent);
-  document.documentElement.dataset.accent = accent;
+  applyAccent(accent);
+  broadcastSync({ type: "accent", value: accent });
   window.dispatchEvent(new CustomEvent("notefast_accent_changed", { detail: { accent } }));
 }
 
@@ -96,11 +105,19 @@ export function getStoredFont(): string {
   return "inter";
 }
 
+export function applyFont(fontId: string): void {
+  if (typeof window === "undefined") return;
+  const font = FONT_OPTIONS.find((f) => f.id === fontId) || FONT_OPTIONS[0];
+  document.documentElement.style.setProperty("--editor-font", font.family);
+  document.documentElement.dataset.font = font.id;
+}
+
 export function setStoredFont(fontId: string): void {
   if (typeof window === "undefined") return;
   const font = FONT_OPTIONS.find((f) => f.id === fontId) || FONT_OPTIONS[0];
   localStorage.setItem("notefast_font", font.id);
-  document.documentElement.style.setProperty("--editor-font", font.family);
+  applyFont(font.id);
+  broadcastSync({ type: "font", value: font.id });
   window.dispatchEvent(new CustomEvent("notefast_font_changed", { detail: { fontId: font.id } }));
 }
 
@@ -108,8 +125,8 @@ export function initTheme(): void {
   if (typeof window === "undefined") return;
 
   applyThemeMode(getStoredThemeMode());
-  setStoredAccent(getStoredAccent());
-  setStoredFont(getStoredFont());
+  applyAccent(getStoredAccent());
+  applyFont(getStoredFont());
 
   try {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -118,5 +135,5 @@ export function initTheme(): void {
         applyThemeMode("system");
       }
     });
-  } catch {}
+  } catch { }
 }
