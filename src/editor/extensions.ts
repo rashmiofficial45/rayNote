@@ -13,6 +13,13 @@ import { SearchExtension } from "./searchExtension";
 import { ShortcutsExtension } from "./shortcutsExtension";
 
 import { HorizontalRuleExtension } from "./horizontalRuleExtension";
+import { Markdown } from "@tiptap/markdown";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { Youtube } from "@tiptap/extension-youtube";
+import { IframeExtension } from "./iframeExtension";
 
 const lowlight = createLowlight(common);
 
@@ -67,10 +74,41 @@ export function getExtensions(slashCommandExtension?: any) {
       lowlight,
     }),
     Link.configure({
-      openOnClick: true,
+      openOnClick: false,
       autolink: true,
+      linkOnPaste: true,
       defaultProtocol: 'https',
+      HTMLAttributes: {
+        class: 'editor-link',
+        title: 'Click to open link in browser',
+      },
     }),
+    Markdown.configure({
+      indentation: {
+        style: 'space',
+        size: 2,
+      },
+    }),
+    Table.configure({
+      resizable: true,
+      HTMLAttributes: {
+        class: 'notefast-table',
+      },
+    }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    Youtube.configure({
+      inline: false,
+      allowFullscreen: true,
+      nocookie: true,
+      HTMLAttributes: {
+        class: 'notefast-youtube-iframe',
+        referrerpolicy: 'strict-origin-when-cross-origin',
+        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+      },
+    }),
+    IframeExtension,
   ];
 
   if (slashCommandExtension) {

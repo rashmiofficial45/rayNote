@@ -14,8 +14,21 @@ import {
   Strikethrough,
   Highlighter as HighlightIcon,
   Minus,
+  Table as TableIcon,
+  Video,
   ALargeSmall,
+  Type,
+  ChevronDown,
 } from "lucide-react";
+import {
+  ACCENT_OPTIONS,
+  FONT_OPTIONS,
+  AccentColor,
+  getStoredAccent,
+  setStoredAccent,
+  getStoredFont,
+  setStoredFont,
+} from "../lib/theme";
 
 interface BottomToolbarProps {
   editor: Editor | null;
@@ -24,19 +37,53 @@ interface BottomToolbarProps {
 export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
+  const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
+  const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
   useEffect(() => {
-    if (!isMenuOpen) return;
+    const handleAccent = (e: any) => {
+      if (e.detail?.accent) setCurrentAccent(e.detail.accent);
+    };
+    const handleFont = (e: any) => {
+      if (e.detail?.fontId) setCurrentFont(e.detail.fontId);
+    };
+    window.addEventListener("notefast_accent_changed", handleAccent);
+    window.addEventListener("notefast_font_changed", handleFont);
+    return () => {
+      window.removeEventListener("notefast_accent_changed", handleAccent);
+      window.removeEventListener("notefast_font_changed", handleFont);
+    };
+  }, []);
+
+  const handleAccentChange = (accent: AccentColor) => {
+    setStoredAccent(accent);
+    setCurrentAccent(accent);
+  };
+
+  const handleFontChange = (fontId: string) => {
+    setStoredFont(fontId);
+    setCurrentFont(fontId);
+    setIsFontPickerOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      setIsFontPickerOpen(false);
+      return;
+    }
 
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsMenuOpen(false);
+        setIsFontPickerOpen(false);
       }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsMenuOpen(false);
+        setIsFontPickerOpen(false);
       }
     };
 
@@ -176,7 +223,82 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             >
               <Minus size={14} />
             </button>
+            <button
+              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+              className="toolbar-btn liquid-btn"
+              title="Insert Table (3x3)"
+            >
+              <TableIcon size={14} />
+            </button>
+            <button
+              onClick={() => {
+                const input = window.prompt("Enter YouTube URL or <iframe> embed code:");
+                if (!input || !input.trim()) return;
+                const trimmed = input.trim();
+                const iframeSrcMatch = trimmed.match(/src=["']([^"']+)["']/i);
+                if (trimmed.startsWith("<iframe") && iframeSrcMatch) {
+                  (editor.chain().focus() as any).setIframe({ src: iframeSrcMatch[1] }).run();
+                } else if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
+                  (editor.chain().focus() as any).setYoutubeVideo({ src: trimmed }).run();
+                } else {
+                  (editor.chain().focus() as any).setIframe({ src: trimmed }).run();
+                }
+              }}
+              className="toolbar-btn liquid-btn"
+              title="Embed Video / Iframe"
+            >
+              <Video size={14} />
+            </button>
           </div>
+
+          <div className="expanded-toolbar-divider" />
+
+          {/* Row 3: Accent Shade (Violet vs Raycast Red) & Font Picker */}
+          <div className="toolbar-theme-row">
+            <div className="toolbar-accent-group" title="Accent Shade: Violet vs Raycast Red">
+              {ACCENT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => handleAccentChange(opt.id)}
+                  className={`accent-color-btn ${currentAccent === opt.id ? "is-selected" : ""}`}
+                  title={`Accent Shade: ${opt.name}`}
+                  aria-label={`Accent: ${opt.name}`}
+                >
+                  <span
+                    className="accent-color-btn-dot"
+                    style={{ backgroundColor: opt.color }}
+                  />
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setIsFontPickerOpen((prev) => !prev)}
+              className="toolbar-font-btn"
+              title="Change Editor Font"
+            >
+              <Type size={12} />
+              <span>{FONT_OPTIONS.find((f) => f.id === currentFont)?.name || "Font"}</span>
+              <ChevronDown size={11} style={{ opacity: 0.6 }} />
+            </button>
+          </div>
+
+          {/* Collapsible 6-Font Grid */}
+          {isFontPickerOpen && (
+            <div className="toolbar-font-dropdown">
+              {FONT_OPTIONS.map((font) => (
+                <button
+                  key={font.id}
+                  onClick={() => handleFontChange(font.id)}
+                  className={`toolbar-font-item ${currentFont === font.id ? "is-active" : ""}`}
+                  style={{ fontFamily: font.family }}
+                  title={font.name}
+                >
+                  {font.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

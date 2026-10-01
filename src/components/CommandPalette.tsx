@@ -23,7 +23,15 @@ import {
   Sparkles,
   X,
   Power,
+  Palette,
+  Type,
 } from "lucide-react";
+import {
+  ACCENT_OPTIONS,
+  FONT_OPTIONS,
+  setStoredAccent,
+  setStoredFont,
+} from "../lib/theme";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -363,6 +371,28 @@ export function CommandPalette({
         quitApp().catch(console.error);
       },
     },
+    ...ACCENT_OPTIONS.map((acc) => ({
+      id: `accent-${acc.id}`,
+      label: `Appearance Accent: ${acc.name}`,
+      icon: <Palette size={14} style={{ color: acc.color }} />,
+      keywords: ["accent", "theme", "color", "red", "violet", "purple", "raycast", acc.name.toLowerCase()],
+      action: () => {
+        setStoredAccent(acc.id);
+        onShowToast?.(`Accent color changed to ${acc.name}`);
+        onClose();
+      },
+    })),
+    ...FONT_OPTIONS.map((font) => ({
+      id: `font-${font.id}`,
+      label: `Font: ${font.name}`,
+      icon: <Type size={14} />,
+      keywords: ["font", "typography", "text", "typeface", font.name.toLowerCase()],
+      action: () => {
+        setStoredFont(font.id);
+        onShowToast?.(`Font changed to ${font.name}`);
+        onClose();
+      },
+    })),
   ];
 
   const filteredActions = actions.filter((a) => {

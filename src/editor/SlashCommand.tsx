@@ -26,6 +26,8 @@ import {
   Underline as UnderlineIcon,
   Strikethrough,
   Highlighter,
+  Table as TableIcon,
+  Video,
 } from "lucide-react";
 
 export interface CommandItem {
@@ -185,6 +187,40 @@ const getSuggestionItems = (): CommandItem[] => [
     icon: <Highlighter size={13} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleHighlight().run();
+    },
+  },
+  {
+    title: "Table",
+    badge: "table",
+    aliases: ["table", "grid", "rows", "columns", "tabular"],
+    icon: <TableIcon size={13} />,
+    command: ({ editor, range }) => {
+      editor
+        .chain()
+        .focus()
+        .deleteRange(range)
+        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+        .run();
+    },
+  },
+  {
+    title: "Embed Video / Iframe",
+    badge: "embed",
+    aliases: ["embed", "youtube", "video", "iframe", "media"],
+    icon: <Video size={13} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      const input = window.prompt("Enter YouTube URL or <iframe> embed code:");
+      if (!input || !input.trim()) return;
+      const trimmed = input.trim();
+      const iframeSrcMatch = trimmed.match(/src=["']([^"']+)["']/i);
+      if (trimmed.startsWith("<iframe") && iframeSrcMatch) {
+        (editor.chain().focus() as any).setIframe({ src: iframeSrcMatch[1] }).run();
+      } else if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
+        (editor.chain().focus() as any).setYoutubeVideo({ src: trimmed }).run();
+      } else {
+        (editor.chain().focus() as any).setIframe({ src: trimmed }).run();
+      }
     },
   },
 ];

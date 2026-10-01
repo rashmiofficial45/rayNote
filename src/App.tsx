@@ -21,6 +21,7 @@ import {
   quitApp,
   Note,
 } from "./lib/db";
+import { initTheme } from "./lib/theme";
 import {
   Check,
   Copy,
@@ -98,8 +99,9 @@ function App() {
     }, 1900);
   }, []);
 
-  // Load notes on mount
+  // Load notes & initialize theme on mount
   useEffect(() => {
+    initTheme();
     loadNotes();
   }, []);
 

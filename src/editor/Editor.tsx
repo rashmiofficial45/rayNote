@@ -1,10 +1,16 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { getExtensions } from "./extensions";
 import { SlashCommand } from "./SlashCommand";
 import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
+import {
+  isMarkdownContent,
+  markdownToTipTapHtml,
+  sliceToMarkdown,
+} from "./markdownUtils";
 
 interface EditorProps {
   content: string;
@@ -36,6 +42,7 @@ export function Editor({
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingUpdateRef = useRef<{ content: string; title: string } | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<any>(null);
 
   const handleUpdate = useCallback(
     (json: any) => {
@@ -66,11 +73,81 @@ export function Editor({
           class: "tiptap",
           spellcheck: "true",
         },
+        clipboardTextSerializer: (slice) => {
+          return sliceToMarkdown(slice, editorRef.current);
+        },
+        handlePaste: (_view, event) => {
+          const clipboardData = event.clipboardData;
+          if (!clipboardData) return false;
+
+          // 1. Check if a Markdown or text file was pasted directly
+          const files = clipboardData.files;
+          if (files && files.length > 0) {
+            const file = files[0];
+            const isMdFile =
+              file.name.endsWith(".md") ||
+              file.name.endsWith(".markdown") ||
+              file.name.endsWith(".txt") ||
+              file.type.includes("markdown");
+
+            if (isMdFile) {
+              event.preventDefault();
+              file.text().then((mdText) => {
+                if (editorRef.current) {
+                  const html = markdownToTipTapHtml(mdText);
+                  editorRef.current.commands.insertContent(html);
+                }
+              });
+              return true;
+            }
+          }
+
+          // 2. Check if pasted plain text contains Markdown formatting
+          const plainText = clipboardData.getData("text/plain");
+          if (plainText && isMarkdownContent(plainText)) {
+            event.preventDefault();
+            const html = markdownToTipTapHtml(plainText);
+            if (editorRef.current) {
+              editorRef.current.commands.insertContent(html);
+            }
+            return true;
+          }
+
+          return false;
+        },
       },
       autofocus: "end",
     },
     [noteId]
   );
+
+  editorRef.current = editor;
+
+  // Intercept external links and open via native system browser
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleLinkClick = (e: MouseEvent) => {
+      const link = (e.target as HTMLElement).closest("a");
+      if (!link) return;
+
+      const href = link.getAttribute("href");
+      if (href && href !== "#") {
+        e.preventDefault();
+        e.stopPropagation();
+        openUrl(href).catch((err) => {
+          console.warn("Could not open URL via tauri opener, fallback to window.open", err);
+          window.open(href, "_blank");
+        });
+      }
+    };
+
+    container.addEventListener("click", handleLinkClick);
+    return () => {
+      container.removeEventListener("click", handleLinkClick);
+    };
+  }, []);
 
   // Flush pending update on unmount to prevent lost keystrokes and free memory
   useEffect(() => {
@@ -84,6 +161,20 @@ export function Editor({
       }
     };
   }, [onUpdate]);
+
+  const [charCount, setCharCount] = useState(0);
+
+  useEffect(() => {
+    if (!editor) return;
+    const updateCount = () => {
+      setCharCount(editor.getText().length);
+    };
+    updateCount();
+    editor.on("update", updateCount);
+    return () => {
+      editor.off("update", updateCount);
+    };
+  }, [editor]);
 
   if (!editor) return null;
 
@@ -106,6 +197,9 @@ export function Editor({
           />
           <EditorContent editor={editor} />
         </div>
+      </div>
+      <div className="editor-char-count">
+        {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
       </div>
       <BottomToolbar editor={editor} />
     </div>
