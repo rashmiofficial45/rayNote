@@ -101,14 +101,14 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
         {/* Header */}
         <div className="shortcuts-modal-header">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-[#6C5CE7]/20 border border-[#6C5CE7]/30 flex items-center justify-center text-[#B8A9FF]">
-              <Keyboard size={14} />
+            <div className="w-6 h-6 rounded-full bg-[var(--color-accent-muted)] border border-[var(--color-accent)] flex items-center justify-center text-[var(--color-accent)]">
+              <Keyboard size={13} />
             </div>
-            <h2 className="text-sm font-semibold text-white/90">Keyboard Shortcuts</h2>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Keyboard Shortcuts</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+            className="w-7 h-7 rounded-full flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--btn-liquid-bg-hover)] transition-colors"
             title="Close (Esc)"
           >
             <X size={15} />
@@ -117,14 +117,14 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
         {/* Filter input */}
         <div className="shortcuts-modal-search">
-          <Search size={14} className="text-white/30 flex-shrink-0" />
+          <Search size={14} className="text-[var(--text-muted)] flex-shrink-0" />
           <input
             type="text"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Search shortcuts…"
             autoFocus
-            className="bg-transparent border-none outline-none text-xs text-white/90 placeholder:text-white/30 w-full"
+            className="bg-transparent border-none outline-none text-xs text-[var(--text-primary)] placeholder:text-[var(--placeholder)] w-full"
           />
         </div>
 
@@ -155,7 +155,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
           })}
 
           {filteredShortcuts.length === 0 && (
-            <div className="text-center py-8 text-white/30 text-xs">
+            <div className="text-center py-8 text-[var(--text-muted)] text-xs">
               No shortcuts found matching "{filter}"
             </div>
           )}
@@ -163,7 +163,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
 
         {/* Footer tip */}
         <div className="shortcuts-modal-footer">
-          <span className="text-[11px] text-white/30">
+          <span className="text-[11px] text-[var(--text-muted)]">
             Tip: Press <kbd className="shortcut-key text-[10px] px-1 py-0.5">/</kbd> in the editor to open the block insertion menu
           </span>
         </div>

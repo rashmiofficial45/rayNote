@@ -25,12 +25,16 @@ import {
   Power,
   Palette,
   Type,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
   FONT_OPTIONS,
   setStoredAccent,
   setStoredFont,
+  setStoredThemeMode,
 } from "../lib/theme";
 
 interface CommandPaletteProps {
@@ -371,14 +375,47 @@ export function CommandPalette({
         quitApp().catch(console.error);
       },
     },
+    {
+      id: "theme-dark",
+      label: "Appearance: Dark Mode",
+      icon: <Moon size={14} />,
+      keywords: ["appearance", "theme", "dark", "night", "mode", "black", "obsidian"],
+      action: () => {
+        setStoredThemeMode("dark");
+        onShowToast?.("Appearance set to Dark Mode", <Moon size={14} />);
+        onClose();
+      },
+    },
+    {
+      id: "theme-light",
+      label: "Appearance: Light Mode",
+      icon: <Sun size={14} />,
+      keywords: ["appearance", "theme", "light", "day", "mode", "white", "bright"],
+      action: () => {
+        setStoredThemeMode("light");
+        onShowToast?.("Appearance set to Light Mode", <Sun size={14} />);
+        onClose();
+      },
+    },
+    {
+      id: "theme-system",
+      label: "Appearance: System Mode (Auto macOS)",
+      icon: <Monitor size={14} />,
+      keywords: ["appearance", "theme", "system", "auto", "mac", "os", "match"],
+      action: () => {
+        setStoredThemeMode("system");
+        onShowToast?.("Appearance set to System Mode", <Monitor size={14} />);
+        onClose();
+      },
+    },
     ...ACCENT_OPTIONS.map((acc) => ({
       id: `accent-${acc.id}`,
-      label: `Appearance Accent: ${acc.name}`,
+      label: `Theme: ${acc.name}`,
       icon: <Palette size={14} style={{ color: acc.color }} />,
-      keywords: ["accent", "theme", "color", "red", "violet", "purple", "raycast", acc.name.toLowerCase()],
+      keywords: ["theme", "accent", "color", "red", "violet", "emerald", "ocean", "amber", "rose", "pink", "blue", "green", acc.name.toLowerCase()],
       action: () => {
         setStoredAccent(acc.id);
-        onShowToast?.(`Accent color changed to ${acc.name}`);
+        onShowToast?.(`Theme changed to ${acc.name}`);
         onClose();
       },
     })),
@@ -496,7 +533,7 @@ export function CommandPalette({
       >
         {/* Search input with view toggle */}
         <div className="command-search">
-          <Search size={14} style={{ color: "rgba(255,255,255,0.35)", flexShrink: 0 }} />
+          <Search size={14} className="text-[var(--text-muted)] flex-shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -542,7 +579,7 @@ export function CommandPalette({
                     {item.label}
                   </span>
                   {item.badge && (
-                    <span className="text-[10px] px-1.5 py-0.5 ml-2 rounded bg-white/10 text-white/70 font-mono tracking-tight">
+                    <span className="text-[10px] px-2 py-0.5 ml-2 rounded-full bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-secondary)] font-mono tracking-tight">
                       {item.badge}
                     </span>
                   )}
@@ -573,7 +610,7 @@ export function CommandPalette({
                 {note.is_pinned && (
                   <Pin
                     size={10}
-                    style={{ color: "#6C5CE7", flexShrink: 0, fill: "currentColor" }}
+                    style={{ color: "var(--color-accent)", flexShrink: 0, fill: "currentColor" }}
                   />
                 )}
                 <span className="browse-note-title">
@@ -586,7 +623,7 @@ export function CommandPalette({
             ))}
 
           {currentItems.length === 0 && (
-            <div style={{ padding: "16px", textAlign: "center", color: "rgba(255,255,255,0.2)", fontSize: 13 }}>
+            <div style={{ padding: "16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
               {view === "actions" ? "No matching actions" : "No notes found"}
             </div>
           )}

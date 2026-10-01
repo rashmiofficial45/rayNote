@@ -20,13 +20,13 @@ export function NoteEditor({
   if (!note) {
     return (
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-white/[0.04] flex items-center justify-center">
-          <FileText size={22} className="text-white/15" />
+        <div className="w-12 h-12 rounded-2xl bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] flex items-center justify-center">
+          <FileText size={22} className="text-[var(--text-muted)]" />
         </div>
         <div className="text-center">
-          <p className="text-white/20 text-[13px]">No note selected</p>
-          <p className="text-white/10 text-[11px] mt-1">
-            Press <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-white/40 text-[10px]">⌘N</kbd> to create a new note
+          <p className="text-[var(--text-secondary)] text-[13px] font-medium">No note selected</p>
+          <p className="text-[var(--text-muted)] text-[11px] mt-1">
+            Press <kbd className="px-1.5 py-0.5 rounded-full bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-primary)] text-[10px]">⌘N</kbd> to create a new note
           </p>
         </div>
       </div>

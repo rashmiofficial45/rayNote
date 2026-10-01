@@ -30,17 +30,17 @@ export function NoteList({
   });
 
   return (
-    <div className="flex flex-col h-full bg-[rgba(22,22,22,0.98)]">
+    <div className="flex flex-col h-full bg-[var(--app-bg-glass)]">
       {/* Search */}
-      <div className="px-3 py-2.5 border-b border-white/[0.06]">
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.04] rounded-lg border border-white/[0.06] focus-within:border-[#6C5CE7]/40 transition-colors">
-          <Search size={13} className="text-white/25 flex-shrink-0" />
+      <div className="px-3 py-2.5 border-b border-[var(--separator)]">
+        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-[var(--btn-liquid-bg)] rounded-xl border border-[var(--btn-liquid-border)] focus-within:border-[var(--color-accent)] transition-colors">
+          <Search size={13} className="text-[var(--text-muted)] flex-shrink-0" />
           <input
             type="text"
             placeholder="Search notes…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-transparent border-none outline-none text-[13px] text-white/80 placeholder:text-white/20 w-full"
+            className="bg-transparent border-none outline-none text-[13px] text-[var(--text-primary)] placeholder:text-[var(--placeholder)] w-full"
           />
         </div>
       </div>
@@ -49,7 +49,7 @@ export function NoteList({
       <div className="flex-1 overflow-y-auto px-2 py-1.5">
         {filteredNotes.length === 0 && (
           <div className="text-center py-8">
-            <p className="text-white/20 text-xs">
+            <p className="text-[var(--text-muted)] text-xs">
               {search ? "No notes found" : "No notes yet"}
             </p>
           </div>
@@ -58,11 +58,11 @@ export function NoteList({
         {filteredNotes.map((note) => (
           <div
             key={note.id}
-            className={`group relative px-3 py-2.5 rounded-lg mb-0.5 cursor-pointer transition-all duration-100
+            className={`group relative px-3 py-2.5 rounded-xl mb-0.5 cursor-pointer transition-all duration-100
               ${
                 activeNoteId === note.id
-                  ? "bg-[#6C5CE7]/15 border border-[#6C5CE7]/20"
-                  : "border border-transparent hover:bg-white/[0.04]"
+                  ? "bg-[var(--color-accent-muted)] border border-[var(--color-accent)]"
+                  : "border border-transparent hover:bg-[var(--btn-liquid-bg-hover)]"
               }`}
             onClick={() => onSelectNote(note.id)}
             onMouseEnter={() => setHoveredId(note.id)}
@@ -74,17 +74,17 @@ export function NoteList({
                   {note.is_pinned && (
                     <Pin
                       size={10}
-                      className="text-[#6C5CE7] flex-shrink-0 fill-current"
+                      className="text-[var(--color-accent)] flex-shrink-0 fill-current"
                     />
                   )}
-                  <h3 className="text-[13px] font-medium text-white/80 truncate leading-tight">
+                  <h3 className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-tight">
                     {getNoteTitle(note.title, note.content)}
                   </h3>
                 </div>
-                <p className="text-[11px] text-white/25 mt-1 truncate leading-tight">
+                <p className="text-[11px] text-[var(--text-muted)] mt-1 truncate leading-tight">
                   {getPreviewText(note.content)}
                 </p>
-                <span className="text-[10px] text-white/15 mt-1 block">
+                <span className="text-[10px] text-[var(--text-subtle)] mt-1 block">
                   {formatDate(note.updated_at)}
                 </span>
               </div>
@@ -97,11 +97,11 @@ export function NoteList({
                       e.stopPropagation();
                       onTogglePin(note.id);
                     }}
-                    className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/[0.08] transition-colors
+                    className={`w-6 h-6 flex items-center justify-center rounded-full hover:bg-[var(--btn-liquid-bg)] transition-colors
                       ${
                         note.is_pinned
-                          ? "text-[#6C5CE7]"
-                          : "text-white/30 hover:text-white/60"
+                          ? "text-[var(--color-accent)]"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                       }`}
                     title={note.is_pinned ? "Unpin" : "Pin"}
                   >
@@ -112,7 +112,7 @@ export function NoteList({
                       e.stopPropagation();
                       onDeleteNote(note.id);
                     }}
-                    className="w-6 h-6 flex items-center justify-center rounded text-white/30 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="w-6 h-6 flex items-center justify-center rounded-full text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                     title="Delete"
                   >
                     <Trash2 size={11} />

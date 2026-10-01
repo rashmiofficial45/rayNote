@@ -19,15 +19,21 @@ import {
   ALargeSmall,
   Type,
   ChevronDown,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
   FONT_OPTIONS,
   AccentColor,
+  ThemeMode,
   getStoredAccent,
   setStoredAccent,
   getStoredFont,
   setStoredFont,
+  getStoredThemeMode,
+  setStoredThemeMode,
 } from "../lib/theme";
 
 interface BottomToolbarProps {
@@ -39,6 +45,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
+  const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -48,17 +55,27 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     const handleFont = (e: any) => {
       if (e.detail?.fontId) setCurrentFont(e.detail.fontId);
     };
+    const handleTheme = (e: any) => {
+      if (e.detail?.mode) setCurrentThemeMode(e.detail.mode);
+    };
     window.addEventListener("notefast_accent_changed", handleAccent);
     window.addEventListener("notefast_font_changed", handleFont);
+    window.addEventListener("notefast_theme_changed", handleTheme);
     return () => {
       window.removeEventListener("notefast_accent_changed", handleAccent);
       window.removeEventListener("notefast_font_changed", handleFont);
+      window.removeEventListener("notefast_theme_changed", handleTheme);
     };
   }, []);
 
   const handleAccentChange = (accent: AccentColor) => {
     setStoredAccent(accent);
     setCurrentAccent(accent);
+  };
+
+  const handleThemeModeChange = (mode: ThemeMode) => {
+    setStoredThemeMode(mode);
+    setCurrentThemeMode(mode);
   };
 
   const handleFontChange = (fontId: string) => {
@@ -253,9 +270,41 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
           <div className="expanded-toolbar-divider" />
 
-          {/* Row 3: Accent Shade (Violet vs Raycast Red) & Font Picker */}
+          {/* Row 3: Appearance Mode (Dark/Light/System) + Accent Shade + Font Picker */}
           <div className="toolbar-theme-row">
-            <div className="toolbar-accent-group" title="Accent Shade: Violet vs Raycast Red">
+            <div className="toolbar-theme-mode-group" title="Theme Mode: Dark, Light, or System">
+              <button
+                type="button"
+                onClick={() => handleThemeModeChange("dark")}
+                className={`theme-mode-btn ${currentThemeMode === "dark" ? "is-selected" : ""}`}
+                title="Dark Mode"
+                aria-label="Dark Mode"
+              >
+                <Moon size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleThemeModeChange("light")}
+                className={`theme-mode-btn ${currentThemeMode === "light" ? "is-selected" : ""}`}
+                title="Light Mode"
+                aria-label="Light Mode"
+              >
+                <Sun size={11} />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleThemeModeChange("system")}
+                className={`theme-mode-btn ${currentThemeMode === "system" ? "is-selected" : ""}`}
+                title="System (Auto macOS)"
+                aria-label="System Mode"
+              >
+                <Monitor size={11} />
+              </button>
+            </div>
+
+            <div className="toolbar-separator" />
+
+            <div className="toolbar-accent-group" title="Themes: 6 Liquid Glass Palettes">
               {ACCENT_OPTIONS.map((opt) => (
                 <button
                   key={opt.id}
@@ -271,6 +320,8 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
                 </button>
               ))}
             </div>
+
+            <div className="toolbar-separator" />
 
             <button
               onClick={() => setIsFontPickerOpen((prev) => !prev)}
