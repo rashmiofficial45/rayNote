@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Note, hideWindow, quitApp } from "../lib/db";
+import { Note, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
@@ -28,6 +28,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Settings,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
@@ -351,6 +352,18 @@ export function CommandPalette({
       action: () => {
         onClose();
         onShowShortcuts?.();
+      },
+    },
+    {
+      id: "settings",
+      label: "Settings / Preferences…",
+      badge: "macOS",
+      icon: <Settings size={14} />,
+      shortcut: ["⌘", ","],
+      keywords: ["settings", "preferences", "config", "appearance", "theme", "options"],
+      action: () => {
+        onClose();
+        openSettingsWindow().catch(console.error);
       },
     },
     {

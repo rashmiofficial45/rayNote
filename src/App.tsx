@@ -19,6 +19,7 @@ import {
   saveWindowSize,
   hideWindow,
   quitApp,
+  openSettingsWindow,
   Note,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
@@ -58,6 +59,27 @@ function App() {
   useEffect(() => {
     localStorage.setItem("notefast_zoom_level", zoomLevel.toString());
   }, [zoomLevel]);
+
+  // Synchronize settings changes from Settings window
+  useEffect(() => {
+    const handleZoomEvent = (e: any) => {
+      if (typeof e.detail?.zoom === "number") {
+        setZoomLevel(e.detail.zoom);
+      }
+    };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "notefast_zoom_level" && e.newValue) {
+        const val = parseFloat(e.newValue);
+        if (!isNaN(val)) setZoomLevel(val);
+      }
+    };
+    window.addEventListener("notefast_zoom_changed", handleZoomEvent);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("notefast_zoom_changed", handleZoomEvent);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
 
   // Persist window dimensions across restarts
   useEffect(() => {
@@ -548,6 +570,13 @@ function App() {
       if (isCmd && (e.key === "/" || e.key === "?")) {
         e.preventDefault();
         setIsShortcutsModalOpen((prev) => !prev);
+        return;
+      }
+
+      // ⌘, : Open Settings
+      if (isCmd && e.key === ",") {
+        e.preventDefault();
+        openSettingsWindow().catch(console.error);
         return;
       }
 

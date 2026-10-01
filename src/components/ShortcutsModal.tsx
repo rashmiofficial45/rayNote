@@ -23,6 +23,7 @@ const SHORTCUTS: ShortcutItem[] = [
   { keys: ["⌥", "↓"], description: "Next Note in List", category: "Navigation & App" },
   { keys: ["⌘", "["], description: "Go Back in History", category: "Navigation & App" },
   { keys: ["⌘", "]"], description: "Go Forward in History", category: "Navigation & App" },
+  { keys: ["⌘", ","], description: "Open Settings / Preferences", category: "Navigation & App" },
   { keys: ["⌘", "W"], description: "Hide Window (Run in Background)", category: "Navigation & App" },
   { keys: ["⌘", "Q"], description: "Quit NoteFast Completely", category: "Navigation & App" },
   { keys: ["⇧", "⌘", "⌫"], description: "Delete Current Note", category: "Navigation & App" },

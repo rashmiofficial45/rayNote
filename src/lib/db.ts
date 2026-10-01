@@ -48,3 +48,26 @@ export async function hideWindow(): Promise<void> {
 export async function quitApp(): Promise<void> {
   return invoke("quit_app");
 }
+
+export async function openSettingsWindow(): Promise<void> {
+  return invoke("open_settings_window");
+}
+
+export async function closeSettingsWindow(): Promise<void> {
+  return invoke("close_settings_window");
+}
+
+export async function openAppDataFolder(): Promise<void> {
+  return invoke("open_app_data_folder");
+}
+
+export interface StorageStats {
+  notes_count: number;
+  db_path: string;
+  size_bytes: number;
+}
+
+export async function getStorageStats(): Promise<StorageStats> {
+  return invoke<StorageStats>("get_storage_stats");
+}
+

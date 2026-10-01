@@ -1978,4 +1978,649 @@ html[data-smooth-caret="false"] .tiptap {
   border-radius: 12px;
 }
 
+/* ═════════════════════════════════════════════════════════════
+   RAYCAST NOTES STYLE SETTINGS WINDOW (NSWindow Architecture)
+═════════════════════════════════════════════════════════════ */
+.settings-window-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--liquid-card-bg);
+  backdrop-filter: blur(48px) saturate(210%);
+  -webkit-backdrop-filter: blur(48px) saturate(210%);
+  color: var(--text-primary);
+  user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Segoe UI", "Apple Color Emoji", sans-serif;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 1px 0 var(--app-inner-highlight);
+}
+
+/* Header bar with traffic lights integration */
+.settings-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px 80px; /* 80px left padding reserves space for native macOS traffic lights */
+  border-bottom: 1px solid var(--separator);
+  background: var(--surface-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.settings-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-nav-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-nav-btn:hover:not(:disabled) {
+  background: var(--btn-liquid-bg-hover);
+  transform: translateY(-0.5px);
+}
+
+.settings-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.settings-tab-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--input-bg);
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--border-primary);
+}
+
+.settings-tab-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.settings-tab-pill:hover:not(.is-active) {
+  color: var(--text-primary);
+  background: var(--btn-liquid-bg);
+}
+
+.settings-tab-pill.is-active {
+  background: var(--surface-glass-elevated);
+  color: var(--text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0.5px 0 var(--app-inner-highlight);
+}
+
+.settings-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-close-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-close-btn:hover {
+  background: var(--btn-liquid-bg-hover);
+  color: var(--text-primary);
+}
+
+/* Settings Body & Scrollable Content */
+.settings-body-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* App Hero Section (matching Raycast screenshot) */
+.settings-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.settings-hero-icon-wrapper {
+  margin-bottom: 12px;
+}
+
+.settings-hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 17px;
+  background: linear-gradient(145deg, #ff4d4d, #d62828);
+  box-shadow: 0 10px 24px rgba(220, 38, 38, 0.35), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.settings-hero-icon-letter {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  font-weight: 800;
+  font-size: 32px;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.settings-hero-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px 0;
+  color: var(--text-primary);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.settings-hero-subtitle {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings-action-banner {
+  padding: 8px 16px;
+  background: var(--surface-glass-elevated);
+  border: 1px solid var(--color-accent);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  color: var(--color-accent-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  animation: slideUp 0.15s ease-out;
+}
+
+/* Pane Container */
+.settings-pane-content {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Grouped Cards (macOS Raycast standard) */
+.settings-card {
+  background: var(--surface-glass-elevated);
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--surface-glass-inner), 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.settings-card-divider {
+  height: 1px;
+  background: var(--separator);
+  margin: 0 16px;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  gap: 16px;
+}
+
+.settings-row-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-row-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.settings-row-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.settings-row-action {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Segmented Theme Mode Control */
+.settings-segmented-group {
+  display: flex;
+  align-items: center;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  padding: 2.5px;
+  border-radius: 9999px;
+  gap: 2px;
+}
+
+.settings-seg-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-seg-btn:hover:not(.is-active) {
+  color: var(--text-primary);
+}
+
+.settings-seg-btn.is-active {
+  background: var(--color-accent);
+  color: #ffffff;
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+/* Accent Palette Grid in Settings */
+.settings-accent-palette-grid {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-accent-dot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  outline: none;
+  transition: transform 0.1s ease;
+}
+
+.settings-accent-dot-btn:hover {
+  transform: scale(1.15);
+}
+
+.settings-accent-dot {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  transition: all 0.1s ease;
+}
+
+.settings-accent-dot-btn.is-selected .settings-accent-dot {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+  transform: scale(1.12);
+}
+
+.settings-accent-name {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+.settings-accent-dot-btn.is-selected .settings-accent-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* Select Input */
+.settings-select-input {
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 9999px;
+  padding: 5px 12px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.settings-select-input:focus {
+  border-color: var(--color-accent);
+}
+
+/* iOS / macOS Toggle Switch */
+.settings-switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.settings-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 9999px;
+}
+
+.settings-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #ffffff;
+  transition: 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.settings-switch input:checked + .settings-slider {
+  background-color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.settings-switch input:checked + .settings-slider:before {
+  transform: translateX(16px);
+}
+
+/* Zoom Stepper (Raycast Style) */
+.settings-zoom-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 4px;
+}
+
+.settings-stepper-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.settings-stepper-btn:hover:not(:disabled) {
+  background: var(--btn-liquid-bg-hover);
+  color: var(--text-primary);
+}
+
+.settings-stepper-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.settings-zoom-display {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 44px;
+  text-align: center;
+}
+
+/* Section Header */
+.settings-section-header h2 {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Commands Table Card */
+.commands-table-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-command-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 16px;
+  gap: 12px;
+  transition: background 0.1s ease;
+}
+
+.settings-command-row:hover {
+  background: var(--btn-liquid-bg);
+}
+
+.settings-cmd-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-cmd-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(145deg, #ff5555, #d62828);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.settings-cmd-icon-symbol {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.settings-cmd-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-cmd-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.settings-cmd-alias {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-width: 60px;
+  text-align: right;
+  font-family: inherit;
+}
+
+.settings-cmd-alias.has-alias {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.settings-cmd-kbd {
+  font-family: inherit;
+  font-size: 11.5px;
+  padding: 2px 7px;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  min-width: 32px;
+  text-align: center;
+}
+
+.settings-cmd-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--btn-liquid-border);
+  background: var(--btn-liquid-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.1s ease;
+}
+
+.settings-cmd-checkbox.is-checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* Action & Stat buttons */
+.settings-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 9999px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-action-btn:hover {
+  background: var(--btn-liquid-bg-hover);
+  border-color: var(--color-accent);
+}
+
+.settings-stat-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent-text);
+  background: var(--color-accent-muted);
+  padding: 3px 9px;
+  border-radius: 9999px;
+}
+
+/* Danger Zone */
+.danger-card {
+  border-color: rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.danger-title {
+  color: #ef4444;
+}
+
+.settings-danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 9999px;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-danger-btn:hover:not(:disabled) {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.settings-danger-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.settings-danger-confirm-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-danger-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+
 

@@ -247,3 +247,112 @@ pub fn get_drag_diagnostics(window: tauri::WebviewWindow) -> Result<serde_json::
         Ok(serde_json::json!({}))
     }
 }
+
+#[tauri::command]
+pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+
+        #[cfg(target_os = "macos")]
+        unsafe {
+            use objc2::msg_send;
+            use objc2::runtime::AnyObject;
+            let app_class = objc2::class!(NSApplication);
+            let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+            let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
+            if let Ok(ptr) = win.ns_window() {
+                if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                    let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
+                }
+            }
+        }
+        return Ok(());
+    }
+
+    let settings_window = tauri::WebviewWindowBuilder::new(
+        &app,
+        "settings",
+        tauri::WebviewUrl::App("index.html?window=settings".into()),
+    )
+    .title("NoteFast Settings")
+    .inner_size(580.0, 720.0)
+    .min_inner_size(500.0, 520.0)
+    .resizable(true)
+    .decorations(true)
+    .title_bar_style(tauri::TitleBarStyle::Overlay)
+    .hidden_title(true)
+    .transparent(true)
+    .shadow(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    let _ = settings_window.show();
+    let _ = settings_window.set_focus();
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        let app_class = objc2::class!(NSApplication);
+        let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+        let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
+        if let Ok(ptr) = settings_window.ns_window() {
+            if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.destroy();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_app_data_folder(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let path_str = app_dir.to_string_lossy().to_string();
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_storage_stats(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+) -> Result<serde_json::Value, String> {
+    use tauri::Manager;
+    let notes = db.get_all_notes().map_err(|e| e.to_string())?;
+    let count = notes.len();
+    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let db_path = app_dir.join("notefast.db");
+    let size_bytes = if let Ok(meta) = std::fs::metadata(&db_path) {
+        meta.len()
+    } else {
+        0
+    };
+    Ok(serde_json::json!({
+        "notes_count": count,
+        "db_path": db_path.to_string_lossy(),
+        "size_bytes": size_bytes,
+    }))
+}
+

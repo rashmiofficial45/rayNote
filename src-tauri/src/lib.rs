@@ -294,7 +294,11 @@ pub fn run() {
             get_drag_diagnostics,
             hide_window,
             save_window_size,
-            quit_app
+            quit_app,
+            open_settings_window,
+            close_settings_window,
+            open_app_data_folder,
+            get_storage_stats
         ])
         .build(tauri::generate_context!())
         .expect("error while building NoteFast");

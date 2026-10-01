@@ -1,6 +1,7 @@
-import { Command, Copy, Plus, Trash2 } from "lucide-react";
+import { Command, Copy, Plus, Trash2, Settings } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+import { openSettingsWindow } from "../lib/db";
 
 interface TitleBarProps {
   title: string;
@@ -192,6 +193,18 @@ export function TitleBar({
                 <Command size={13} />
                 <span>Command Palette</span>
                 <kbd className="popover-kbd">⌘K</kbd>
+              </button>
+              <div className="command-popover-divider" />
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  openSettingsWindow().catch(console.error);
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <Settings size={13} />
+                <span>Settings…</span>
+                <kbd className="popover-kbd">⌘,</kbd>
               </button>
             </div>
           )}
