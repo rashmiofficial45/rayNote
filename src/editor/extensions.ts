@@ -20,8 +20,48 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Youtube } from "@tiptap/extension-youtube";
 import { IframeExtension } from "./iframeExtension";
+import { ReactNodeViewRenderer } from "@tiptap/react";
+import { CodeBlockComponent } from "./CodeBlockComponent";
 
-const lowlight = createLowlight(common);
+function enhancedBash(hljs: any) {
+  const base = common.bash(hljs);
+  const ADDITIONAL_BUILT_INS = [
+    "grep", "egrep", "fgrep", "ps", "node", "npm", "npx", "pnpm", "yarn", "bun", "deno",
+    "git", "cargo", "rustc", "rustup", "docker", "curl", "wget", "awk", "sed", "find",
+    "tar", "zip", "unzip", "ssh", "scp", "rsync", "sudo", "kill", "pkill", "killall",
+    "top", "htop", "brew", "python", "python3", "pip", "pip3", "go", "make", "gcc", "clang"
+  ];
+  const keywords = base.keywords as any;
+  if (keywords && Array.isArray(keywords.built_in)) {
+    keywords.built_in.push(...ADDITIONAL_BUILT_INS);
+  }
+  base.contains = [
+    {
+      className: "operator",
+      match: /\|{1,2}|&&|>>?|<<?/,
+    },
+    {
+      className: "params",
+      match: /--?[a-zA-Z0-9_\-]+/,
+    },
+    ...(base.contains || []),
+  ];
+  return base;
+}
+
+const lowlight = createLowlight({ ...common, bash: enhancedBash });
+
+// Register convenient language aliases so any shorthand highlights correctly
+lowlight.registerAlias("bash", ["sh", "zsh", "shell", "terminal"]);
+lowlight.registerAlias("javascript", ["js", "jsx"]);
+lowlight.registerAlias("typescript", ["ts", "tsx"]);
+lowlight.registerAlias("python", ["py"]);
+lowlight.registerAlias("rust", ["rs"]);
+lowlight.registerAlias("xml", ["html", "xhtml"]);
+lowlight.registerAlias("yaml", ["yml"]);
+lowlight.registerAlias("csharp", ["cs", "c#"]);
+lowlight.registerAlias("cpp", ["c++", "cc", "hpp"]);
+lowlight.registerAlias("markdown", ["md"]);
 
 const CustomDocument = Document.extend({
   content: "block+",
@@ -70,8 +110,13 @@ export function getExtensions(slashCommandExtension?: any) {
       multicolor: false,
     }),
     Typography,
-    CodeBlockLowlight.configure({
+    CodeBlockLowlight.extend({
+      addNodeView() {
+        return ReactNodeViewRenderer(CodeBlockComponent);
+      },
+    }).configure({
       lowlight,
+      defaultLanguage: "bash",
     }),
     Link.configure({
       openOnClick: false,
