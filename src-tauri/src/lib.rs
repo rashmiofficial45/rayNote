@@ -281,6 +281,9 @@ pub fn run() {
                 setup_macos_panel(app);
             }
 
+            // Initialize Menu Bar status item
+            let _ = set_menu_bar_visible(app.handle().clone(), true);
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -299,7 +302,9 @@ pub fn run() {
             close_settings_window,
             open_app_data_folder,
             get_storage_stats,
-            set_always_on_top
+            set_always_on_top,
+            set_menu_bar_visible,
+            export_notes_to_folder
         ])
         .build(tauri::generate_context!())
         .expect("error while building NoteFast");

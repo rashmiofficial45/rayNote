@@ -62,22 +62,25 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
           const level = Math.min(Math.max(node.attrs?.level || 1, 1), 6);
           const prefix = "#".repeat(level) + " ";
           const text = (node.content || []).map(serializeInline).join("");
-          return `${prefix}${text}\n`;
+          return `${prefix}${text}\n\n`;
         }
         case "paragraph": {
           const text = (node.content || []).map(serializeInline).join("");
-          return `${text}\n`;
+          return `${text}\n\n`;
         }
         case "bulletList": {
           return (
             (node.content || [])
               .map((item: any) => {
-                const itemText = (item.content || [])
-                  .map((p: any) => serializeNode(p, indent + "  ").trim())
-                  .join(" ");
-                return `${indent}- ${itemText}`;
+                const itemLines = (item.content || []).map((p: any) => {
+                  if (p.type === "paragraph") {
+                    return (p.content || []).map(serializeInline).join("");
+                  }
+                  return serializeNode(p, indent + "  ").trim();
+                });
+                return `${indent}- ${itemLines.join(" ")}`;
               })
-              .join("\n") + "\n"
+              .join("\n") + "\n\n"
           );
         }
         case "orderedList": {
@@ -85,12 +88,15 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
           return (
             (node.content || [])
               .map((item: any, idx: number) => {
-                const itemText = (item.content || [])
-                  .map((p: any) => serializeNode(p, indent + "   ").trim())
-                  .join(" ");
-                return `${indent}${start + idx}. ${itemText}`;
+                const itemLines = (item.content || []).map((p: any) => {
+                  if (p.type === "paragraph") {
+                    return (p.content || []).map(serializeInline).join("");
+                  }
+                  return serializeNode(p, indent + "   ").trim();
+                });
+                return `${indent}${start + idx}. ${itemLines.join(" ")}`;
               })
-              .join("\n") + "\n"
+              .join("\n") + "\n\n"
           );
         }
         case "taskList": {
@@ -98,13 +104,26 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
             (node.content || [])
               .map((item: any) => {
                 const checked = item.attrs?.checked ? "[x]" : "[ ]";
-                const itemText = (item.content || [])
-                  .map((p: any) => serializeNode(p, indent + "  ").trim())
-                  .join(" ");
-                return `${indent}- ${checked} ${itemText}`;
+                const itemLines = (item.content || []).map((p: any) => {
+                  if (p.type === "paragraph") {
+                    return (p.content || []).map(serializeInline).join("");
+                  }
+                  return serializeNode(p, indent + "  ").trim();
+                });
+                return `${indent}- ${checked} ${itemLines.join(" ")}`;
               })
-              .join("\n") + "\n"
+              .join("\n") + "\n\n"
           );
+        }
+        case "taskItem": {
+          const checked = node.attrs?.checked ? "[x]" : "[ ]";
+          const text = (node.content || []).map((p: any) => {
+            if (p.type === "paragraph") {
+              return (p.content || []).map(serializeInline).join("");
+            }
+            return serializeNode(p, indent).trim();
+          }).join(" ");
+          return `${indent}- ${checked} ${text}\n`;
         }
         case "blockquote": {
           const text = (node.content || [])
@@ -114,16 +133,55 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
             text
               .split("\n")
               .map((l: string) => `> ${l}`)
-              .join("\n") + "\n"
+              .join("\n") + "\n\n"
           );
         }
         case "codeBlock": {
           const lang = node.attrs?.language || "";
           const text = (node.content || []).map((n: any) => n.text || "").join("");
-          return `\`\`\`${lang}\n${text}\n\`\`\`\n`;
+          return `\`\`\`${lang}\n${text}\n\`\`\`\n\n`;
+        }
+        case "table": {
+          const rows = node.content || [];
+          if (rows.length === 0) return "";
+          const tableLines: string[] = [];
+          rows.forEach((row: any, rIdx: number) => {
+            const cells = (row.content || []).map((cell: any) => {
+              const cellText = (cell.content || [])
+                .map((p: any) => {
+                  if (p.type === "paragraph") {
+                    return (p.content || []).map(serializeInline).join("");
+                  }
+                  return serializeNode(p).trim();
+                })
+                .join(" ");
+              return cellText.replace(/\|/g, "\\|");
+            });
+            tableLines.push(`| ${cells.join(" | ")} |`);
+            if (rIdx === 0) {
+              tableLines.push(`| ${cells.map(() => "---").join(" | ")} |`);
+            }
+          });
+          return tableLines.join("\n") + "\n\n";
+        }
+        case "image": {
+          const alt = node.attrs?.alt || "";
+          const src = node.attrs?.src || "";
+          const title = node.attrs?.title ? ` "${node.attrs.title}"` : "";
+          return `![${alt}](${src}${title})\n\n`;
+        }
+        case "youtube": {
+          const src = node.attrs?.src || "";
+          return `${src}\n\n`;
+        }
+        case "iframe": {
+          const src = node.attrs?.src || "";
+          const w = node.attrs?.width || "100%";
+          const h = node.attrs?.height || 315;
+          return `<iframe src="${src}" width="${w}" height="${h}" allowfullscreen></iframe>\n\n`;
         }
         case "horizontalRule": {
-          return "---\n";
+          return "---\n\n";
         }
         default: {
           if (node.content) {
@@ -137,6 +195,10 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
     }
 
     function serializeInline(node: any): string {
+      if (!node) return "";
+      if (node.type === "hardBreak") {
+        return "  \n";
+      }
       if (!node.text) return "";
       let text = node.text;
       if (!node.marks || node.marks.length === 0) return text;
@@ -173,7 +235,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
       lines.push(serializeNode(child));
     }
 
-    return lines.join("\n").trim() + "\n";
+    return lines.join("").trim() + "\n";
   } catch {
     return content;
   }

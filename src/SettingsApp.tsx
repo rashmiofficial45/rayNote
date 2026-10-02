@@ -45,7 +45,7 @@ import {
   formatKeystrokeFromEvent,
   getKeystrokeModifierString,
 } from "./lib/settingsSync";
-import { downloadFile, noteContentToMarkdown } from "./lib/utils";
+import { noteContentToMarkdown } from "./lib/utils";
 
 type SettingsPane = "general" | "commands" | "storage" | "about";
 
@@ -382,10 +382,15 @@ export default function SettingsApp() {
   };
 
   // Toggle handlers
-  const handleToggleMenuBar = () => {
+  const handleToggleMenuBar = async () => {
     const val = !showMenuBar;
     setShowMenuBar(val);
     localStorage.setItem("notefast_show_menubar", val ? "true" : "false");
+    try {
+      await invoke("set_menu_bar_visible", { visible: val });
+    } catch (err) {
+      console.error("set_menu_bar_visible error:", err);
+    }
   };
 
   const handleToggleEscLosesFocus = () => {
@@ -422,14 +427,14 @@ export default function SettingsApp() {
         return;
       }
 
-      for (let i = 0; i < notes.length; i++) {
-        const n = notes[i];
-        const md = noteContentToMarkdown(n.content, n.title);
-        const safeTitle = (n.title || `Untitled_${i + 1}`).replace(/[/\\?%*:|"<>]/g, "-");
-        downloadFile(`${safeTitle}.md`, md, "text/markdown");
-      }
-      setActionMessage(`Exported ${notes.length} note(s) as Markdown.`);
-      setTimeout(() => setActionMessage(null), 3000);
+      const exportNotes = notes.map((n, idx) => ({
+        title: n.title || `Untitled_${idx + 1}`,
+        content: noteContentToMarkdown(n.content, n.title),
+      }));
+
+      await invoke("export_notes_to_folder", { notes: exportNotes });
+      setActionMessage(`Exported ${notes.length} note(s) to Downloads/NoteFast_Exports.`);
+      setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error(err);
       setActionMessage("Export failed.");
@@ -457,25 +462,7 @@ export default function SettingsApp() {
   };
 
   return (
-    <div
-      className="settings-window-root"
-      onMouseDown={(e) => {
-        const target = e.target as HTMLElement;
-        if (
-          !target.closest("button") &&
-          !target.closest("input") &&
-          !target.closest("select") &&
-          !target.closest("textarea") &&
-          !target.closest(".settings-tab-pill")
-        ) {
-          e.preventDefault();
-          window.getSelection()?.removeAllRanges();
-          if (e.button === 0) {
-            invoke("start_native_drag").catch(console.error);
-          }
-        }
-      }}
-    >
+    <div className="settings-window-root">
       {/* Top Header Bar with Navigation and Tabs (macOS Draggable) */}
       <header
         ref={headerRef}
@@ -501,7 +488,7 @@ export default function SettingsApp() {
               onClick={closeSettingsWindow}
               onMouseEnter={() => setIsCloseHovered(true)}
               onMouseLeave={() => setIsCloseHovered(false)}
-              className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
+              className={`close-btn-x liquid-btn ${isCloseHovered ? "is-hovered" : ""}`}
               title="Close Settings (⌘W)"
               aria-label="Close Settings"
             >
@@ -528,7 +515,7 @@ export default function SettingsApp() {
         <div className="settings-tab-pills" data-tauri-drag-region>
           <button
             type="button"
-            className={`settings-tab-pill ${activePane === "general" ? "is-active" : ""}`}
+            className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
             onClick={() => handlePaneChange("general")}
           >
             <Sliders size={12} />
@@ -536,7 +523,7 @@ export default function SettingsApp() {
           </button>
           <button
             type="button"
-            className={`settings-tab-pill ${activePane === "commands" ? "is-active" : ""}`}
+            className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
             onClick={() => handlePaneChange("commands")}
           >
             <Keyboard size={12} />
@@ -544,7 +531,7 @@ export default function SettingsApp() {
           </button>
           <button
             type="button"
-            className={`settings-tab-pill ${activePane === "storage" ? "is-active" : ""}`}
+            className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
             onClick={() => handlePaneChange("storage")}
           >
             <Database size={12} />
@@ -552,7 +539,7 @@ export default function SettingsApp() {
           </button>
           <button
             type="button"
-            className={`settings-tab-pill ${activePane === "about" ? "is-active" : ""}`}
+            className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
             onClick={() => handlePaneChange("about")}
           >
             <Info size={12} />
@@ -600,7 +587,7 @@ export default function SettingsApp() {
                   <div className="settings-segmented-group">
                     <button
                       type="button"
-                      className={`settings-seg-btn ${themeMode === "dark" ? "is-active" : ""}`}
+                      className={`settings-seg-btn liquid-btn ${themeMode === "dark" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("dark")}
                     >
                       <Moon size={12} />
@@ -608,7 +595,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className={`settings-seg-btn ${themeMode === "light" ? "is-active" : ""}`}
+                      className={`settings-seg-btn liquid-btn ${themeMode === "light" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("light")}
                     >
                       <Sun size={12} />
@@ -616,7 +603,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className={`settings-seg-btn ${themeMode === "system" ? "is-active" : ""}`}
+                      className={`settings-seg-btn liquid-btn ${themeMode === "system" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("system")}
                     >
                       <Monitor size={12} />
@@ -763,7 +750,7 @@ export default function SettingsApp() {
                   <div className="settings-zoom-stepper">
                     <button
                       type="button"
-                      className="settings-stepper-btn"
+                      className="settings-stepper-btn liquid-btn"
                       onClick={() => handleZoom(1.2)}
                       title="Reset Zoom to 120%"
                     >
@@ -771,7 +758,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className="settings-stepper-btn"
+                      className="settings-stepper-btn liquid-btn"
                       onClick={() => handleZoom(zoomLevel - 0.1)}
                       disabled={zoomLevel <= 0.6}
                       title="Zoom Out"
@@ -783,7 +770,7 @@ export default function SettingsApp() {
                     </span>
                     <button
                       type="button"
-                      className="settings-stepper-btn"
+                      className="settings-stepper-btn liquid-btn"
                       onClick={() => handleZoom(zoomLevel + 0.1)}
                       disabled={zoomLevel >= 2.0}
                       title="Zoom In"
@@ -848,7 +835,7 @@ export default function SettingsApp() {
                             {isCustom && !isRecording && (
                               <button
                                 type="button"
-                                className="settings-cmd-reset-btn"
+                                className="settings-cmd-reset-btn liquid-btn"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleResetHotkey(cmd.id);
@@ -921,7 +908,7 @@ export default function SettingsApp() {
                             {isCustom && !isRecording && (
                               <button
                                 type="button"
-                                className="settings-cmd-reset-btn"
+                                className="settings-cmd-reset-btn liquid-btn"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleResetHotkey(cmd.id);
@@ -965,7 +952,7 @@ export default function SettingsApp() {
                 <div className="settings-row-action">
                   <button
                     type="button"
-                    className="settings-action-btn"
+                    className="settings-action-btn liquid-btn"
                     onClick={openAppDataFolder}
                   >
                     <FolderOpen size={13} />
@@ -1000,7 +987,7 @@ export default function SettingsApp() {
                 <div className="settings-row-action">
                   <button
                     type="button"
-                    className="settings-action-btn"
+                    className="settings-action-btn liquid-btn"
                     onClick={handleExportAll}
                   >
                     <FileDown size={13} />
@@ -1023,7 +1010,7 @@ export default function SettingsApp() {
                   {!isClearing ? (
                     <button
                       type="button"
-                      className="settings-danger-btn"
+                      className="settings-danger-btn liquid-btn"
                       onClick={() => setIsClearing(true)}
                     >
                       <Trash2 size={13} />
@@ -1041,7 +1028,7 @@ export default function SettingsApp() {
                       </label>
                       <button
                         type="button"
-                        className="settings-danger-btn danger-confirm"
+                        className="settings-danger-btn danger-confirm liquid-btn"
                         disabled={!clearAgreed}
                         onClick={handleClearAllNotes}
                       >
@@ -1049,7 +1036,7 @@ export default function SettingsApp() {
                       </button>
                       <button
                         type="button"
-                        className="settings-stepper-btn"
+                        className="settings-stepper-btn liquid-btn"
                         onClick={() => {
                           setIsClearing(false);
                           setClearAgreed(false);

@@ -611,6 +611,10 @@ function App() {
 
       // Escape: Close overlays in order of hierarchy, or unfocus editor if escLosesFocus enabled
       if (e.key === "Escape") {
+        if (deleteConfirm) {
+          setDeleteConfirm(null);
+          return;
+        }
         if (isShortcutsModalOpen) {
           setIsShortcutsModalOpen(false);
           return;
@@ -633,8 +637,11 @@ function App() {
               Boolean(active.closest(".tiptap")))
           ) {
             active.blur();
-            return;
           }
+          return;
+        } else {
+          hideWindow().catch(console.error);
+          return;
         }
       }
     };
@@ -644,6 +651,7 @@ function App() {
   }, [
     activeNoteId,
     commandsConfig,
+    deleteConfirm,
     escLosesFocus,
     handleNewNote,
     handleDuplicateNote,
@@ -686,6 +694,7 @@ function App() {
         }}
         onDuplicateNote={handleDuplicateNote}
         onDeleteNote={() => activeNoteId && promptDeleteNote(activeNoteId)}
+        onCopyMarkdown={handleCopyNoteAsMarkdown}
       />
 
       {/* Delete Confirmation Dialog */}

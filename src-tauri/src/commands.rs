@@ -272,7 +272,6 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
             let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
             if let Ok(ptr) = win.ns_window() {
                 if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
-                    let _: () = msg_send![ns_win, setMovableByWindowBackground: true];
                     let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
                 }
             }
@@ -292,6 +291,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .decorations(false)
     .transparent(true)
     .shadow(true)
+    .accept_first_mouse(true)
     .build()
     .map_err(|e| e.to_string())?;
 
@@ -307,7 +307,6 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
         if let Ok(ptr) = settings_window.ns_window() {
             if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
-                let _: () = msg_send![ns_win, setMovableByWindowBackground: true];
                 let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
             }
         }
@@ -356,6 +355,7 @@ pub fn close_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 pub fn open_app_data_folder(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&app_dir);
     let path_str = app_dir.to_string_lossy().to_string();
     #[cfg(target_os = "macos")]
     {
@@ -364,6 +364,100 @@ pub fn open_app_data_folder(app: tauri::AppHandle) -> Result<(), String> {
             .spawn()
             .map_err(|e| e.to_string())?;
     }
+    Ok(())
+}
+
+#[derive(serde::Deserialize)]
+pub struct ExportNoteItem {
+    pub title: String,
+    pub content: String,
+}
+
+#[tauri::command]
+pub fn export_notes_to_folder(
+    app: tauri::AppHandle,
+    notes: Vec<ExportNoteItem>,
+) -> Result<String, String> {
+    use tauri::Manager;
+    let download_dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| e.to_string())?;
+
+    let export_dir = download_dir.join("NoteFast_Exports");
+    std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
+
+    for (idx, note) in notes.into_iter().enumerate() {
+        let raw_title = if note.title.trim().is_empty() {
+            format!("Untitled_{}", idx + 1)
+        } else {
+            note.title.trim().to_string()
+        };
+        let safe_name: String = raw_title
+            .chars()
+            .map(|c| match c {
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+                _ => c,
+            })
+            .collect();
+        let file_path = export_dir.join(format!("{}.md", safe_name));
+        std::fs::write(&file_path, note.content).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let path_str = export_dir.to_string_lossy().to_string();
+        let _ = std::process::Command::new("open").arg(&path_str).spawn();
+    }
+
+    Ok(export_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> {
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_visible(visible);
+        return Ok(());
+    }
+
+    if visible {
+        let mut builder = TrayIconBuilder::with_id("main-tray").tooltip("NoteFast");
+        if let Some(icon) = app.default_window_icon().cloned() {
+            builder = builder.icon(icon);
+        }
+        let _ = builder
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } = event
+                {
+                    let app = tray.app_handle();
+                    #[cfg(target_os = "macos")]
+                    {
+                        use tauri_nspanel::ManagerExt;
+                        if let Ok(panel) = app.get_webview_panel("main") {
+                            if panel.is_visible() {
+                                panel.hide();
+                            } else {
+                                crate::show_and_focus_main_panel(app);
+                            }
+                        }
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        crate::show_and_focus_main_panel(app);
+                    }
+                }
+            })
+            .build(&app)
+            .map_err(|e| e.to_string())?;
+    }
+
     Ok(())
 }
 

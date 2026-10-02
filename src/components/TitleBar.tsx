@@ -1,4 +1,4 @@
-import { Command, Copy, Plus, Trash2, Settings } from "lucide-react";
+import { Command, Copy, Plus, Trash2, Settings, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { openSettingsWindow } from "../lib/db";
@@ -9,6 +9,7 @@ interface TitleBarProps {
   onOpenCommandPalette: () => void;
   onDuplicateNote: () => void;
   onDeleteNote: () => void;
+  onCopyMarkdown: () => void;
 }
 
 export function TitleBar({
@@ -17,6 +18,7 @@ export function TitleBar({
   onOpenCommandPalette,
   onDuplicateNote,
   onDeleteNote,
+  onCopyMarkdown,
 }: TitleBarProps) {
   const titleBarRef = useRef<HTMLDivElement>(null);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
@@ -143,8 +145,16 @@ export function TitleBar({
       {/* Center: Note title */}
       <div className="title-text">{title || "Untitled"}</div>
 
-      {/* Right: Delete + Command (Command opens popover) */}
+      {/* Right: Copy Markdown + Delete + Command (Command opens popover) */}
       <div className="title-bar-right">
+        <button
+          className="title-bar-btn liquid-btn copy-md-btn"
+          onClick={onCopyMarkdown}
+          title="Copy Note as Markdown (⇧⌘C)"
+          aria-label="Copy Note as Markdown"
+        >
+          <FileText size={13} />
+        </button>
         <button
           className="title-bar-btn liquid-btn delete-btn"
           onClick={onDeleteNote}
@@ -162,6 +172,17 @@ export function TitleBar({
           </button>
           {commandMenuOpen && (
             <div className="command-popover">
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  onCopyMarkdown();
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <FileText size={13} />
+                <span>Copy as Markdown</span>
+                <kbd className="popover-kbd">⇧⌘C</kbd>
+              </button>
               <button
                 className="command-popover-item"
                 onClick={() => {
