@@ -10,6 +10,7 @@ import {
   noteContentToMarkdown,
   noteContentToPlainText,
   downloadFile,
+  extractTitleFromMarkdown,
 } from "./lib/utils";
 import {
   getAllNotes,
@@ -153,22 +154,14 @@ function App() {
     async (file: File) => {
       try {
         const text = await file.text();
-        const lines = text.split("\n");
-        let title = file.name.replace(/\.(md|markdown|txt)$/i, "");
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("# ")) {
-            title = trimmed.replace(/^#+\s*/, "").trim();
-            break;
-          }
-        }
+        const title = extractTitleFromMarkdown(text, file.name);
         const newNote = await createNote();
         await updateNote(newNote.id, title, text);
         newNote.title = title;
         newNote.content = text;
         setNotes((prev) => [newNote, ...prev]);
         setActiveNoteId(newNote.id);
-        showToast(`Imported "${file.name}" to notes`, <Check size={14} />);
+        showToast(`Imported "${title}" to notes`, <Check size={14} />);
       } catch (err) {
         console.error("Failed to import file:", err);
         showToast("Failed to import file", <Trash2 size={14} />);

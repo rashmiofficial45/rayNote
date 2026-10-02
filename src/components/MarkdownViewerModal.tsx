@@ -7,9 +7,11 @@ import {
   Check,
   Eye,
   Code2,
-  FileCheck,
+  HardDriveDownload,
+  ShieldCheck,
 } from "lucide-react";
 import { markdownToTipTapHtml } from "../editor/markdownUtils";
+import { extractTitleFromMarkdown } from "../lib/utils";
 
 export interface PreviewFileData {
   name: string;
@@ -38,7 +40,7 @@ export function MarkdownViewerModal({
     const text = fileData.content;
     const words = text.trim() ? text.trim().split(/\s+/).length : 0;
     const chars = text.length;
-    const lines = text.split("\n").length;
+    const lines = text.split(/\r?\n/).length;
     return { words, chars, lines };
   }, [fileData?.content]);
 
@@ -46,6 +48,11 @@ export function MarkdownViewerModal({
     if (!fileData?.content) return "";
     return markdownToTipTapHtml(fileData.content);
   }, [fileData?.content]);
+
+  const docTitle = useMemo(() => {
+    if (!fileData) return "Untitled";
+    return extractTitleFromMarkdown(fileData.content, fileData.name);
+  }, [fileData]);
 
   if (!fileData) return null;
 
@@ -58,18 +65,7 @@ export function MarkdownViewerModal({
   };
 
   const handleImport = () => {
-    // Extract title from first heading or fallback to file name
-    const lines = fileData.content.split("\n");
-    let title = fileData.name.replace(/\.(md|markdown|txt)$/i, "");
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith("# ")) {
-        title = trimmed.replace(/^#+\s*/, "").trim();
-        break;
-      }
-    }
-
-    onImportToNotes(title, fileData.content);
+    onImportToNotes(docTitle, fileData.content);
     onClose();
   };
 
@@ -78,77 +74,102 @@ export function MarkdownViewerModal({
       <div
         className="md-viewer-modal"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="md-viewer-heading"
       >
-        {/* Header */}
-        <div className="md-viewer-header">
-          <div className="md-viewer-title-group">
-            <div className="md-viewer-file-icon">
-              <FileText size={16} />
+        {/* Tier 1: Main Header (Document identity, badge, close button) */}
+        <div className="md-viewer-topbar">
+          <div className="md-viewer-header-left">
+            <div className="md-viewer-icon-wrapper">
+              <FileText size={18} className="text-[#6C5CE7]" />
             </div>
-            <div className="md-viewer-title-info">
-              <div className="flex items-center gap-2">
-                <span className="md-viewer-filename">{fileData.name}</span>
-                <span className="md-viewer-badge">View Only • Not Uploaded</span>
+
+            <div className="md-viewer-title-box">
+              <div className="md-viewer-title-row">
+                <h2 id="md-viewer-heading" className="md-viewer-title" title={docTitle}>
+                  {docTitle}
+                </h2>
+                <div className="md-viewer-status-badge">
+                  <span className="md-viewer-status-dot" />
+                  <span>Preview Only</span>
+                </div>
               </div>
-              <span className="md-viewer-subtitle">
-                {stats.words.toLocaleString()} words • {stats.chars.toLocaleString()} chars • {stats.lines} lines
-              </span>
+              <p className="md-viewer-meta-text" title={fileData.name}>
+                <span>{fileData.name}</span>
+                <span className="meta-separator">•</span>
+                <span>In-Memory</span>
+              </p>
             </div>
           </div>
 
-          <div className="md-viewer-actions">
-            {/* View Mode Switcher */}
-            <div className="md-viewer-toggle-group">
+          <div className="md-viewer-header-right">
+            <button
+              type="button"
+              className="md-viewer-close-btn"
+              onClick={onClose}
+              title="Close Preview (Esc)"
+              aria-label="Close Preview"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Tier 2: Action Toolbar (View switch, stats, primary actions) */}
+        <div className="md-viewer-toolbar">
+          <div className="md-viewer-toolbar-left">
+            {/* View Mode Segmented Control */}
+            <div className="md-viewer-segmented-control">
               <button
                 type="button"
-                className={`md-viewer-toggle-btn ${viewMode === "rendered" ? "is-active" : ""}`}
+                className={`md-viewer-segment ${viewMode === "rendered" ? "is-active" : ""}`}
                 onClick={() => setViewMode("rendered")}
                 title="Rendered Markdown Preview"
               >
-                <Eye size={12} />
+                <Eye size={13} />
                 <span>Preview</span>
               </button>
               <button
                 type="button"
-                className={`md-viewer-toggle-btn ${viewMode === "raw" ? "is-active" : ""}`}
+                className={`md-viewer-segment ${viewMode === "raw" ? "is-active" : ""}`}
                 onClick={() => setViewMode("raw")}
                 title="Raw Markdown Code"
               >
-                <Code2 size={12} />
+                <Code2 size={13} />
                 <span>Raw</span>
               </button>
             </div>
 
+            {/* Document Statistics Pill */}
+            <div className="md-viewer-stats-pill">
+              <span>{stats.words.toLocaleString()} words</span>
+              <span className="stats-dot">•</span>
+              <span>{stats.lines.toLocaleString()} lines</span>
+            </div>
+          </div>
+
+          <div className="md-viewer-toolbar-right">
             {/* Copy Button */}
             <button
               type="button"
-              className="md-viewer-btn liquid-btn"
+              className="md-viewer-btn md-viewer-copy-btn"
               onClick={handleCopy}
-              title="Copy Markdown"
+              title="Copy Markdown content to clipboard"
             >
               {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
               <span>{copied ? "Copied" : "Copy"}</span>
             </button>
 
-            {/* Import Button */}
+            {/* Import to Notes Button */}
             <button
               type="button"
-              className="md-viewer-btn md-viewer-btn-primary liquid-btn"
+              className="md-viewer-btn md-viewer-import-btn"
               onClick={handleImport}
-              title="Save this file permanently into your local NoteFast SQLite notes"
+              title="Save this document permanently into your NoteFast notes database"
             >
-              <Plus size={13} />
+              <Plus size={14} />
               <span>Import to Notes</span>
-            </button>
-
-            {/* Close Button */}
-            <button
-              type="button"
-              className="md-viewer-close-btn liquid-btn"
-              onClick={onClose}
-              title="Close Preview (Esc)"
-            >
-              <X size={14} />
             </button>
           </div>
         </div>
@@ -169,16 +190,19 @@ export function MarkdownViewerModal({
 
         {/* Footer */}
         <div className="md-viewer-footer">
-          <span className="flex items-center gap-1.5 text-[var(--text-muted)] text-[11px]">
-            <FileCheck size={12} />
-            <span>Viewing local file strictly in-memory. Zero changes made to local SQLite database.</span>
-          </span>
+          <div className="md-viewer-footer-info">
+            <ShieldCheck size={13} className="text-emerald-400 flex-shrink-0" />
+            <span>Viewing strictly in memory. Your SQLite database remains untouched.</span>
+          </div>
+
           <button
             type="button"
-            className="md-viewer-import-link"
+            className="md-viewer-footer-cta"
             onClick={handleImport}
+            title="Import note"
           >
-            Want to keep this? Click to import as an editable note →
+            <HardDriveDownload size={13} />
+            <span>Want to save this note? Click to import →</span>
           </button>
         </div>
       </div>

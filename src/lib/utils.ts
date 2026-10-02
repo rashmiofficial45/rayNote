@@ -47,6 +47,76 @@ export function getNoteTitle(title: string, content: string): string {
   return preview.length > 30 ? preview.slice(0, 30) + "…" : preview;
 }
 
+/**
+ * Extracts the title from a Markdown document.
+ * Follows precedence:
+ * 1. YAML frontmatter title: "..."
+ * 2. Setext style header (Header\n=== or Header\n---)
+ * 3. ATX style header (# Header, ## Header, etc.)
+ * 4. The very first non-empty line of text (cleaned of markdown formatting)
+ * 5. Fallback to filename without extension
+ */
+export function extractTitleFromMarkdown(text: string, fallbackFileName = "Untitled"): string {
+  if (!text || !text.trim()) {
+    const base = fallbackFileName.replace(/\.(md|markdown|txt)$/i, "").trim();
+    return base || "Untitled Note";
+  }
+
+  // 1. Check for YAML front matter (e.g. title: "...")
+  const frontMatterMatch = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (frontMatterMatch) {
+    const frontMatter = frontMatterMatch[1];
+    const titleMatch = frontMatter.match(/(?:^|\n)title:\s*["']?([^"'\n\r]+)["']?/i);
+    if (titleMatch && titleMatch[1].trim()) {
+      return titleMatch[1].trim();
+    }
+  }
+
+  // Remove frontmatter if present to inspect the content lines
+  const cleanText = frontMatterMatch ? text.slice(frontMatterMatch[0].length) : text;
+  const lines = cleanText.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i].trim();
+    if (!rawLine) continue;
+
+    // Check Setext style header (line followed by === or ---)
+    if (i + 1 < lines.length) {
+      const nextLine = lines[i + 1].trim();
+      if (/^={2,}$/.test(nextLine) || /^-{2,}$/.test(nextLine)) {
+        const cleaned = rawLine.replace(/^[#\s*`_~]+|[#\s*`_~]+$/g, "").trim();
+        if (cleaned) return cleaned.slice(0, 100);
+      }
+    }
+
+    // Check ATX style header (# Title, ## Title, etc.)
+    if (/^#{1,6}\s+/.test(rawLine)) {
+      const cleaned = rawLine.replace(/^#{1,6}\s+/, "").replace(/[#\s*`_~]+$/, "").trim();
+      if (cleaned) return cleaned.slice(0, 100);
+    }
+
+    // First non-empty line (clean markdown marks, bullets, quotes)
+    let candidate = rawLine
+      .replace(/^[-*+]\s+/, "") // bullets
+      .replace(/^\d+\.\s+/, "") // numbered items
+      .replace(/^>\s+/, "") // blockquotes
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // links [text](url) -> text
+      .replace(/[*_`~#]/g, "") // styling marks
+      .trim();
+
+    if (candidate) {
+      // Skip markdown code fence opening or raw HTML comments
+      if (candidate.startsWith("```") || candidate.startsWith("<!--")) {
+        continue;
+      }
+      return candidate.length > 80 ? candidate.slice(0, 80) + "…" : candidate;
+    }
+  }
+
+  const base = fallbackFileName.replace(/\.(md|markdown|txt)$/i, "").trim();
+  return base || "Untitled Note";
+}
+
 export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled"): string {
   if (!content) return `# ${fallbackTitle}\n\n`;
   try {

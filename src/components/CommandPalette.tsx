@@ -1001,7 +1001,7 @@ export function CommandPalette({
             type="text"
             placeholder={
               view === "actions"
-                ? "Type a command or search settings (⌥P)…"
+                ? "Search commands & settings…"
                 : view === "browse"
                 ? "Search notes by title or content…"
                 : view === "sub_accents"
@@ -1024,26 +1024,21 @@ export function CommandPalette({
                 setSearch("");
               }}
             >
-              Back to Actions
+              ← Back to Actions
             </button>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-muted)]">
-                ⌥P
-              </span>
-              <button
-                type="button"
-                className="command-view-switch-btn"
-                onClick={() => {
-                  setView((prev) => (prev === "actions" ? "browse" : "actions"));
-                  setSearch("");
-                  setTimeout(() => inputRef.current?.focus(), 20);
-                }}
-                title="Press Tab to switch mode"
-              >
-                {view === "actions" ? "Notes (⌘P)" : "Settings (⌥P)"}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="command-view-switch-btn"
+              onClick={() => {
+                setView((prev) => (prev === "actions" ? "browse" : "actions"));
+                setSearch("");
+                setTimeout(() => inputRef.current?.focus(), 20);
+              }}
+              title="Press Tab to switch mode"
+            >
+              {view === "actions" ? "Notes (⌘P)" : "Commands (⌥P)"}
+            </button>
           )}
         </div>
 
@@ -1073,25 +1068,27 @@ export function CommandPalette({
                   >
                     <div className="command-item-icon">{item.icon}</div>
                     <div className="command-item-text flex flex-col justify-center min-w-0">
-                      <div className="flex items-center">
-                        <span className={`command-item-label ${item.disabled ? "disabled" : ""}`}>
-                          {item.label}
-                        </span>
+                      <span className={`command-item-label ${item.disabled ? "disabled" : ""}`}>
+                        {item.label}
+                      </span>
+                      {item.subtitle && (
+                        <span className="command-item-subtitle">{item.subtitle}</span>
+                      )}
+                    </div>
+                    {(item.badge || item.shortcut) && (
+                      <div className="command-item-meta">
                         {item.badge && (
                           <span className={`command-badge ${item.badge === "ON" ? "is-on" : ""}`}>
                             {item.badge}
                           </span>
                         )}
-                      </div>
-                      {item.subtitle && (
-                        <span className="command-item-subtitle">{item.subtitle}</span>
-                      )}
-                    </div>
-                    {item.shortcut && (
-                      <div className="command-item-shortcut">
-                        {item.shortcut.map((k, i) => (
-                          <kbd key={i}>{k}</kbd>
-                        ))}
+                        {item.shortcut && (
+                          <div className="command-item-shortcut">
+                            {item.shortcut.map((k, i) => (
+                              <kbd key={i}>{k}</kbd>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </button>
