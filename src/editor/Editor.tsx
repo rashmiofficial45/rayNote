@@ -233,7 +233,7 @@ export function Editor({
       />
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto scroll-smooth pt-3 relative"
+        className="flex-1 min-h-0 overflow-y-auto pt-3 relative"
       >
         <div style={{ zoom: zoomLevel } as React.CSSProperties} className="relative">
           <SmoothCaret

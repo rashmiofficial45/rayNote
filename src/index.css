@@ -542,7 +542,7 @@ body,
 .tiptap {
   outline: none;
   min-height: calc(100vh - 44px);
-  padding: 16px 32px 100px 32px;
+  padding: 20px clamp(36px, 7vw, 84px) 110px clamp(36px, 7vw, 84px);
   color: var(--text-primary);
   background: transparent;
   font-family: var(--editor-font, 'Inter', -apple-system, sans-serif);
@@ -550,6 +550,14 @@ body,
   line-height: 1.7;
   user-select: text;
   position: relative;
+  box-sizing: border-box;
+}
+
+@media (min-width: 860px) {
+  .tiptap {
+    padding-left: clamp(48px, 9vw, 96px);
+    padding-right: clamp(48px, 9vw, 96px);
+  }
 }
 
 /* Hide native caret when smooth caret is enabled, show dynamic accent native caret if disabled */
@@ -3490,10 +3498,18 @@ html[data-smooth-caret="false"] .tiptap {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 28px;
+  padding: 24px clamp(36px, 7vw, 84px);
   font-size: 14px;
   line-height: 1.65;
   color: var(--text-primary);
+  box-sizing: border-box;
+}
+
+@media (min-width: 860px) {
+  .md-viewer-body {
+    padding-left: clamp(48px, 9vw, 96px);
+    padding-right: clamp(48px, 9vw, 96px);
+  }
 }
 
 .md-viewer-rendered {
@@ -3830,66 +3846,69 @@ html[data-smooth-caret="false"] .tiptap {
 
 .doc-tick-item {
   height: 1.5px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 1px;
-  transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
   transform-origin: right center;
+  transition: background 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.doc-tick-item.is-small {
+  width: 10px;
+}
+
+.doc-tick-item.is-big {
+  width: 16px;
 }
 
 [data-theme="light"] .doc-tick-item {
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(0, 0, 0, 0.18);
 }
 
-.doc-tick-item.is-major {
-  height: 1.5px;
-  background: rgba(255, 255, 255, 0.35);
+/* Crossed parts: smoothly highlighted as you scroll past them */
+.doc-tick-item.is-crossed {
+  background: rgba(255, 255, 255, 0.42);
 }
 
-[data-theme="light"] .doc-tick-item.is-major {
+[data-theme="light"] .doc-tick-item.is-crossed {
   background: rgba(0, 0, 0, 0.35);
 }
 
 .doc-tick-slider-track:hover .doc-tick-item {
-  background: rgba(255, 255, 255, 0.42);
+  opacity: 0.9;
 }
 
-[data-theme="light"] .doc-tick-slider-track:hover .doc-tick-item {
-  background: rgba(0, 0, 0, 0.4);
+.doc-tick-item:hover {
+  background: rgba(255, 255, 255, 0.75) !important;
 }
 
-.doc-tick-thumb {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 15px;
-  height: 3px;
-  border-radius: 2px;
-  background: #ffffff;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 2px rgba(255, 255, 255, 1);
-  pointer-events: none;
-  will-change: transform;
-  transition: transform 0.05s ease-out, width 0.1s ease;
+[data-theme="light"] .doc-tick-item:hover {
+  background: rgba(0, 0, 0, 0.6) !important;
 }
 
-[data-theme="light"] .doc-tick-thumb {
-  background: var(--color-accent, #0284c7);
-  box-shadow: 0 0 6px rgba(2, 132, 199, 0.6), 0 0 2px rgba(2, 132, 199, 0.9);
+/* Active Highlighted Part: glows up accordingly whether small or big */
+.doc-tick-item.is-active {
+  height: 2px !important;
+  min-height: 2px !important;
+  border-radius: 1px !important;
+  background: #ffffff !important;
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5), 0 0 1px rgba(255, 255, 255, 0.8) !important;
+  transform: none !important;
+  z-index: 2;
+  opacity: 1 !important;
 }
 
-.doc-tick-slider-wrapper.is-dragging .doc-tick-thumb,
-.doc-tick-slider-track:hover .doc-tick-thumb {
-  width: 17px;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.95), 0 0 3px #ffffff;
+.doc-tick-item.is-active.is-small {
+  width: 10px !important;
 }
 
-[data-theme="light"] .doc-tick-slider-wrapper.is-dragging .doc-tick-thumb,
-[data-theme="light"] .doc-tick-slider-track:hover .doc-tick-thumb {
-  width: 17px;
-  box-shadow: 0 0 8px rgba(2, 132, 199, 0.8), 0 0 3px var(--color-accent, #0284c7);
+.doc-tick-item.is-active.is-big {
+  width: 16px !important;
 }
 
-.doc-tick-slider-wrapper.is-dragging .doc-tick-thumb {
-  transition: none; /* Zero lag while dragging */
+[data-theme="light"] .doc-tick-item.is-active {
+  background: var(--color-accent, #0284c7) !important;
+  box-shadow: 0 0 5px rgba(2, 132, 199, 0.45), 0 0 1px rgba(2, 132, 199, 0.75) !important;
 }
 
 

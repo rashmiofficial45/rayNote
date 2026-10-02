@@ -19,8 +19,9 @@ export function DocumentTickSlider({
 
   const trackRef = useRef<HTMLDivElement>(null);
   const rafId = useRef<number | null>(null);
+  const dragRafId = useRef<number | null>(null);
 
-  // Responsive detection: do not show on very small window sizes
+  // Responsive: hide on compact / narrow window size (< 520px)
   useEffect(() => {
     const handleResize = () => {
       setIsCompact(window.innerWidth < 520 || window.innerHeight < 320);
@@ -29,14 +30,14 @@ export function DocumentTickSlider({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Update scroll metrics and progress
+  // Update scroll metrics and progress (0.0 to 1.0)
   const updateScrollProgress = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
     const maxScroll = scrollHeight - clientHeight;
-    const scrollable = maxScroll > 20;
+    const scrollable = maxScroll > 25;
     setIsScrollable(scrollable);
 
     if (maxScroll > 0) {
@@ -48,13 +49,13 @@ export function DocumentTickSlider({
 
     if (trackRef.current) {
       const h = trackRef.current.clientHeight;
-      if (h > 0 && h !== trackHeight) {
+      if (h > 0 && Math.abs(h - trackHeight) > 4) {
         setTrackHeight(h);
       }
     }
   }, [scrollContainerRef, trackHeight]);
 
-  // Scroll and Resize listeners on container
+  // Attach scroll & resize observers
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -68,13 +69,11 @@ export function DocumentTickSlider({
 
     container.addEventListener("scroll", onScroll, { passive: true });
 
-    // Periodic check or ResizeObserver to detect content length changes
     const observer = new ResizeObserver(() => {
       updateScrollProgress();
     });
     observer.observe(container);
 
-    // Initial measurement
     updateScrollProgress();
 
     return () => {
@@ -84,92 +83,105 @@ export function DocumentTickSlider({
     };
   }, [scrollContainerRef, updateScrollProgress]);
 
-  // Generate organic tick lines matching document rhythm (varying widths like code/text minimap)
+  // Generate discrete tick marks representing sections / parts of the document with big and small bars
   const ticks = useMemo(() => {
-    const count = Math.min(38, Math.max(16, Math.floor(trackHeight / 14)));
-    const list: { id: number; width: number; isMajor: boolean }[] = [];
-
-    for (let i = 0; i < count; i++) {
-      // Subtle variations in width (like headings, body lines, and breaks in screenshot)
-      let w = 11;
-      let isMajor = false;
-      if (i % 6 === 0) {
-        w = 16;
-        isMajor = true;
-      } else if (i % 3 === 0) {
-        w = 13;
-      } else if (i % 5 === 0) {
-        w = 8;
-      }
-      list.push({ id: i, width: w, isMajor });
-    }
-    return list;
+    const count = Math.min(36, Math.max(16, Math.floor(trackHeight / 14)));
+    return Array.from({ length: count }, (_, id) => {
+      // Big and small bar pattern matching the document spine in screenshot
+      const isBig = id === 0 || id === 2 || (id > 2 && (id % 7 === 0 || id % 11 === 0));
+      return { id, isBig };
+    });
   }, [trackHeight]);
 
-  // Handle direct click or drag on the slider track
-  const scrollToClientY = useCallback(
-    (clientY: number, smooth: boolean = false) => {
+  // Determine which discrete tick part is currently active / crossed
+  const activeIndex = useMemo(() => {
+    if (ticks.length === 0) return 0;
+    return Math.min(ticks.length - 1, Math.max(0, Math.round(scrollProgress * (ticks.length - 1))));
+  }, [scrollProgress, ticks.length]);
+
+  // Smoothly scroll to a specific tick part or ratio
+  const scrollToRatio = useCallback(
+    (ratio: number, smooth: boolean = false) => {
       const container = scrollContainerRef.current;
-      const track = trackRef.current;
-      if (!container || !track) return;
+      if (!container) return;
 
-      const rect = track.getBoundingClientRect();
-      if (rect.height <= 0) return;
-
-      const relativeY = clientY - rect.top;
-      const ratio = Math.max(0, Math.min(1, relativeY / rect.height));
+      const clampedRatio = Math.max(0, Math.min(1, ratio));
       const maxScroll = container.scrollHeight - container.clientHeight;
+      const targetY = clampedRatio * maxScroll;
 
       if (smooth) {
         container.scrollTo({
-          top: ratio * maxScroll,
+          top: targetY,
           behavior: "smooth",
         });
       } else {
-        container.scrollTop = ratio * maxScroll;
+        container.scrollTop = targetY;
       }
     },
     [scrollContainerRef]
   );
 
+  const getRatioFromClientY = useCallback((clientY: number) => {
+    const track = trackRef.current;
+    if (!track) return 0;
+    const rect = track.getBoundingClientRect();
+    if (rect.height <= 0) return 0;
+    const relativeY = clientY - rect.top;
+    return Math.max(0, Math.min(1, relativeY / rect.height));
+  }, []);
+
+  // Pointer drag directly on the right bars
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
     e.currentTarget.setPointerCapture(e.pointerId);
-    scrollToClientY(e.clientY, false);
+
+    const ratio = getRatioFromClientY(e.clientY);
+    scrollToRatio(ratio, false);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     e.preventDefault();
-    scrollToClientY(e.clientY, false);
+
+    if (dragRafId.current) cancelAnimationFrame(dragRafId.current);
+    const clientY = e.clientY;
+    dragRafId.current = requestAnimationFrame(() => {
+      const ratio = getRatioFromClientY(clientY);
+      scrollToRatio(ratio, false);
+    });
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isDragging) {
       setIsDragging(false);
+      if (dragRafId.current) cancelAnimationFrame(dragRafId.current);
       try {
         e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
-        // Ignore if pointer capture already released
+        // Safe release
       }
     }
   };
 
-  // Do not render on small windows or when not scrollable
+  // Clicking an individual bar smoothly scrolls to that part
+  const handleTickClick = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (ticks.length <= 1) return;
+    const ratio = index / (ticks.length - 1);
+    scrollToRatio(ratio, true);
+  };
+
+  // Do not render on compact window or when not scrollable
   if (isCompact || !isScrollable) {
     return null;
   }
 
-  // Thumb vertical position calculation
-  const indicatorHeight = 3;
-  const thumbTranslateY = scrollProgress * (trackHeight - indicatorHeight);
-
   return (
     <div
       className={`doc-tick-slider-wrapper ${isDragging ? "is-dragging" : ""} ${className}`}
-      title="Scroll indicator (drag or click to navigate)"
+      title="Document parts indicator (drag or click bars to scroll)"
     >
       <div
         ref={trackRef}
@@ -179,24 +191,22 @@ export function DocumentTickSlider({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        {/* Ticks column */}
         <div className="doc-tick-column">
-          {ticks.map((tick) => (
-            <div
-              key={tick.id}
-              className={`doc-tick-item ${tick.isMajor ? "is-major" : ""}`}
-              style={{ width: `${tick.width}px` }}
-            />
-          ))}
-        </div>
+          {ticks.map((tick, index) => {
+            const isActive = index === activeIndex;
+            const isCrossed = index <= activeIndex;
 
-        {/* Smooth gliding active thumb indicator */}
-        <div
-          className="doc-tick-thumb"
-          style={{
-            transform: `translate3d(0, ${thumbTranslateY}px, 0)`,
-          }}
-        />
+            return (
+              <div
+                key={tick.id}
+                onClick={(e) => handleTickClick(index, e)}
+                className={`doc-tick-item ${tick.isBig ? "is-big" : "is-small"} ${
+                  isActive ? "is-active" : ""
+                } ${isCrossed ? "is-crossed" : ""}`}
+              />
+            );
+          })}
+        </div>
       </div>
     </div>
   );
