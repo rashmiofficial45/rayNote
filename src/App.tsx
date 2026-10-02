@@ -7,6 +7,7 @@ import { ShortcutsModal } from "./components/ShortcutsModal";
 import { MarkdownViewerModal, PreviewFileData } from "./components/MarkdownViewerModal";
 import {
   getNoteTitle,
+  getPreviewText,
   noteContentToMarkdown,
   noteContentToPlainText,
   downloadFile,
@@ -14,6 +15,7 @@ import {
 } from "./lib/utils";
 import {
   getAllNotes,
+  getNote,
   createNote,
   updateNote,
   deleteNote,
@@ -23,7 +25,8 @@ import {
   quitApp,
   openSettingsWindow,
   setAlwaysOnTop,
-  Note,
+  exportAllNotesFromDb,
+  NoteSummary,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
 import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
@@ -44,8 +47,12 @@ import {
 } from "lucide-react";
 
 function App() {
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<NoteSummary[]>([]);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const [activeNoteContent, setActiveNoteContent] = useState<string | null>(null);
+  const contentCacheRef = useRef<Map<string, string>>(new Map());
+  const activeFetchIdRef = useRef<string | null>(null);
+
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "browse">("actions");
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
@@ -95,6 +102,8 @@ function App() {
       onNotesCleared: () => {
         setNotes([]);
         setActiveNoteId(null);
+        setActiveNoteContent(null);
+        contentCacheRef.current.clear();
       },
     });
   }, []);
@@ -139,6 +148,45 @@ function App() {
     }, 1900);
   }, []);
 
+  const handleSelectNote = useCallback((id: string, recordHistory = true) => {
+    setActiveNoteId(id);
+    localStorage.setItem("notefast_active_note_id", id);
+    if (recordHistory) {
+      setHistoryIndex((prevIndex) => {
+        setHistory((prevHistory) => {
+          // Cap history buffer to 50 to prevent memory growth
+          const newHistory = prevHistory.slice(Math.max(0, prevIndex - 49), prevIndex + 1);
+          newHistory.push(id);
+          return newHistory;
+        });
+        return Math.min(prevIndex + 1, 50);
+      });
+    }
+
+    // Fast cache check (0ms instantaneous switch)
+    if (contentCacheRef.current.has(id)) {
+      setActiveNoteContent(contentCacheRef.current.get(id)!);
+    } else {
+      setActiveNoteContent(null);
+      activeFetchIdRef.current = id;
+      getNote(id)
+        .then((fullNote) => {
+          if (activeFetchIdRef.current === id && fullNote) {
+            contentCacheRef.current.set(id, fullNote.content);
+            // Cap memory cache to 25 items
+            if (contentCacheRef.current.size > 25) {
+              const oldestKey = contentCacheRef.current.keys().next().value;
+              if (oldestKey) contentCacheRef.current.delete(oldestKey);
+            }
+            setActiveNoteContent(fullNote.content);
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load note content:", err);
+        });
+    }
+  }, []);
+
   // Local Markdown File Import & Preview States
   const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
   const [droppedFilePrompt, setDroppedFilePrompt] = useState<{ file: File; text: string } | null>(null);
@@ -161,17 +209,25 @@ function App() {
         const title = extractTitleFromMarkdown(text, file.name);
         const newNote = await createNote();
         await updateNote(newNote.id, title, text);
-        newNote.title = title;
-        newNote.content = text;
-        setNotes((prev) => [newNote, ...prev]);
-        setActiveNoteId(newNote.id);
+        contentCacheRef.current.set(newNote.id, text);
+        const preview = getPreviewText(text);
+        const summary: NoteSummary = {
+          id: newNote.id,
+          title,
+          preview,
+          created_at: newNote.created_at,
+          updated_at: new Date().toISOString(),
+          is_pinned: false,
+        };
+        setNotes((prev) => [summary, ...prev]);
+        handleSelectNote(newNote.id);
         showToast(`Imported "${title}" to notes`, <Check size={14} />);
       } catch (err) {
         console.error("Failed to import file:", err);
         showToast("Failed to import file", <Trash2 size={14} />);
       }
     },
-    [showToast]
+    [handleSelectNote, showToast]
   );
 
   const processViewFile = useCallback(
@@ -267,45 +323,29 @@ function App() {
     }
   };
 
-  const handleSelectNote = useCallback((id: string, recordHistory = true) => {
-    setActiveNoteId(id);
-    localStorage.setItem("notefast_active_note_id", id);
-    if (recordHistory) {
-      setHistoryIndex((prevIndex) => {
-        setHistory((prevHistory) => {
-          // Cap history buffer to 50 to prevent memory growth
-          const newHistory = prevHistory.slice(Math.max(0, prevIndex - 49), prevIndex + 1);
-          newHistory.push(id);
-          return newHistory;
-        });
-        return Math.min(prevIndex + 1, 50);
-      });
-    }
-  }, []);
-
   const handleGoBack = useCallback(() => {
     setHistoryIndex((prevIndex) => {
       if (prevIndex > 0) {
         const newIndex = prevIndex - 1;
-        setActiveNoteId(history[newIndex]);
+        handleSelectNote(history[newIndex], false);
         showToast("Navigated Back");
         return newIndex;
       }
       return prevIndex;
     });
-  }, [history, showToast]);
+  }, [history, handleSelectNote, showToast]);
 
   const handleGoForward = useCallback(() => {
     setHistoryIndex((prevIndex) => {
       if (prevIndex < history.length - 1) {
         const newIndex = prevIndex + 1;
-        setActiveNoteId(history[newIndex]);
+        handleSelectNote(history[newIndex], false);
         showToast("Navigated Forward");
         return newIndex;
       }
       return prevIndex;
     });
-  }, [history, showToast]);
+  }, [history, handleSelectNote, showToast]);
 
   const handleNextNote = useCallback(() => {
     if (notes.length === 0) return;
@@ -313,7 +353,7 @@ function App() {
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % notes.length;
     const nextNote = notes[nextIndex];
     handleSelectNote(nextNote.id);
-    showToast(getNoteTitle(nextNote.title, nextNote.content));
+    showToast(getNoteTitle(nextNote.title, nextNote.preview));
   }, [notes, activeNoteId, handleSelectNote, showToast]);
 
   const handlePreviousNote = useCallback(() => {
@@ -325,13 +365,22 @@ function App() {
         : (currentIndex - 1 + notes.length) % notes.length;
     const prevNote = notes[prevIndex];
     handleSelectNote(prevNote.id);
-    showToast(getNoteTitle(prevNote.title, prevNote.content));
+    showToast(getNoteTitle(prevNote.title, prevNote.preview));
   }, [notes, activeNoteId, handleSelectNote, showToast]);
 
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote();
-      setNotes((prev) => [note, ...prev]);
+      contentCacheRef.current.set(note.id, note.content);
+      const summary: NoteSummary = {
+        id: note.id,
+        title: note.title,
+        preview: note.preview,
+        created_at: note.created_at,
+        updated_at: note.updated_at,
+        is_pinned: note.is_pinned,
+      };
+      setNotes((prev) => [summary, ...prev]);
       handleSelectNote(note.id);
       showToast("New note created", <Plus size={14} />);
     } catch (err) {
@@ -340,23 +389,36 @@ function App() {
   }, [handleSelectNote, showToast]);
 
   const handleDuplicateNote = useCallback(async () => {
-    if (!activeNote) return;
+    if (!activeNoteId) return;
     try {
+      let content = activeNoteContent;
+      if (content === null) {
+        const full = await getNote(activeNoteId);
+        content = full?.content || "";
+      }
+      const currentSummary = notes.find((n) => n.id === activeNoteId);
       const note = await createNote();
-      const updatedNote = {
-        ...note,
-        title: activeNote.title ? `${activeNote.title} (Copy)` : "Untitled (Copy)",
-        content: activeNote.content,
-      };
-      await updateNote(updatedNote.id, updatedNote.title, updatedNote.content);
+      const title = currentSummary?.title ? `${currentSummary.title} (Copy)` : "Untitled (Copy)";
+      await updateNote(note.id, title, content);
 
-      setNotes((prev) => [updatedNote, ...prev]);
-      handleSelectNote(updatedNote.id);
+      contentCacheRef.current.set(note.id, content);
+      const preview = getPreviewText(content);
+      const newSummary: NoteSummary = {
+        id: note.id,
+        title,
+        preview,
+        created_at: note.created_at,
+        updated_at: new Date().toISOString(),
+        is_pinned: false,
+      };
+
+      setNotes((prev) => [newSummary, ...prev]);
+      handleSelectNote(note.id);
       showToast("Note duplicated", <Copy size={14} />);
     } catch (err) {
       console.error("Failed to duplicate note:", err);
     }
-  }, [activeNote, handleSelectNote, showToast]);
+  }, [activeNoteId, activeNoteContent, notes, handleSelectNote, showToast]);
 
   const handleUpdateNote = useCallback(
     async (content: string, titleHint?: string) => {
@@ -375,7 +437,12 @@ function App() {
           } catch { }
         }
 
+        contentCacheRef.current.set(activeNoteId, content);
+        setActiveNoteContent(content);
+
         await updateNote(activeNoteId, title, content);
+
+        const preview = getPreviewText(content);
 
         setNotes((prev) =>
           prev.map((n) =>
@@ -383,7 +450,7 @@ function App() {
               ? {
                 ...n,
                 title,
-                content,
+                preview,
                 updated_at: new Date().toISOString(),
               }
               : n
@@ -400,6 +467,7 @@ function App() {
     async (id: string) => {
       try {
         await deleteNote(id);
+        contentCacheRef.current.delete(id);
         setNotes((prev) => prev.filter((n) => n.id !== id));
         if (activeNoteId === id) {
           const remaining = notes.filter((n) => n.id !== id);
@@ -407,6 +475,7 @@ function App() {
             handleSelectNote(remaining[0].id);
           } else {
             setActiveNoteId(null);
+            setActiveNoteContent(null);
           }
         }
         showToast("Note deleted", <Trash2 size={14} />);
@@ -456,54 +525,67 @@ function App() {
     [showToast]
   );
 
-  const handleCopyNoteAsMarkdown = useCallback(() => {
-    if (!activeNote) return;
-    const md = noteContentToMarkdown(activeNote.content, activeNote.title);
+  const handleCopyNoteAsMarkdown = useCallback(async () => {
+    if (!activeNoteId) return;
+    let content = activeNoteContent;
+    if (content === null) {
+      const full = await getNote(activeNoteId);
+      content = full?.content || "";
+    }
+    const md = noteContentToMarkdown(content, activeNote?.title);
     navigator.clipboard.writeText(md).then(() => {
       showToast("Copied note as Markdown", <Check size={14} />);
     });
-  }, [activeNote, showToast]);
+  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
-  const handleCopyNoteAsText = useCallback(() => {
-    if (!activeNote) return;
-    const text = noteContentToPlainText(activeNote.content, activeNote.title);
+  const handleCopyNoteAsText = useCallback(async () => {
+    if (!activeNoteId) return;
+    let content = activeNoteContent;
+    if (content === null) {
+      const full = await getNote(activeNoteId);
+      content = full?.content || "";
+    }
+    const text = noteContentToPlainText(content, activeNote?.title);
     navigator.clipboard.writeText(text).then(() => {
       showToast("Copied note as Plain Text", <Check size={14} />);
     });
-  }, [activeNote, showToast]);
+  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
   const handleCopyDeeplink = useCallback(() => {
-    if (!activeNote) return;
-    const deeplink = `notefast://note/${activeNote.id}`;
+    if (!activeNoteId) return;
+    const deeplink = `notefast://note/${activeNoteId}`;
     navigator.clipboard.writeText(deeplink).then(() => {
       showToast("Deeplink copied to clipboard", <Link2 size={14} />);
     });
-  }, [activeNote, showToast]);
+  }, [activeNoteId, showToast]);
 
-  const handleExportNote = useCallback(() => {
-    if (!activeNote) return;
-    const title = getNoteTitle(activeNote.title, activeNote.content);
+  const handleExportNote = useCallback(async () => {
+    if (!activeNoteId) return;
+    let content = activeNoteContent;
+    if (content === null) {
+      const full = await getNote(activeNoteId);
+      content = full?.content || "";
+    }
+    const title = getNoteTitle(activeNote?.title || "", activeNote?.preview || content);
     const filename = `${title.replace(/[/\\?%*:|"<>]/g, "-") || "Note"}.md`;
-    const md = noteContentToMarkdown(activeNote.content, activeNote.title);
+    const md = noteContentToMarkdown(content, activeNote?.title);
     downloadFile(filename, md, "text/markdown");
     showToast(`Exported "${filename}"`, <FileDown size={14} />);
-  }, [activeNote, showToast]);
+  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
-  const handleExportAllNotes = useCallback(() => {
+  const handleExportAllNotes = useCallback(async () => {
     if (notes.length === 0) {
       showToast("No notes to export");
       return;
     }
-    notes.forEach((note, index) => {
-      setTimeout(() => {
-        const title = getNoteTitle(note.title, note.content);
-        const filename = `${title.replace(/[/\\?%*:|"<>]/g, "-") || `Note-${index + 1}`}.md`;
-        const md = noteContentToMarkdown(note.content, note.title);
-        downloadFile(filename, md, "text/markdown");
-      }, index * 80);
-    });
-    showToast(`Exported ${notes.length} note${notes.length > 1 ? "s" : ""} as Markdown (.md)`, <FileDown size={14} />);
-  }, [notes, showToast]);
+    try {
+      const resultMsg = await exportAllNotesFromDb();
+      showToast(resultMsg || `Exported ${notes.length} note${notes.length > 1 ? "s" : ""}`, <FileDown size={14} />);
+    } catch (err) {
+      console.error("Export all failed:", err);
+      showToast("Export failed", <Trash2 size={14} />);
+    }
+  }, [notes.length, showToast]);
 
   const handleZoomIn = useCallback(() => {
     setZoomLevel((prev) => {
@@ -826,7 +908,7 @@ function App() {
       )}
 
       <TitleBar
-        title={activeNote ? getNoteTitle(activeNote.title, activeNote.content) : "rayNote"}
+        title={activeNote ? getNoteTitle(activeNote.title, activeNote.preview) : "rayNote"}
         onNewNote={handleNewNote}
         onOpenCommandPalette={() => {
           setPaletteInitialView("actions");
@@ -948,7 +1030,8 @@ function App() {
 
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <NoteEditor
-          note={activeNote}
+          noteId={activeNoteId}
+          content={activeNoteContent}
           onUpdate={handleUpdateNote}
           zoomLevel={zoomLevel}
           isFindOpen={isFindOpen}
@@ -998,6 +1081,8 @@ function App() {
             Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
               setNotes([]);
               setActiveNoteId(null);
+              setActiveNoteContent(null);
+              contentCacheRef.current.clear();
               showToast("All notes cleared", <Trash2 size={14} />);
             }).catch(console.error);
           }
@@ -1018,10 +1103,18 @@ function App() {
           try {
             const newNote = await createNote();
             await updateNote(newNote.id, title, markdown);
-            newNote.title = title;
-            newNote.content = markdown;
-            setNotes((prev) => [newNote, ...prev]);
-            setActiveNoteId(newNote.id);
+            contentCacheRef.current.set(newNote.id, markdown);
+            const preview = getPreviewText(markdown);
+            const summary: NoteSummary = {
+              id: newNote.id,
+              title,
+              preview,
+              created_at: newNote.created_at,
+              updated_at: new Date().toISOString(),
+              is_pinned: false,
+            };
+            setNotes((prev) => [summary, ...prev]);
+            handleSelectNote(newNote.id);
             setPreviewFile(null);
             showToast(`Imported "${title}" to notes`, <Check size={14} />);
           } catch (err) {

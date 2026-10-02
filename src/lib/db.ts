@@ -1,20 +1,28 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export interface Note {
+export interface NoteSummary {
   id: string;
   title: string;
-  content: string;
+  preview: string;
   created_at: string;
   updated_at: string;
   is_pinned: boolean;
 }
 
-export async function getAllNotes(): Promise<Note[]> {
-  return invoke<Note[]>("get_all_notes");
+export interface Note extends NoteSummary {
+  content: string;
+}
+
+export async function getAllNotes(): Promise<NoteSummary[]> {
+  return invoke<NoteSummary[]>("get_all_notes");
 }
 
 export async function getNote(id: string): Promise<Note | null> {
   return invoke<Note | null>("get_note", { id });
+}
+
+export async function exportAllNotesFromDb(): Promise<string> {
+  return invoke<string>("export_all_notes_from_db");
 }
 
 export async function createNote(): Promise<Note> {

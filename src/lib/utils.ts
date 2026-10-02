@@ -24,10 +24,14 @@ export function formatDate(dateStr: string): string {
   });
 }
 
-export function getPreviewText(content: string): string {
-  if (!content) return "New note";
+export function getPreviewText(contentOrPreview: string): string {
+  if (!contentOrPreview) return "New note";
+  const trimmed = contentOrPreview.trim();
+  if (!trimmed.startsWith("{")) {
+    return trimmed.length > 80 ? trimmed.slice(0, 80) + "…" : trimmed || "New note";
+  }
   try {
-    const doc = JSON.parse(content);
+    const doc = JSON.parse(trimmed);
     const texts: string[] = [];
     function extractText(node: any) {
       if (node.text) texts.push(node.text);
@@ -37,13 +41,14 @@ export function getPreviewText(content: string): string {
     const joined = texts.join(" ").trim();
     return joined.length > 80 ? joined.slice(0, 80) + "…" : joined || "New note";
   } catch {
-    return "New note";
+    return trimmed.length > 80 ? trimmed.slice(0, 80) + "…" : trimmed || "New note";
   }
 }
 
-export function getNoteTitle(title: string, content: string): string {
-  if (title && title.trim()) return title;
-  const preview = getPreviewText(content);
+export function getNoteTitle(title: string, previewOrContent?: string): string {
+  if (title && title.trim()) return title.trim();
+  if (!previewOrContent) return "Untitled Note";
+  const preview = getPreviewText(previewOrContent);
   return preview.length > 30 ? preview.slice(0, 30) + "…" : preview;
 }
 

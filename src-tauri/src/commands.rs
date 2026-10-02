@@ -1,10 +1,10 @@
-use crate::database::{Database, Note};
+use crate::database::{Database, Note, NoteSummary};
 use tauri::State;
 use uuid::Uuid;
 use chrono::Utc;
 
 #[tauri::command]
-pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<Note>, String> {
+pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<NoteSummary>, String> {
     db.get_all_notes().map_err(|e| e.to_string())
 }
 
@@ -20,6 +20,7 @@ pub fn create_note(db: State<'_, Database>) -> Result<Note, String> {
         id: Uuid::new_v4().to_string(),
         title: String::new(),
         content: "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[]}]}".to_string(),
+        preview: String::new(),
         created_at: now.clone(),
         updated_at: now,
         is_pinned: false,
@@ -428,6 +429,109 @@ pub fn export_notes_to_folder(
     }
 
     Ok(export_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn export_all_notes_from_db(
+    app: tauri::AppHandle,
+    db: State<'_, Database>,
+) -> Result<String, String> {
+    use tauri::Manager;
+    let download_dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().app_data_dir())
+        .map_err(|e| e.to_string())?;
+
+    let export_dir = download_dir.join("rayNote_Exports");
+    std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
+
+    let all_notes = db.get_all_notes_with_content().map_err(|e| e.to_string())?;
+    for (idx, note) in all_notes.into_iter().enumerate() {
+        let raw_title = if note.title.trim().is_empty() {
+            format!("Untitled_{}", idx + 1)
+        } else {
+            note.title.trim().to_string()
+        };
+        let safe_name: String = raw_title
+            .chars()
+            .map(|c| match c {
+                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+                _ => c,
+            })
+            .collect();
+        let file_path = export_dir.join(format!("{}.md", safe_name));
+        let md = note_content_to_markdown_clean(&note.content, &note.title);
+        std::fs::write(&file_path, md).map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let path_str = export_dir.to_string_lossy().to_string();
+        let _ = std::process::Command::new("open").arg(&path_str).spawn();
+    }
+
+    Ok(export_dir.to_string_lossy().to_string())
+}
+
+fn note_content_to_markdown_clean(content: &str, title: &str) -> String {
+    let trimmed = content.trim();
+    if trimmed.starts_with('{') {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
+            let mut out = String::new();
+            if !title.trim().is_empty() {
+                out.push_str(&format!("# {}\n\n", title.trim()));
+            }
+            json_doc_to_markdown(&value, &mut out);
+            let res = out.trim();
+            if !res.is_empty() {
+                return res.to_string();
+            }
+        }
+    }
+    if !title.trim().is_empty() && !trimmed.starts_with('#') {
+        format!("# {}\n\n{}", title.trim(), trimmed)
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn json_doc_to_markdown(node: &serde_json::Value, out: &mut String) {
+    if let Some(node_type) = node.get("type").and_then(|t| t.as_str()) {
+        match node_type {
+            "paragraph" => {
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for child in content {
+                        json_doc_to_markdown(child, out);
+                    }
+                }
+                out.push_str("\n\n");
+            }
+            "heading" => {
+                let level = node.get("attrs").and_then(|a| a.get("level")).and_then(|l| l.as_u64()).unwrap_or(1);
+                out.push_str(&"#".repeat(level as usize));
+                out.push(' ');
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for child in content {
+                        json_doc_to_markdown(child, out);
+                    }
+                }
+                out.push_str("\n\n");
+            }
+            "text" => {
+                if let Some(text) = node.get("text").and_then(|t| t.as_str()) {
+                    out.push_str(text);
+                }
+            }
+            _ => {
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for child in content {
+                        json_doc_to_markdown(child, out);
+                    }
+                }
+            }
+        }
+    }
 }
 
 #[tauri::command]

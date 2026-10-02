@@ -304,7 +304,8 @@ pub fn run() {
             get_storage_stats,
             set_always_on_top,
             set_menu_bar_visible,
-            export_notes_to_folder
+            export_notes_to_folder,
+            export_all_notes_from_db,
         ])
         .build(tauri::generate_context!())
         .expect("error while building rayNote");

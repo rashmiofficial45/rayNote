@@ -1,10 +1,10 @@
-import { Note } from "../lib/db";
-import { formatDate, getNoteTitle, getPreviewText } from "../lib/utils";
+import { NoteSummary } from "../lib/db";
+import { formatDate, getNoteTitle } from "../lib/utils";
 import { Pin, Trash2, Search } from "lucide-react";
 import { useState } from "react";
 
 interface NoteListProps {
-  notes: Note[];
+  notes: NoteSummary[];
   activeNoteId: string | null;
   onSelectNote: (id: string) => void;
   onDeleteNote: (id: string) => void;
@@ -24,8 +24,8 @@ export function NoteList({
   const filteredNotes = notes.filter((note) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    const title = getNoteTitle(note.title, note.content).toLowerCase();
-    const preview = getPreviewText(note.content).toLowerCase();
+    const title = getNoteTitle(note.title, note.preview).toLowerCase();
+    const preview = (note.preview || "").toLowerCase();
     return title.includes(q) || preview.includes(q);
   });
 
@@ -78,11 +78,11 @@ export function NoteList({
                     />
                   )}
                   <h3 className="text-[13px] font-medium text-[var(--text-primary)] truncate leading-tight">
-                    {getNoteTitle(note.title, note.content)}
+                    {getNoteTitle(note.title, note.preview)}
                   </h3>
                 </div>
                 <p className="text-[11px] text-[var(--text-muted)] mt-1 truncate leading-tight">
-                  {getPreviewText(note.content)}
+                  {note.preview || "New note"}
                 </p>
                 <span className="text-[10px] text-[var(--text-subtle)] mt-1 block">
                   {formatDate(note.updated_at)}

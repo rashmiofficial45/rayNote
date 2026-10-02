@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Note, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
+import { NoteSummary, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
@@ -54,7 +54,7 @@ import { invoke } from "@tauri-apps/api/core";
 export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  notes: Note[];
+  notes: NoteSummary[];
   activeNoteId: string | null;
   initialView?: "actions" | "browse" | "settings";
   zoomLevel: number;
@@ -792,9 +792,9 @@ export function CommandPalette({
   const filteredNotes = notes.filter((n) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
-    const title = getNoteTitle(n.title, n.content).toLowerCase();
-    const content = (n.content || "").toLowerCase();
-    return title.includes(q) || content.includes(q);
+    const title = getNoteTitle(n.title, n.preview).toLowerCase();
+    const preview = (n.preview || "").toLowerCase();
+    return title.includes(q) || preview.includes(q);
   });
 
   const getActiveItems = () => {
@@ -1181,7 +1181,7 @@ export function CommandPalette({
                   />
                 )}
                 <span className="browse-note-title">
-                  {getNoteTitle(note.title, note.content)}
+                  {getNoteTitle(note.title, note.preview)}
                 </span>
                 <span className="browse-note-date">
                   {formatDate(note.updated_at)}

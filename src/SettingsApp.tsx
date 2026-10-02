@@ -37,6 +37,7 @@ import {
   StorageStats,
   getAllNotes,
   deleteNote,
+  exportAllNotesFromDb,
 } from "./lib/db";
 import {
   broadcastSync,
@@ -44,7 +45,6 @@ import {
   formatKeystrokeFromEvent,
   getKeystrokeModifierString,
 } from "./lib/settingsSync";
-import { noteContentToMarkdown } from "./lib/utils";
 
 type SettingsPane = "general" | "commands" | "storage" | "about";
 
@@ -409,19 +409,13 @@ export default function SettingsApp() {
   // Export All Notes
   const handleExportAll = async () => {
     try {
-      const notes = await getAllNotes();
-      if (notes.length === 0) {
+      const stats = await getStorageStats();
+      if (stats.notes_count === 0) {
         setActionMessage("No notes to export.");
         return;
       }
-
-      const exportNotes = notes.map((n, idx) => ({
-        title: n.title || `Untitled_${idx + 1}`,
-        content: noteContentToMarkdown(n.content, n.title),
-      }));
-
-      await invoke("export_notes_to_folder", { notes: exportNotes });
-      setActionMessage(`Exported ${notes.length} note(s) to Downloads/rayNote_Exports.`);
+      await exportAllNotesFromDb();
+      setActionMessage(`Exported ${stats.notes_count} note(s) to Downloads/rayNote_Exports.`);
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error(err);
