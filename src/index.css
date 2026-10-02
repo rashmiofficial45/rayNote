@@ -3754,6 +3754,144 @@ html[data-smooth-caret="false"] .tiptap {
   color: var(--text-primary);
 }
 
+/* ── Document Tick-Mark Minimap Scroll Slider ──────────────── */
+.doc-tick-slider-wrapper {
+  position: absolute;
+  right: 6px;
+  top: 24px;
+  bottom: 44px;
+  width: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 35;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.85;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Hide default browser scrollbar on the editor text area so only the tick slider is visible */
+.editor-wrapper > div.overflow-y-auto,
+.md-viewer-body.overflow-y-auto,
+.md-viewer-body {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.editor-wrapper > div.overflow-y-auto::-webkit-scrollbar,
+.md-viewer-body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Responsive: in very small window size it should NOT show */
+@media (max-width: 520px), (max-height: 320px) {
+  .doc-tick-slider-wrapper {
+    display: none !important;
+  }
+}
+
+.doc-tick-slider-wrapper:hover,
+.doc-tick-slider-wrapper.is-dragging {
+  opacity: 1;
+}
+
+.doc-tick-slider-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: 88%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  pointer-events: auto;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.doc-tick-slider-wrapper.is-dragging .doc-tick-slider-track {
+  cursor: grabbing;
+}
+
+.doc-tick-column {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 2px;
+  padding-right: 1px;
+}
+
+.doc-tick-item {
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 1px;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+  transform-origin: right center;
+}
+
+[data-theme="light"] .doc-tick-item {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.doc-tick-item.is-major {
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+[data-theme="light"] .doc-tick-item.is-major {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.doc-tick-slider-track:hover .doc-tick-item {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+[data-theme="light"] .doc-tick-slider-track:hover .doc-tick-item {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.doc-tick-thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 15px;
+  height: 3px;
+  border-radius: 2px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 2px rgba(255, 255, 255, 1);
+  pointer-events: none;
+  will-change: transform;
+  transition: transform 0.05s ease-out, width 0.1s ease;
+}
+
+[data-theme="light"] .doc-tick-thumb {
+  background: var(--color-accent, #0284c7);
+  box-shadow: 0 0 6px rgba(2, 132, 199, 0.6), 0 0 2px rgba(2, 132, 199, 0.9);
+}
+
+.doc-tick-slider-wrapper.is-dragging .doc-tick-thumb,
+.doc-tick-slider-track:hover .doc-tick-thumb {
+  width: 17px;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.95), 0 0 3px #ffffff;
+}
+
+[data-theme="light"] .doc-tick-slider-wrapper.is-dragging .doc-tick-thumb,
+[data-theme="light"] .doc-tick-slider-track:hover .doc-tick-thumb {
+  width: 17px;
+  box-shadow: 0 0 8px rgba(2, 132, 199, 0.8), 0 0 3px var(--color-accent, #0284c7);
+}
+
+.doc-tick-slider-wrapper.is-dragging .doc-tick-thumb {
+  transition: none; /* Zero lag while dragging */
+}
+
 
 
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   FileText,
   X,
@@ -14,6 +14,7 @@ import {
 import { markdownToTipTapHtml } from "../editor/markdownUtils";
 import { extractTitleFromMarkdown } from "../lib/utils";
 import { openSettingsWindow } from "../lib/db";
+import { DocumentTickSlider } from "./DocumentTickSlider";
 
 export interface PreviewFileData {
   name: string;
@@ -36,6 +37,7 @@ export function MarkdownViewerModal({
 }: MarkdownViewerModalProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
   const [copied, setCopied] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!fileData) return;
@@ -201,7 +203,7 @@ export function MarkdownViewerModal({
         </div>
 
         {/* Content Body */}
-        <div className="md-viewer-body">
+        <div ref={bodyRef} className="md-viewer-body relative">
           {viewMode === "rendered" ? (
             <div
               className="tiptap md-viewer-rendered"
@@ -212,6 +214,7 @@ export function MarkdownViewerModal({
               <code>{fileData.content}</code>
             </pre>
           )}
+          <DocumentTickSlider scrollContainerRef={bodyRef} />
         </div>
 
         {/* Footer */}

@@ -6,6 +6,7 @@ import { SlashCommand } from "./SlashCommand";
 import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
+import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import {
   isMarkdownContent,
   markdownToTipTapHtml,
@@ -243,6 +244,7 @@ export function Editor({
           <EditorContent editor={editor} />
         </div>
       </div>
+      <DocumentTickSlider scrollContainerRef={scrollContainerRef} />
       <div className="editor-char-count">
         {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
       </div>
