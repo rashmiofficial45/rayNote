@@ -241,7 +241,7 @@ export function TitleBar({
               >
                 <Command size={13} />
                 <span>Command & Settings Palette</span>
-                <kbd className="popover-kbd">⌥P</kbd>
+                <kbd className="popover-kbd">⌘K</kbd>
               </button>
               <div className="command-popover-divider" />
               <button

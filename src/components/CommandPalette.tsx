@@ -84,7 +84,7 @@ export interface CommandPaletteProps {
   onPromptClearAllNotes?: () => void;
 }
 
-type PaletteView = "actions" | "browse" | "settings" | "sub_accents" | "sub_fonts" | "sub_zoom";
+type PaletteView = "actions" | "browse" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom";
 
 export interface ActionItem {
   id: string;
@@ -322,6 +322,20 @@ export function CommandPalette({
     },
 
     // ─── 2. SETTINGS: APPEARANCE & THEME (Instant Apply / Sub-View) ───
+    {
+      id: "sub-appearance-picker",
+      category: "Settings: Appearance",
+      label: "Choose Appearance Mode…",
+      subtitle: `Currently ${currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1)} Mode • Select Dark, Light, or System`,
+      badge: "Sub-Menu",
+      icon: <Sun size={14} className="text-amber-400" />,
+      keywords: ["appearance", "theme", "dark", "light", "system", "mode", "color", "choose", "select", "options", "submenu"],
+      action: () => {
+        setView("sub_appearance");
+        setSearch("");
+        setSelectedIndex(0);
+      },
+    },
     {
       id: "sub-theme-picker",
       category: "Settings: Appearance",
@@ -769,6 +783,40 @@ export function CommandPalette({
     },
   ];
 
+  // Sub-view: Appearance mode options
+  const appearanceSubActions: ActionItem[] = [
+    {
+      id: "sub-app-dark",
+      category: "Appearance",
+      label: "Dark Mode",
+      subtitle: "Deep contrast glassmorphism with glowing illumination",
+      badge: currentTheme === "dark" ? "Selected" : undefined,
+      icon: <Moon size={14} className="text-indigo-400" />,
+      keywords: ["dark", "mode", "night", "black", "obsidian"],
+      action: () => handleApplyTheme("dark"),
+    },
+    {
+      id: "sub-app-light",
+      category: "Appearance",
+      label: "Light Mode",
+      subtitle: "Crisp, bright paper aesthetic with clean high-contrast text",
+      badge: currentTheme === "light" ? "Selected" : undefined,
+      icon: <Sun size={14} className="text-amber-400" />,
+      keywords: ["light", "mode", "day", "white", "bright"],
+      action: () => handleApplyTheme("light"),
+    },
+    {
+      id: "sub-app-system",
+      category: "Appearance",
+      label: "System Auto (Follow macOS)",
+      subtitle: "Automatically match your system appearance setting",
+      badge: currentTheme === "system" ? "Selected" : undefined,
+      icon: <Monitor size={14} className="text-sky-400" />,
+      keywords: ["system", "auto", "mac", "os", "match"],
+      action: () => handleApplyTheme("system"),
+    },
+  ];
+
   // Sub-view: Accent color options
   const accentSubActions: ActionItem[] = ACCENT_OPTIONS.map((acc) => ({
     id: `sub-acc-${acc.id}`,
@@ -857,6 +905,7 @@ export function CommandPalette({
   };
 
   const filteredActions = filterList(actions);
+  const filteredAppearance = filterList(appearanceSubActions);
   const filteredAccents = filterList(accentSubActions);
   const filteredFonts = filterList(fontSubActions);
   const filteredZoom = filterList(zoomSubActions);
@@ -873,6 +922,8 @@ export function CommandPalette({
     switch (view) {
       case "browse":
         return filteredNotes;
+      case "sub_appearance":
+        return filteredAppearance;
       case "sub_accents":
         return filteredAccents;
       case "sub_fonts":
@@ -884,6 +935,12 @@ export function CommandPalette({
         return filteredActions;
     }
   };
+
+  const isSubView =
+    view === "sub_appearance" ||
+    view === "sub_accents" ||
+    view === "sub_fonts" ||
+    view === "sub_zoom";
 
   const currentItems = getActiveItems();
 
@@ -929,6 +986,11 @@ export function CommandPalette({
         setSelectedIndex((i) => (i > 0 ? i - 1 : Math.max(0, currentItems.length - 1)));
         return;
       }
+      if (e.key === "Backspace" && isSubView && !search) {
+        e.preventDefault();
+        setView("actions");
+        return;
+      }
       if (e.key === "Enter") {
         e.preventDefault();
         if (view === "browse") {
@@ -938,13 +1000,16 @@ export function CommandPalette({
             onClose();
           }
         } else {
-          const list = view === "sub_accents"
-            ? filteredAccents
-            : view === "sub_fonts"
-            ? filteredFonts
-            : view === "sub_zoom"
-            ? filteredZoom
-            : filteredActions;
+          const list =
+            view === "sub_appearance"
+              ? filteredAppearance
+              : view === "sub_accents"
+              ? filteredAccents
+              : view === "sub_fonts"
+              ? filteredFonts
+              : view === "sub_zoom"
+              ? filteredZoom
+              : filteredActions;
 
           const action = list[selectedIndex];
           if (action && !action.disabled) action.action();
@@ -955,9 +1020,12 @@ export function CommandPalette({
     [
       view,
       initialView,
+      isSubView,
+      search,
       currentItems,
       selectedIndex,
       filteredActions,
+      filteredAppearance,
       filteredAccents,
       filteredFonts,
       filteredZoom,
@@ -968,8 +1036,6 @@ export function CommandPalette({
   );
 
   if (!isOpen) return null;
-
-  const isSubView = view === "sub_accents" || view === "sub_fonts" || view === "sub_zoom";
 
   return (
     <div className="command-overlay" onClick={onClose}>
@@ -988,7 +1054,7 @@ export function CommandPalette({
                 setView("actions");
                 setSearch("");
               }}
-              title="Back to All Actions"
+              title="Back to All Actions (Backspace)"
             >
               <ChevronLeft size={16} />
             </button>
@@ -1004,6 +1070,8 @@ export function CommandPalette({
                 ? "Search commands & settings…"
                 : view === "browse"
                 ? "Search notes by title or content…"
+                : view === "sub_appearance"
+                ? "Choose appearance (Dark, Light, System)…"
                 : view === "sub_accents"
                 ? "Search accent themes…"
                 : view === "sub_fonts"
@@ -1037,7 +1105,7 @@ export function CommandPalette({
               }}
               title="Press Tab to switch mode"
             >
-              {view === "actions" ? "Notes (⌘P)" : "Commands (⌥P)"}
+              {view === "actions" ? "Notes (⌘P)" : "Commands (⌘K)"}
             </button>
           )}
         </div>
@@ -1095,6 +1163,28 @@ export function CommandPalette({
                 </div>
               );
             })}
+
+          {/* Sub-View: Appearance (Dark / Light / System) */}
+          {view === "sub_appearance" && (
+            <div>
+              <div className="command-category-header">Select Appearance Mode (Applies Immediately)</div>
+              {filteredAppearance.map((item, idx) => (
+                <button
+                  key={item.id}
+                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                  onClick={() => item.action()}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <div className="command-item-icon">{item.icon}</div>
+                  <div className="command-item-text flex flex-col justify-center min-w-0">
+                    <span className="command-item-label">{item.label}</span>
+                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  </div>
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Sub-View: Accents */}
           {view === "sub_accents" && (

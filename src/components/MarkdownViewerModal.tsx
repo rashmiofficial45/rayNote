@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   FileText,
   X,
@@ -9,9 +9,11 @@ import {
   Code2,
   HardDriveDownload,
   ShieldCheck,
+  Settings,
 } from "lucide-react";
 import { markdownToTipTapHtml } from "../editor/markdownUtils";
 import { extractTitleFromMarkdown } from "../lib/utils";
+import { openSettingsWindow } from "../lib/db";
 
 export interface PreviewFileData {
   name: string;
@@ -34,6 +36,21 @@ export function MarkdownViewerModal({
 }: MarkdownViewerModalProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!fileData) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        openSettingsWindow().catch(console.error);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fileData, onClose]);
 
   const stats = useMemo(() => {
     if (!fileData?.content) return { words: 0, chars: 0, lines: 0 };
@@ -104,6 +121,15 @@ export function MarkdownViewerModal({
           </div>
 
           <div className="md-viewer-header-right">
+            <button
+              type="button"
+              className="md-viewer-tool-btn"
+              onClick={() => openSettingsWindow().catch(console.error)}
+              title="NoteFast Settings (⌘,)"
+              aria-label="Settings"
+            >
+              <Settings size={14} />
+            </button>
             <button
               type="button"
               className="md-viewer-close-btn"

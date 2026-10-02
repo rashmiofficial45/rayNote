@@ -22,6 +22,7 @@ import {
   hideWindow,
   quitApp,
   openSettingsWindow,
+  setAlwaysOnTop,
   Note,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
@@ -87,6 +88,9 @@ function App() {
     return listenToSettingsSync({
       onZoomChange: (val) => setZoomLevel(val),
       onEscLosesFocusChange: (val) => setEscLosesFocus(val),
+      onAlwaysOnTopChange: (val) => {
+        setAlwaysOnTop(val).catch(console.error);
+      },
       onCommandsConfigChange: (val) => setCommandsConfig(val),
       onNotesCleared: () => {
         setNotes([]);
@@ -236,10 +240,12 @@ function App() {
     }
   };
 
-  // Load notes & initialize theme on mount
+  // Load notes, initialize theme & apply always on top on mount
   useEffect(() => {
     initTheme();
     loadNotes();
+    const savedAlwaysOnTop = localStorage.getItem("notefast_always_on_top") !== "false";
+    setAlwaysOnTop(savedAlwaysOnTop).catch(console.error);
   }, []);
 
   const loadNotes = async () => {
@@ -558,13 +564,8 @@ function App() {
         return;
       }
 
-      // Search Notes / Toggle Command & Settings Palette (Option+P or Cmd+K)
-      const isAltP =
-        e.altKey &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        (e.code === "KeyP" || e.key.toLowerCase() === "p" || e.key === "π");
-      if (isAltP || isTriggered("search", "⌥P") || isTriggered("search", "⌘K")) {
+      // Search Notes / Toggle Command Palette (Cmd+K only)
+      if (isTriggered("search", "⌘K")) {
         e.preventDefault();
         setPaletteInitialView("actions");
         setIsCommandPaletteOpen((prev) => !prev);

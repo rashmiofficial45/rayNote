@@ -320,14 +320,30 @@ pub fn set_always_on_top(app: tauri::AppHandle, always_on_top: bool) -> Result<(
     use tauri::Manager;
     #[cfg(target_os = "macos")]
     {
+        use tauri_nspanel::ManagerExt;
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
+
+        let level_i64: i64 = if always_on_top { 1000 } else { 0 };
+        let level_isize: isize = if always_on_top { 1000 } else { 0 };
+
+        // 1. Update tauri_nspanel WebviewPanel level & floating property
+        if let Ok(panel) = app.get_webview_panel("main") {
+            panel.set_level(level_i64);
+            panel.set_floating_panel(always_on_top);
+        }
+
+        // 2. Update NSWindow / NSPanel pointer and window manager flags
         if let Some(win) = app.get_webview_window("main") {
+            let _ = win.set_always_on_top(always_on_top);
             if let Ok(ptr) = win.ns_window() {
                 unsafe {
                     if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
-                        let level: isize = if always_on_top { 1000 } else { 0 };
-                        let _: () = msg_send![ns_win, setLevel: level];
+                        let _: () = msg_send![ns_win, setLevel: level_isize];
+                        let _: () = msg_send![ns_win, setFloatingPanel: always_on_top];
+                        if !always_on_top {
+                            let _: () = msg_send![ns_win, orderBack: std::ptr::null_mut::<AnyObject>()];
+                        }
                     }
                 }
             }
