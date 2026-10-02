@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  ChevronLeft,
-  ChevronRight,
   Info,
   Sliders,
   Keyboard,
@@ -51,42 +49,39 @@ import { downloadFile, noteContentToMarkdown } from "./lib/utils";
 
 type SettingsPane = "general" | "commands" | "storage" | "about";
 
-const PANES: SettingsPane[] = ["general", "commands", "storage", "about"];
-
 interface CommandRow {
   id: string;
   title: string;
-  alias: string;
   hotkey: string;
   enabled: boolean;
   category: "commands" | "extensions";
 }
 
 const DEFAULT_COMMANDS: CommandRow[] = [
-  { id: "create", title: "Create Note", alias: "", hotkey: "⌘N", enabled: true, category: "commands" },
-  { id: "browse", title: "Quick Open / Browse Notes", alias: "", hotkey: "⌘P", enabled: true, category: "commands" },
-  { id: "search", title: "Search Notes / Command Palette", alias: "", hotkey: "⌘K", enabled: true, category: "commands" },
-  { id: "find", title: "Find in Note", alias: "", hotkey: "⌘F", enabled: true, category: "commands" },
-  { id: "duplicate", title: "Duplicate Note", alias: "", hotkey: "⌘D", enabled: true, category: "commands" },
-  { id: "pin", title: "Pin / Unpin Note", alias: "", hotkey: "⇧⌘P", enabled: true, category: "commands" },
-  { id: "delete", title: "Delete Note", alias: "", hotkey: "⇧⌘⌫", enabled: true, category: "commands" },
-  { id: "next_note", title: "Next Note in List", alias: "", hotkey: "⌥↓", enabled: true, category: "commands" },
-  { id: "prev_note", title: "Previous Note in List", alias: "", hotkey: "⌥↑", enabled: true, category: "commands" },
-  { id: "history_back", title: "Go Back in History", alias: "", hotkey: "⌘[", enabled: true, category: "commands" },
-  { id: "history_forward", title: "Go Forward in History", alias: "", hotkey: "⌘]", enabled: true, category: "commands" },
-  { id: "copy_markdown", title: "Copy Note as Markdown", alias: "", hotkey: "⇧⌘C", enabled: true, category: "commands" },
-  { id: "copy_deeplink", title: "Copy Deeplink", alias: "", hotkey: "⇧⌘D", enabled: true, category: "commands" },
-  { id: "export_note", title: "Export Note", alias: "", hotkey: "⇧⌘E", enabled: true, category: "commands" },
-  { id: "zoom_in", title: "Zoom In", alias: "", hotkey: "⌘=", enabled: true, category: "commands" },
-  { id: "zoom_out", title: "Zoom Out", alias: "", hotkey: "⌘-", enabled: true, category: "commands" },
-  { id: "reset_zoom", title: "Reset Zoom", alias: "", hotkey: "⌘0", enabled: true, category: "commands" },
-  { id: "shortcuts_help", title: "Shortcuts Cheatsheet", alias: "", hotkey: "⌘/", enabled: true, category: "commands" },
-  { id: "settings", title: "Open Settings", alias: "", hotkey: "⌘,", enabled: true, category: "commands" },
-  { id: "hide", title: "Hide Window", alias: "", hotkey: "⌘W", enabled: true, category: "commands" },
-  { id: "quit", title: "Quit NoteFast", alias: "", hotkey: "⌘Q", enabled: true, category: "commands" },
-  { id: "toggle", title: "NoteFast (Toggle Notes)", alias: "ntoe", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
-  { id: "slash", title: "Slash Commands Menu", alias: "", hotkey: "/", enabled: true, category: "extensions" },
-  { id: "tables", title: "Tables & Embeds", alias: "", hotkey: "/table & /video", enabled: true, category: "extensions" },
+  { id: "create", title: "Create Note", hotkey: "⌘N", enabled: true, category: "commands" },
+  { id: "browse", title: "Quick Open / Browse Notes", hotkey: "⌘P", enabled: true, category: "commands" },
+  { id: "search", title: "Search Notes / Command Palette", hotkey: "⌘K", enabled: true, category: "commands" },
+  { id: "find", title: "Find in Note", hotkey: "⌘F", enabled: true, category: "commands" },
+  { id: "duplicate", title: "Duplicate Note", hotkey: "⌘D", enabled: true, category: "commands" },
+  { id: "pin", title: "Pin / Unpin Note", hotkey: "⇧⌘P", enabled: true, category: "commands" },
+  { id: "delete", title: "Delete Note", hotkey: "⇧⌘⌫", enabled: true, category: "commands" },
+  { id: "next_note", title: "Next Note in List", hotkey: "⌥↓", enabled: true, category: "commands" },
+  { id: "prev_note", title: "Previous Note in List", hotkey: "⌥↑", enabled: true, category: "commands" },
+  { id: "history_back", title: "Go Back in History", hotkey: "⌘[", enabled: true, category: "commands" },
+  { id: "history_forward", title: "Go Forward in History", hotkey: "⌘]", enabled: true, category: "commands" },
+  { id: "copy_markdown", title: "Copy Note as Markdown", hotkey: "⇧⌘C", enabled: true, category: "commands" },
+  { id: "copy_deeplink", title: "Copy Deeplink", hotkey: "⇧⌘D", enabled: true, category: "commands" },
+  { id: "export_note", title: "Export Note", hotkey: "⇧⌘E", enabled: true, category: "commands" },
+  { id: "zoom_in", title: "Zoom In", hotkey: "⌘=", enabled: true, category: "commands" },
+  { id: "zoom_out", title: "Zoom Out", hotkey: "⌘-", enabled: true, category: "commands" },
+  { id: "reset_zoom", title: "Reset Zoom", hotkey: "⌘0", enabled: true, category: "commands" },
+  { id: "shortcuts_help", title: "Shortcuts Cheatsheet", hotkey: "⌘/", enabled: true, category: "commands" },
+  { id: "settings", title: "Open Settings", hotkey: "⌘,", enabled: true, category: "commands" },
+  { id: "hide", title: "Hide Window", hotkey: "⌘W", enabled: true, category: "commands" },
+  { id: "quit", title: "Quit NoteFast", hotkey: "⌘Q", enabled: true, category: "commands" },
+  { id: "toggle", title: "NoteFast (Toggle Notes)", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
+  { id: "slash", title: "Slash Commands Menu", hotkey: "/", enabled: true, category: "extensions" },
+  { id: "tables", title: "Tables & Embeds", hotkey: "/table & /video", enabled: true, category: "extensions" },
 ];
 
 export default function SettingsApp() {
@@ -98,9 +93,6 @@ export default function SettingsApp() {
     }
     return "general";
   });
-
-  const [paneHistory, setPaneHistory] = useState<SettingsPane[]>([activePane]);
-  const [historyIndex, setHistoryIndex] = useState(0);
 
   // Appearance & Theme State
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
@@ -238,33 +230,6 @@ export default function SettingsApp() {
     if (pane === activePane) return;
     setActivePane(pane);
     localStorage.setItem("notefast_settings_active_pane", pane);
-
-    setPaneHistory((prev) => {
-      const next = prev.slice(0, historyIndex + 1);
-      next.push(pane);
-      return next;
-    });
-    setHistoryIndex((prev) => prev + 1);
-  };
-
-  const handleBack = () => {
-    if (historyIndex > 0) {
-      const newIdx = historyIndex - 1;
-      const targetPane = paneHistory[newIdx];
-      setHistoryIndex(newIdx);
-      setActivePane(targetPane);
-      localStorage.setItem("notefast_settings_active_pane", targetPane);
-    }
-  };
-
-  const handleForward = () => {
-    if (historyIndex < paneHistory.length - 1) {
-      const newIdx = historyIndex + 1;
-      const targetPane = paneHistory[newIdx];
-      setHistoryIndex(newIdx);
-      setActivePane(targetPane);
-      localStorage.setItem("notefast_settings_active_pane", targetPane);
-    }
   };
 
   const startRecording = (id: string) => {
@@ -385,35 +350,11 @@ export default function SettingsApp() {
         e.preventDefault();
         handlePaneChange("about");
       }
-
-      // Left and Right keys navigate between all menubar options in Settings tab
-      const activeEl = document.activeElement;
-      const isInput =
-        activeEl?.tagName === "INPUT" ||
-        activeEl?.tagName === "TEXTAREA" ||
-        activeEl?.getAttribute("contenteditable") === "true";
-
-      if (!isInput && !isCmd && !e.altKey && !e.shiftKey) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          const curr = PANES.indexOf(activePane);
-          const prev = (curr - 1 + PANES.length) % PANES.length;
-          handlePaneChange(PANES[prev]);
-          return;
-        }
-        if (e.key === "ArrowRight") {
-          e.preventDefault();
-          const curr = PANES.indexOf(activePane);
-          const next = (curr + 1) % PANES.length;
-          handlePaneChange(PANES[next]);
-          return;
-        }
-      }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [paneHistory, historyIndex, activePane, recordingCommandId]);
+  }, [activePane, recordingCommandId]);
 
   // Synchronize Theme Changes
   const handleThemeModeChange = (mode: ThemeMode) => {
@@ -579,27 +520,6 @@ export default function SettingsApp() {
                   strokeLinecap="round"
                 />
               </svg>
-            </button>
-          </div>
-
-          <div className="settings-nav-controls" data-tauri-drag-region>
-            <button
-              type="button"
-              className="settings-nav-btn"
-              disabled={historyIndex <= 0}
-              onClick={handleBack}
-              title="Back (⌘[)"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <button
-              type="button"
-              className="settings-nav-btn"
-              disabled={historyIndex >= paneHistory.length - 1}
-              onClick={handleForward}
-              title="Forward (⌘])"
-            >
-              <ChevronRight size={14} />
             </button>
           </div>
         </div>
@@ -906,10 +826,6 @@ export default function SettingsApp() {
                         </div>
 
                         <div className="settings-cmd-right">
-                          <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
-                            {cmd.alias || "Add Alias"}
-                          </span>
-
                           <div className="settings-cmd-kbd-wrapper">
                             <button
                               type="button"
@@ -983,10 +899,6 @@ export default function SettingsApp() {
                         </div>
 
                         <div className="settings-cmd-right">
-                          <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
-                            {cmd.alias || "Add Alias"}
-                          </span>
-
                           <div className="settings-cmd-kbd-wrapper">
                             <button
                               type="button"

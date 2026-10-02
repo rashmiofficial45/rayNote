@@ -2014,48 +2014,14 @@ html[data-smooth-caret="false"] .tiptap {
 .settings-header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
   -webkit-app-region: drag;
-  min-width: 90px;
+  min-width: 48px;
 }
 
 .settings-header-left .title-bar-left {
   position: static;
   display: flex;
   align-items: center;
-  margin-right: 4px;
-}
-
-.settings-nav-controls {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  -webkit-app-region: drag;
-}
-
-.settings-nav-btn {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  border-radius: 8px;
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all 0.12s ease;
-  -webkit-app-region: no-drag;
-}
-
-.settings-nav-btn:hover:not(:disabled) {
-  background: var(--btn-liquid-bg-hover);
-  transform: translateY(-0.5px);
-}
-
-.settings-nav-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .settings-tab-pills {
@@ -2097,7 +2063,7 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .settings-header-right-spacer {
-  min-width: 90px;
+  min-width: 48px;
   height: 26px;
   pointer-events: none;
   -webkit-app-region: drag;
@@ -2496,19 +2462,6 @@ html[data-smooth-caret="false"] .tiptap {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-}
-
-.settings-cmd-alias {
-  font-size: 12px;
-  color: var(--text-muted);
-  min-width: 60px;
-  text-align: right;
-  font-family: inherit;
-}
-
-.settings-cmd-alias.has-alias {
-  color: var(--text-primary);
-  font-weight: 500;
 }
 
 .settings-cmd-kbd-wrapper {
