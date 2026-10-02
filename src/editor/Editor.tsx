@@ -40,25 +40,47 @@ export function Editor({
   onCloseFind,
 }: EditorProps) {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingUpdateRef = useRef<{ content: string; title: string } | null>(null);
+  const isDirtyRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
-  const handleUpdate = useCallback(
-    (json: any) => {
+  const [charCount, setCharCount] = useState(0);
+
+  // Synchronously serializes and flushes pending changes to SQLite
+  const saveNow = useCallback(() => {
+    if (!isDirtyRef.current || !editorRef.current) return;
+    try {
+      const currentEditor = editorRef.current;
+      const json = currentEditor.getJSON();
       const title = extractTitle(json);
       const strContent = JSON.stringify(json);
-      pendingUpdateRef.current = { content: strContent, title };
+      isDirtyRef.current = false;
+      onUpdateRef.current(strContent, title);
+    } catch (err) {
+      console.error("Failed to save editor content:", err);
+    }
+  }, []);
 
+  const handleEditorUpdate = useCallback(
+    (editorInstance: any) => {
+      // 1. Mark dirty
+      isDirtyRef.current = true;
+
+      // 2. Update cheap metadata (O(1) / direct text length, no JSON serialization)
+      const count = editorInstance?.state?.doc?.textContent?.length ?? 0;
+      setCharCount(count);
+
+      // 3. Reset 300ms debounce timer
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
       debounceTimer.current = setTimeout(() => {
-        onUpdate(strContent, title);
-        pendingUpdateRef.current = null;
+        saveNow();
       }, 300);
     },
-    [onUpdate]
+    [saveNow]
   );
 
   const editor = useEditor(
@@ -74,7 +96,7 @@ export function Editor({
           })()
         : undefined,
       onUpdate: ({ editor }) => {
-        handleUpdate(editor.getJSON());
+        handleEditorUpdate(editor);
       },
       editorProps: {
         attributes: {
@@ -131,6 +153,13 @@ export function Editor({
 
   editorRef.current = editor;
 
+  // Initialize character count once on mount or content load
+  useEffect(() => {
+    if (editor) {
+      setCharCount(editor.state.doc.textContent.length);
+    }
+  }, [editor]);
+
   // Intercept external links and open via native system browser
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -157,32 +186,40 @@ export function Editor({
     };
   }, []);
 
-  // Flush pending update on unmount to prevent lost keystrokes and free memory
+  // Flush pending update on unmount or note switch to guarantee zero data loss
   useEffect(() => {
     return () => {
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
-      if (pendingUpdateRef.current) {
-        onUpdate(pendingUpdateRef.current.content, pendingUpdateRef.current.title);
-        pendingUpdateRef.current = null;
+      if (isDirtyRef.current && editorRef.current) {
+        try {
+          const currentEditor = editorRef.current;
+          const json = currentEditor.getJSON();
+          const title = extractTitle(json);
+          const strContent = JSON.stringify(json);
+          isDirtyRef.current = false;
+          onUpdateRef.current(strContent, title);
+        } catch (err) {
+          console.error("Failed to flush editor update on unmount:", err);
+        }
       }
     };
-  }, [onUpdate]);
+  }, []);
 
-  const [charCount, setCharCount] = useState(0);
-
+  // Flush pending update on window blur / defocus
   useEffect(() => {
-    if (!editor) return;
-    const updateCount = () => {
-      setCharCount(editor.getText().length);
+    const handleBlur = () => {
+      if (isDirtyRef.current) {
+        if (debounceTimer.current) {
+          clearTimeout(debounceTimer.current);
+        }
+        saveNow();
+      }
     };
-    updateCount();
-    editor.on("update", updateCount);
-    return () => {
-      editor.off("update", updateCount);
-    };
-  }, [editor]);
+    window.addEventListener("blur", handleBlur);
+    return () => window.removeEventListener("blur", handleBlur);
+  }, [saveNow]);
 
   if (!editor) return null;
 
