@@ -9,6 +9,11 @@ pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<NoteSummary>, String
 }
 
 #[tauri::command]
+pub fn search_notes(db: State<'_, Database>, query: String) -> Result<Vec<NoteSummary>, String> {
+    db.search_notes(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn get_note(db: State<'_, Database>, id: String) -> Result<Option<Note>, String> {
     db.get_note(&id).map_err(|e| e.to_string())
 }
@@ -474,59 +479,270 @@ pub fn export_all_notes_from_db(
     Ok(export_dir.to_string_lossy().to_string())
 }
 
+fn collect_text_only(node: &serde_json::Value, out: &mut String) {
+    if let Some(text) = node.get("text").and_then(|t| t.as_str()) {
+        out.push_str(text);
+    }
+    if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+        for child in content {
+            collect_text_only(child, out);
+        }
+    }
+}
+
 fn note_content_to_markdown_clean(content: &str, title: &str) -> String {
     let trimmed = content.trim();
     if trimmed.starts_with('{') {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) {
             let mut out = String::new();
-            if !title.trim().is_empty() {
+
+            // Check if document already begins with a heading that matches the title
+            let mut skip_title = title.trim().is_empty();
+            if let Some(content_arr) = value.get("content").and_then(|c| c.as_array()) {
+                if let Some(first) = content_arr.first() {
+                    if first.get("type").and_then(|t| t.as_str()) == Some("heading") {
+                        let mut first_heading_text = String::new();
+                        collect_text_only(first, &mut first_heading_text);
+                        if first_heading_text.trim().eq_ignore_ascii_case(title.trim()) {
+                            skip_title = true;
+                        }
+                    }
+                }
+            }
+
+            if !skip_title {
                 out.push_str(&format!("# {}\n\n", title.trim()));
             }
-            json_doc_to_markdown(&value, &mut out);
+
+            json_doc_to_markdown_recursive(&value, &mut out, "");
             let res = out.trim();
             if !res.is_empty() {
                 return res.to_string();
             }
         }
     }
-    if !title.trim().is_empty() && !trimmed.starts_with('#') {
+
+    if trimmed.starts_with("---") || trimmed.starts_with('#') {
+        trimmed.to_string()
+    } else if !title.trim().is_empty() {
         format!("# {}\n\n{}", title.trim(), trimmed)
     } else {
         trimmed.to_string()
     }
 }
 
-fn json_doc_to_markdown(node: &serde_json::Value, out: &mut String) {
+fn serialize_inline_json(node: &serde_json::Value) -> String {
+    let mut text = node.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
+    if let Some(marks) = node.get("marks").and_then(|m| m.as_array()) {
+        for mark in marks {
+            if let Some(mark_type) = mark.get("type").and_then(|t| t.as_str()) {
+                match mark_type {
+                    "bold" => text = format!("**{}**", text),
+                    "italic" => text = format!("*{}*", text),
+                    "strike" => text = format!("~~{}~~", text),
+                    "code" => text = format!("`{}`", text),
+                    "link" => {
+                        let href = mark.get("attrs").and_then(|a| a.get("href")).and_then(|h| h.as_str()).unwrap_or("");
+                        text = format!("[{}]({})", text, href);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    text
+}
+
+fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, indent: &str) {
     if let Some(node_type) = node.get("type").and_then(|t| t.as_str()) {
         match node_type {
-            "paragraph" => {
+            "doc" => {
                 if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                     for child in content {
-                        json_doc_to_markdown(child, out);
+                        json_doc_to_markdown_recursive(child, out, indent);
                     }
                 }
+            }
+            "paragraph" => {
+                let mut p_text = String::new();
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for child in content {
+                        if child.get("type").and_then(|t| t.as_str()) == Some("text") {
+                            p_text.push_str(&serialize_inline_json(child));
+                        } else {
+                            json_doc_to_markdown_recursive(child, &mut p_text, indent);
+                        }
+                    }
+                }
+                out.push_str(indent);
+                out.push_str(&p_text);
                 out.push_str("\n\n");
             }
             "heading" => {
                 let level = node.get("attrs").and_then(|a| a.get("level")).and_then(|l| l.as_u64()).unwrap_or(1);
-                out.push_str(&"#".repeat(level as usize));
-                out.push(' ');
+                let hashes = "#".repeat(level.clamp(1, 6) as usize);
+                let mut h_text = String::new();
                 if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                     for child in content {
-                        json_doc_to_markdown(child, out);
+                        if child.get("type").and_then(|t| t.as_str()) == Some("text") {
+                            h_text.push_str(&serialize_inline_json(child));
+                        } else {
+                            json_doc_to_markdown_recursive(child, &mut h_text, indent);
+                        }
                     }
                 }
-                out.push_str("\n\n");
+                out.push_str(&format!("{}{} {}\n\n", indent, hashes, h_text.trim()));
+            }
+            "bulletList" => {
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for item in content {
+                        let mut item_lines = Vec::new();
+                        if let Some(item_children) = item.get("content").and_then(|c| c.as_array()) {
+                            for (idx, child) in item_children.iter().enumerate() {
+                                if child.get("type").and_then(|t| t.as_str()) == Some("paragraph") {
+                                    let mut line_text = String::new();
+                                    if let Some(inline) = child.get("content").and_then(|c| c.as_array()) {
+                                        for in_node in inline {
+                                            line_text.push_str(&serialize_inline_json(in_node));
+                                        }
+                                    }
+                                    if idx == 0 {
+                                        item_lines.push(format!("{}- {}", indent, line_text));
+                                    } else {
+                                        item_lines.push(format!("{}  {}", indent, line_text));
+                                    }
+                                } else {
+                                    let mut sub_out = String::new();
+                                    let next_indent = format!("{}  ", indent);
+                                    json_doc_to_markdown_recursive(child, &mut sub_out, &next_indent);
+                                    item_lines.push(sub_out.trim_end().to_string());
+                                }
+                            }
+                        }
+                        out.push_str(&item_lines.join("\n"));
+                        out.push('\n');
+                    }
+                }
+                out.push('\n');
+            }
+            "orderedList" => {
+                let start = node.get("attrs").and_then(|a| a.get("start")).and_then(|s| s.as_u64()).unwrap_or(1);
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for (i, item) in content.iter().enumerate() {
+                        let num = start + (i as u64);
+                        let prefix = format!("{}. ", num);
+                        let indent_prefix = " ".repeat(prefix.len());
+                        let mut item_lines = Vec::new();
+                        if let Some(item_children) = item.get("content").and_then(|c| c.as_array()) {
+                            for (idx, child) in item_children.iter().enumerate() {
+                                if child.get("type").and_then(|t| t.as_str()) == Some("paragraph") {
+                                    let mut line_text = String::new();
+                                    if let Some(inline) = child.get("content").and_then(|c| c.as_array()) {
+                                        for in_node in inline {
+                                            line_text.push_str(&serialize_inline_json(in_node));
+                                        }
+                                    }
+                                    if idx == 0 {
+                                        item_lines.push(format!("{}{}{}", indent, prefix, line_text));
+                                    } else {
+                                        item_lines.push(format!("{}{}{}", indent, indent_prefix, line_text));
+                                    }
+                                } else {
+                                    let mut sub_out = String::new();
+                                    let next_indent = format!("{}{}", indent, indent_prefix);
+                                    json_doc_to_markdown_recursive(child, &mut sub_out, &next_indent);
+                                    item_lines.push(sub_out.trim_end().to_string());
+                                }
+                            }
+                        }
+                        out.push_str(&item_lines.join("\n"));
+                        out.push('\n');
+                    }
+                }
+                out.push('\n');
+            }
+            "taskList" => {
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for item in content {
+                        let checked = item.get("attrs").and_then(|a| a.get("checked")).and_then(|b| b.as_bool()).unwrap_or(false);
+                        let box_str = if checked { "[x]" } else { "[ ]" };
+                        let mut item_lines = Vec::new();
+                        if let Some(item_children) = item.get("content").and_then(|c| c.as_array()) {
+                            for (idx, child) in item_children.iter().enumerate() {
+                                if child.get("type").and_then(|t| t.as_str()) == Some("paragraph") {
+                                    let mut line_text = String::new();
+                                    if let Some(inline) = child.get("content").and_then(|c| c.as_array()) {
+                                        for in_node in inline {
+                                            line_text.push_str(&serialize_inline_json(in_node));
+                                        }
+                                    }
+                                    if idx == 0 {
+                                        item_lines.push(format!("{}- {} {}", indent, box_str, line_text));
+                                    } else {
+                                        item_lines.push(format!("{}  {}", indent, line_text));
+                                    }
+                                } else {
+                                    let mut sub_out = String::new();
+                                    let next_indent = format!("{}  ", indent);
+                                    json_doc_to_markdown_recursive(child, &mut sub_out, &next_indent);
+                                    item_lines.push(sub_out.trim_end().to_string());
+                                }
+                            }
+                        }
+                        out.push_str(&item_lines.join("\n"));
+                        out.push('\n');
+                    }
+                }
+                out.push('\n');
+            }
+            "codeBlock" => {
+                let lang = node.get("attrs").and_then(|a| a.get("language")).and_then(|l| l.as_str()).unwrap_or("");
+                let mut code = String::new();
+                collect_text_only(node, &mut code);
+                out.push_str(&format!("{}```{}\n{}\n{}```\n\n", indent, lang, code, indent));
+            }
+            "blockquote" => {
+                let mut bq_text = String::new();
+                if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
+                    for child in content {
+                        json_doc_to_markdown_recursive(child, &mut bq_text, "");
+                    }
+                }
+                for line in bq_text.trim().lines() {
+                    out.push_str(&format!("{}> {}\n", indent, line));
+                }
+                out.push('\n');
+            }
+            "horizontalRule" => {
+                out.push_str(&format!("{}---\n\n", indent));
+            }
+            "table" => {
+                if let Some(rows) = node.get("content").and_then(|c| c.as_array()) {
+                    for (r_idx, row) in rows.iter().enumerate() {
+                        let mut cells = Vec::new();
+                        if let Some(cell_nodes) = row.get("content").and_then(|c| c.as_array()) {
+                            for cell in cell_nodes {
+                                let mut cell_text = String::new();
+                                collect_text_only(cell, &mut cell_text);
+                                cells.push(cell_text.replace('|', "\\|").trim().to_string());
+                            }
+                        }
+                        out.push_str(&format!("{}| {} |\n", indent, cells.join(" | ")));
+                        if r_idx == 0 {
+                            let sep: Vec<String> = cells.iter().map(|_| "---".to_string()).collect();
+                            out.push_str(&format!("{}| {} |\n", indent, sep.join(" | ")));
+                        }
+                    }
+                    out.push('\n');
+                }
             }
             "text" => {
-                if let Some(text) = node.get("text").and_then(|t| t.as_str()) {
-                    out.push_str(text);
-                }
+                out.push_str(&serialize_inline_json(node));
             }
             _ => {
                 if let Some(content) = node.get("content").and_then(|c| c.as_array()) {
                     for child in content {
-                        json_doc_to_markdown(child, out);
+                        json_doc_to_markdown_recursive(child, out, indent);
                     }
                 }
             }

@@ -144,51 +144,72 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
           return `${text}\n\n`;
         }
         case "bulletList": {
-          return (
-            (node.content || [])
-              .map((item: any) => {
-                const itemLines = (item.content || []).map((p: any) => {
-                  if (p.type === "paragraph") {
-                    return (p.content || []).map(serializeInline).join("");
-                  }
-                  return serializeNode(p, indent + "  ").trim();
-                });
-                return `${indent}- ${itemLines.join(" ")}`;
-              })
-              .join("\n") + "\n\n"
-          );
+          const items = (node.content || []).map((item: any) => {
+            const lines: string[] = [];
+            (item.content || []).forEach((child: any, idx: number) => {
+              if (child.type === "paragraph") {
+                const text = (child.content || []).map(serializeInline).join("");
+                if (idx === 0) {
+                  lines.push(`${indent}- ${text}`);
+                } else {
+                  lines.push(`${indent}  ${text}`);
+                }
+              } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
+                lines.push(serializeNode(child, indent + "  ").trimEnd());
+              } else {
+                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+              }
+            });
+            return lines.join("\n");
+          });
+          return items.join("\n") + "\n\n";
         }
         case "orderedList": {
           const start = node.attrs?.start || 1;
-          return (
-            (node.content || [])
-              .map((item: any, idx: number) => {
-                const itemLines = (item.content || []).map((p: any) => {
-                  if (p.type === "paragraph") {
-                    return (p.content || []).map(serializeInline).join("");
-                  }
-                  return serializeNode(p, indent + "   ").trim();
-                });
-                return `${indent}${start + idx}. ${itemLines.join(" ")}`;
-              })
-              .join("\n") + "\n\n"
-          );
+          const items = (node.content || []).map((item: any, idx: number) => {
+            const prefix = `${start + idx}. `;
+            const indentPrefix = " ".repeat(prefix.length);
+            const lines: string[] = [];
+            (item.content || []).forEach((child: any, cIdx: number) => {
+              if (child.type === "paragraph") {
+                const text = (child.content || []).map(serializeInline).join("");
+                if (cIdx === 0) {
+                  lines.push(`${indent}${prefix}${text}`);
+                } else {
+                  lines.push(`${indent}${indentPrefix}${text}`);
+                }
+              } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
+                lines.push(serializeNode(child, indent + indentPrefix).trimEnd());
+              } else {
+                lines.push(`${indent}${indentPrefix}${serializeNode(child, indent + indentPrefix).trim()}`);
+              }
+            });
+            return lines.join("\n");
+          });
+          return items.join("\n") + "\n\n";
         }
         case "taskList": {
-          return (
-            (node.content || [])
-              .map((item: any) => {
-                const checked = item.attrs?.checked ? "[x]" : "[ ]";
-                const itemLines = (item.content || []).map((p: any) => {
-                  if (p.type === "paragraph") {
-                    return (p.content || []).map(serializeInline).join("");
-                  }
-                  return serializeNode(p, indent + "  ").trim();
-                });
-                return `${indent}- ${checked} ${itemLines.join(" ")}`;
-              })
-              .join("\n") + "\n\n"
-          );
+          const items = (node.content || []).map((item: any) => {
+            const checked = item.attrs?.checked ? "[x]" : "[ ]";
+            const prefix = `- ${checked} `;
+            const lines: string[] = [];
+            (item.content || []).forEach((child: any, idx: number) => {
+              if (child.type === "paragraph") {
+                const text = (child.content || []).map(serializeInline).join("");
+                if (idx === 0) {
+                  lines.push(`${indent}${prefix}${text}`);
+                } else {
+                  lines.push(`${indent}  ${text}`);
+                }
+              } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
+                lines.push(serializeNode(child, indent + "  ").trimEnd());
+              } else {
+                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+              }
+            });
+            return lines.join("\n");
+          });
+          return items.join("\n") + "\n\n";
         }
         case "taskItem": {
           const checked = node.attrs?.checked ? "[x]" : "[ ]";

@@ -59,11 +59,23 @@ export function applyThemeMode(mode: ThemeMode): void {
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const isDark = mode === "dark" || (mode === "system" && prefersDark);
 
-  document.documentElement.classList.toggle("dark", isDark);
-  document.documentElement.classList.toggle("light", !isDark);
-  document.documentElement.dataset.themeMode = mode;
-  document.documentElement.dataset.resolvedTheme = isDark ? "dark" : "light";
-  document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+  const updateDOM = () => {
+    document.documentElement.classList.toggle("dark", isDark);
+    document.documentElement.classList.toggle("light", !isDark);
+    document.documentElement.dataset.themeMode = mode;
+    document.documentElement.dataset.resolvedTheme = isDark ? "dark" : "light";
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
+  };
+
+  if (typeof (document as any).startViewTransition === "function") {
+    try {
+      (document as any).startViewTransition(updateDOM);
+      return;
+    } catch {
+      // Fallback
+    }
+  }
+  updateDOM();
 }
 
 export function setStoredThemeMode(mode: ThemeMode): void {

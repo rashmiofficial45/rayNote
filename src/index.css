@@ -239,6 +239,36 @@ html, body, #root {
   text-rendering: optimizeLegibility;
 }
 
+/* ── Smooth Theme Cross-Fade View Transitions ─────────── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html,
+body,
+#root,
+.app-shell,
+.title-bar,
+.editor-wrapper,
+.tiptap,
+.command-palette,
+.command-palette-shell,
+.settings-modal,
+.settings-window,
+.md-viewer-modal,
+.bottom-dock,
+.sidebar-drawer,
+.liquid-btn,
+.command-input,
+.command-item {
+  transition: background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 /* ── iOS 26 Liquid Glass Button System ─────────────────── */
 .liquid-btn {
   display: inline-flex;
@@ -565,14 +595,15 @@ html[data-smooth-caret="false"] .tiptap {
   }
 }
 
-/* First line = Notion-style Title (large, bold) */
-.tiptap > *:first-child {
-  font-size: 1.7rem;
+/* First line = Notion-style Title (large, bold only for headings) */
+.tiptap > h1:first-child,
+.tiptap > h2:first-child {
+  font-size: 1.75rem;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.25;
   color: var(--text-primary);
-  margin-top: 0;
-  margin-bottom: 0.2em;
+  margin-top: 0 !important;
+  margin-bottom: 0.95em !important;
 }
 
 /* Placeholder for empty first node (title placeholder) */
@@ -601,12 +632,6 @@ html[data-smooth-caret="false"] .tiptap {
 
 .tiptap > * + * {
   margin-top: 0.4em;
-}
-
-/* ── First line (Title) separation from content body ──── */
-.tiptap > *:first-child {
-  margin-top: 0 !important;
-  margin-bottom: 0.95em !important;
 }
 
 .tiptap > h1:first-child {

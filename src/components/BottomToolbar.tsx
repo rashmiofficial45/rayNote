@@ -7,7 +7,6 @@ import {
   CheckSquare,
   Quote,
   Code2,
-  Link as LinkIcon,
   Bold,
   Italic,
   Underline as UnderlineIcon,
@@ -15,7 +14,6 @@ import {
   Highlighter as HighlightIcon,
   Minus,
   Table as TableIcon,
-  Video,
   ALargeSmall,
   Type,
   ChevronDown,
@@ -114,17 +112,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
   if (!editor) return null;
 
-  const handleLinkClick = () => {
-    const previousUrl = editor.getAttributes("link").href;
-    const url = window.prompt("URL", previousUrl || "");
-    if (url === null) return;
-    if (url === "") {
-      editor.chain().focus().unsetLink().run();
-    } else {
-      editor.chain().focus().setLink({ href: url }).run();
-    }
-  };
-
   const hasActiveFormatting =
     editor.isActive("bold") ||
     editor.isActive("italic") ||
@@ -135,8 +122,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     editor.isActive("bulletList") ||
     editor.isActive("taskList") ||
     editor.isActive("blockquote") ||
-    editor.isActive("codeBlock") ||
-    editor.isActive("link");
+    editor.isActive("codeBlock");
 
   return (
     <div ref={containerRef} className="bottom-toolbar-corner-container">
@@ -193,13 +179,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             >
               <HighlightIcon size={14} />
             </button>
-            <button
-              onClick={handleLinkClick}
-              className={`toolbar-btn liquid-btn ${editor.isActive("link") ? "is-active" : ""}`}
-              title="Link (⌘L)"
-            >
-              <LinkIcon size={14} />
-            </button>
           </div>
 
           <div className="expanded-toolbar-divider" />
@@ -246,25 +225,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
               title="Insert Table (3x3)"
             >
               <TableIcon size={14} />
-            </button>
-            <button
-              onClick={() => {
-                const input = window.prompt("Enter YouTube URL or <iframe> embed code:");
-                if (!input || !input.trim()) return;
-                const trimmed = input.trim();
-                const iframeSrcMatch = trimmed.match(/src=["']([^"']+)["']/i);
-                if (trimmed.startsWith("<iframe") && iframeSrcMatch) {
-                  (editor.chain().focus() as any).setIframe({ src: iframeSrcMatch[1] }).run();
-                } else if (trimmed.includes("youtube.com") || trimmed.includes("youtu.be")) {
-                  (editor.chain().focus() as any).setYoutubeVideo({ src: trimmed }).run();
-                } else {
-                  (editor.chain().focus() as any).setIframe({ src: trimmed }).run();
-                }
-              }}
-              className="toolbar-btn liquid-btn"
-              title="Embed Video / Iframe"
-            >
-              <Video size={14} />
             </button>
           </div>
 

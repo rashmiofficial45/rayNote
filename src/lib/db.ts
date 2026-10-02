@@ -17,6 +17,10 @@ export async function getAllNotes(): Promise<NoteSummary[]> {
   return invoke<NoteSummary[]>("get_all_notes");
 }
 
+export async function searchNotes(query: string): Promise<NoteSummary[]> {
+  return invoke<NoteSummary[]>("search_notes", { query });
+}
+
 export async function getNote(id: string): Promise<Note | null> {
   return invoke<Note | null>("get_note", { id });
 }

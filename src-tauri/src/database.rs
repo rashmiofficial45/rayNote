@@ -100,6 +100,20 @@ fn truncate_preview(s: &str, max_chars: usize) -> String {
     }
 }
 
+pub fn sanitize_fts5_query(query: &str) -> String {
+    let mut tokens = Vec::new();
+    for word in query.split_whitespace() {
+        let cleaned: String = word
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if !cleaned.is_empty() {
+            tokens.push(format!("\"{}\"*", cleaned));
+        }
+    }
+    tokens.join(" ")
+}
+
 impl Database {
     pub fn new(app_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&app_dir).ok();
@@ -121,14 +135,14 @@ impl Database {
 
         let conn = Connection::open(&db_path)?;
 
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
-             PRAGMA cache_size = -1000;
-             PRAGMA temp_store = MEMORY;
-             PRAGMA mmap_size = 0;
+        let _ = conn.pragma_update(None, "journal_mode", "WAL");
+        let _ = conn.pragma_update(None, "synchronous", "NORMAL");
+        let _ = conn.pragma_update(None, "cache_size", -1000);
+        let _ = conn.pragma_update(None, "temp_store", "MEMORY");
+        let _ = conn.pragma_update(None, "mmap_size", 0);
 
-             CREATE TABLE IF NOT EXISTS notes (
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS notes (
                 id TEXT PRIMARY KEY,
                 title TEXT NOT NULL DEFAULT '',
                 content TEXT NOT NULL DEFAULT '',
@@ -140,6 +154,29 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
             CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(is_pinned DESC, updated_at DESC);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+                id UNINDEXED,
+                title,
+                content,
+                preview,
+                tokenize='unicode61'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_ai AFTER INSERT ON notes BEGIN
+                INSERT INTO notes_fts(id, title, content, preview)
+                VALUES (new.id, new.title, new.content, new.preview);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_ad AFTER DELETE ON notes BEGIN
+                DELETE FROM notes_fts WHERE id = old.id;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS notes_fts_au AFTER UPDATE ON notes BEGIN
+                DELETE FROM notes_fts WHERE id = old.id;
+                INSERT INTO notes_fts(id, title, content, preview)
+                VALUES (new.id, new.title, new.content, new.preview);
+            END;
             "
         )?;
 
@@ -160,9 +197,48 @@ impl Database {
             }
         }
 
+        // Backfill any existing notes into notes_fts if not already present
+        let _ = conn.execute(
+            "INSERT INTO notes_fts(id, title, content, preview)
+             SELECT id, title, content, preview FROM notes
+             WHERE id NOT IN (SELECT id FROM notes_fts)",
+            [],
+        );
+
         Ok(Database {
             conn: Mutex::new(conn),
         })
+    }
+
+    /// Searches notes across title, preview, and full content using SQLite FTS5
+    pub fn search_notes(&self, query: &str) -> Result<Vec<NoteSummary>> {
+        let clean = sanitize_fts5_query(query);
+        if clean.is_empty() {
+            return self.get_all_notes();
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT n.id, n.title, n.preview, n.created_at, n.updated_at, n.is_pinned
+             FROM notes_fts f
+             JOIN notes n ON n.id = f.id
+             WHERE notes_fts MATCH ?1
+             ORDER BY rank, n.is_pinned DESC, n.updated_at DESC
+             LIMIT 50"
+        )?;
+
+        let notes = stmt.query_map(params![clean], |row| {
+            Ok(NoteSummary {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                preview: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                is_pinned: row.get::<_, i32>(5)? != 0,
+            })
+        })?.collect::<Result<Vec<_>>>()?;
+
+        Ok(notes)
     }
 
     /// Optimized: Returns lightweight note summaries WITHOUT full document content

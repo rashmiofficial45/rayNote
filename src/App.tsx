@@ -1039,55 +1039,57 @@ function App() {
         />
       </div>
 
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        notes={notes}
-        activeNoteId={activeNoteId}
-        initialView={paletteInitialView}
-        onNewNote={handleNewNote}
-        onDuplicateNote={handleDuplicateNote}
-        onSelectNote={handleSelectNote}
-        onDeleteNote={handleDeleteNote}
-        onTogglePin={handleTogglePin}
-        onGoBack={handleGoBack}
-        onGoForward={handleGoForward}
-        onFindInNote={() => setIsFindOpen(true)}
-        onCopyNoteAsMarkdown={handleCopyNoteAsMarkdown}
-        onCopyNoteAsText={handleCopyNoteAsText}
-        onCopyDeeplink={handleCopyDeeplink}
-        onExportNote={handleExportNote}
-        onExportAllNotes={handleExportAllNotes}
-        onShowToast={showToast}
-        onPreviousNote={handlePreviousNote}
-        onNextNote={handleNextNote}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onResetZoom={handleResetZoom}
-        onShowShortcuts={() => setIsShortcutsModalOpen(true)}
-        onTriggerImportFile={handleTriggerImportFile}
-        onTriggerViewFile={handleTriggerViewFile}
-        zoomLevel={zoomLevel}
-        onSetZoom={(zoom) => {
-          setZoomLevel(zoom);
-          broadcastSync({ type: "zoom", value: zoom });
-        }}
-        onPromptClearAllNotes={() => {
-          if (notes.length === 0) {
-            showToast("No notes to clear", <Check size={14} />);
-            return;
-          }
-          if (window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) {
-            Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
-              setNotes([]);
-              setActiveNoteId(null);
-              setActiveNoteContent(null);
-              contentCacheRef.current.clear();
-              showToast("All notes cleared", <Trash2 size={14} />);
-            }).catch(console.error);
-          }
-        }}
-      />
+      {isCommandPaletteOpen && (
+        <CommandPalette
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          notes={notes}
+          activeNoteId={activeNoteId}
+          initialView={paletteInitialView}
+          onNewNote={handleNewNote}
+          onDuplicateNote={handleDuplicateNote}
+          onSelectNote={handleSelectNote}
+          onDeleteNote={handleDeleteNote}
+          onTogglePin={handleTogglePin}
+          onGoBack={handleGoBack}
+          onGoForward={handleGoForward}
+          onFindInNote={() => setIsFindOpen(true)}
+          onCopyNoteAsMarkdown={handleCopyNoteAsMarkdown}
+          onCopyNoteAsText={handleCopyNoteAsText}
+          onCopyDeeplink={handleCopyDeeplink}
+          onExportNote={handleExportNote}
+          onExportAllNotes={handleExportAllNotes}
+          onShowToast={showToast}
+          onPreviousNote={handlePreviousNote}
+          onNextNote={handleNextNote}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onResetZoom={handleResetZoom}
+          onShowShortcuts={() => setIsShortcutsModalOpen(true)}
+          onTriggerImportFile={handleTriggerImportFile}
+          onTriggerViewFile={handleTriggerViewFile}
+          zoomLevel={zoomLevel}
+          onSetZoom={(zoom) => {
+            setZoomLevel(zoom);
+            broadcastSync({ type: "zoom", value: zoom });
+          }}
+          onPromptClearAllNotes={() => {
+            if (notes.length === 0) {
+              showToast("No notes to clear", <Check size={14} />);
+              return;
+            }
+            if (window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) {
+              Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
+                setNotes([]);
+                setActiveNoteId(null);
+                setActiveNoteContent(null);
+                contentCacheRef.current.clear();
+                showToast("All notes cleared", <Trash2 size={14} />);
+              }).catch(console.error);
+            }
+          }}
+        />
+      )}
 
       <ShortcutsModal
         isOpen={isShortcutsModalOpen}

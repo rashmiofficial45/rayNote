@@ -46,7 +46,7 @@ export function markdownToTipTapHtml(md: string): string {
   // Parse using marked with GFM (GitHub Flavored Markdown)
   let html = marked.parse(md, {
     gfm: true,
-    breaks: false,
+    breaks: true,
     async: false,
   }) as string;
 
@@ -56,11 +56,12 @@ export function markdownToTipTapHtml(md: string): string {
   
   // Transform task list items
   html = html.replace(
-    /<li>\s*<input(?:\s+checked(?:="")?)?[^>]*type="checkbox"[^>]*>(.*?)<\/li>/gis,
-    (match, innerText) => {
+    /<li>\s*<input(?:\s+checked(?:="")?)?[^>]*type="checkbox"[^>]*>([\s\S]*?)<\/li>/gis,
+    (match, innerContent) => {
       const isChecked = /checked/i.test(match);
-      const cleanText = innerText.replace(/^<\/?[^>]+>/g, "").trim();
-      return `<li data-type="taskItem" data-checked="${isChecked}"><p>${cleanText}</p></li>`;
+      const clean = innerContent.trim();
+      const formattedBody = clean.startsWith("<p>") ? clean : `<p>${clean}</p>`;
+      return `<li data-type="taskItem" data-checked="${isChecked}"><label contenteditable="false"><input type="checkbox" ${isChecked ? 'checked="checked"' : ""} disabled="disabled"></label><div>${formattedBody}</div></li>`;
     }
   );
 
@@ -104,7 +105,7 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
   }
 
   // Custom high-fidelity ProseMirror Node-to-Markdown serializer
-  const serializeNode = (node: any): string => {
+  const serializeNode = (node: any, indent = ""): string => {
     if (!node) return "";
 
     if (node.isText) {
@@ -140,7 +141,7 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
         childNodes.push(node.content.child(i));
       }
     }
-    const childrenText = childNodes.map(serializeNode).join("");
+    const childrenText = childNodes.map((c) => serializeNode(c, indent)).join("");
 
     switch (type) {
       case "paragraph":
@@ -154,8 +155,21 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
       case "bulletList": {
         let out = "";
         for (const item of childNodes) {
-          const itemText = (item.content ? Array.from({ length: item.content.childCount }, (_, i) => serializeNode(item.content.child(i))).join("") : "").trim();
-          out += `- ${itemText}\n`;
+          const lines: string[] = [];
+          if (item.content) {
+            for (let i = 0; i < item.content.childCount; i++) {
+              const child = item.content.child(i);
+              if (child.type?.name === "paragraph") {
+                const text = serializeNode(child, "").trim();
+                lines.push(i === 0 ? `${indent}- ${text}` : `${indent}  ${text}`);
+              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
+                lines.push(serializeNode(child, indent + "  ").trimEnd());
+              } else {
+                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+              }
+            }
+          }
+          out += lines.join("\n") + "\n";
         }
         return `${out}\n`;
       }
@@ -164,8 +178,23 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
         let out = "";
         let idx = 1;
         for (const item of childNodes) {
-          const itemText = (item.content ? Array.from({ length: item.content.childCount }, (_, i) => serializeNode(item.content.child(i))).join("") : "").trim();
-          out += `${idx}. ${itemText}\n`;
+          const prefix = `${idx}. `;
+          const indentPrefix = " ".repeat(prefix.length);
+          const lines: string[] = [];
+          if (item.content) {
+            for (let i = 0; i < item.content.childCount; i++) {
+              const child = item.content.child(i);
+              if (child.type?.name === "paragraph") {
+                const text = serializeNode(child, "").trim();
+                lines.push(i === 0 ? `${indent}${prefix}${text}` : `${indent}${indentPrefix}${text}`);
+              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
+                lines.push(serializeNode(child, indent + indentPrefix).trimEnd());
+              } else {
+                lines.push(`${indent}${indentPrefix}${serializeNode(child, indent + indentPrefix).trim()}`);
+              }
+            }
+          }
+          out += lines.join("\n") + "\n";
           idx++;
         }
         return `${out}\n`;
@@ -175,15 +204,29 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
         let out = "";
         for (const item of childNodes) {
           const checked = item.attrs?.checked;
-          const itemText = (item.content ? Array.from({ length: item.content.childCount }, (_, i) => serializeNode(item.content.child(i))).join("") : "").trim();
-          out += `- [${checked ? "x" : " "}] ${itemText}\n`;
+          const prefix = `- [${checked ? "x" : " "}] `;
+          const lines: string[] = [];
+          if (item.content) {
+            for (let i = 0; i < item.content.childCount; i++) {
+              const child = item.content.child(i);
+              if (child.type?.name === "paragraph") {
+                const text = serializeNode(child, "").trim();
+                lines.push(i === 0 ? `${indent}${prefix}${text}` : `${indent}  ${text}`);
+              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
+                lines.push(serializeNode(child, indent + "  ").trimEnd());
+              } else {
+                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+              }
+            }
+          }
+          out += lines.join("\n") + "\n";
         }
         return `${out}\n`;
       }
 
       case "taskItem": {
         const checked = node.attrs?.checked;
-        return `- [${checked ? "x" : " "}] ${childrenText.trim()}\n`;
+        return `${indent}- [${checked ? "x" : " "}] ${childrenText.trim()}\n`;
       }
 
       case "codeBlock": {
