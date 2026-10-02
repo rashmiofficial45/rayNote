@@ -37,7 +37,6 @@ import {
   StorageStats,
   getAllNotes,
   deleteNote,
-  setAlwaysOnTop as setAlwaysOnTopNative,
 } from "./lib/db";
 import {
   broadcastSync,
@@ -116,9 +115,6 @@ export default function SettingsApp() {
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
     return localStorage.getItem("notefast_esc_loses_focus") === "true";
   });
-  const [alwaysOnTop, setAlwaysOnTop] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_always_on_top") !== "false";
-  });
 
   // Commands state
   const [commands, setCommands] = useState<CommandRow[]>(() => {
@@ -164,7 +160,6 @@ export default function SettingsApp() {
       onFontChange: setFontFamily,
       onZoomChange: setZoomLevel,
       onEscLosesFocusChange: setEscLosesFocus,
-      onAlwaysOnTopChange: setAlwaysOnTop,
       onCommandsConfigChange: setCommands,
     });
   }, []);
@@ -400,13 +395,6 @@ export default function SettingsApp() {
     broadcastSync({ type: "esc_loses_focus", value: val });
   };
 
-  const handleToggleAlwaysOnTop = () => {
-    const val = !alwaysOnTop;
-    setAlwaysOnTop(val);
-    localStorage.setItem("notefast_always_on_top", val ? "true" : "false");
-    setAlwaysOnTopNative(val).catch(console.error);
-    broadcastSync({ type: "always_on_top", value: val });
-  };
 
   // Toggle command row enabled
   const handleToggleCommand = (id: string) => {
@@ -716,27 +704,7 @@ export default function SettingsApp() {
 
               <div className="settings-card-divider" />
 
-              {/* Always on Top */}
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title">Always on Top (Auxiliary Panel)</div>
-                  <div className="settings-row-desc">
-                    Keep NoteFast floating above all workspaces and fullscreen apps.
-                  </div>
-                </div>
-                <div className="settings-row-action">
-                  <label className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={alwaysOnTop}
-                      onChange={handleToggleAlwaysOnTop}
-                    />
-                    <span className="settings-slider" />
-                  </label>
-                </div>
-              </div>
 
-              <div className="settings-card-divider" />
 
               {/* Zoom Level */}
               <div className="settings-row">

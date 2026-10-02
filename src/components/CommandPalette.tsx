@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Note, hideWindow, quitApp, openSettingsWindow, setAlwaysOnTop as setAlwaysOnTopDb } from "../lib/db";
+import { Note, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
@@ -143,9 +143,6 @@ export function CommandPalette({
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
     return localStorage.getItem("notefast_esc_loses_focus") === "true";
   });
-  const [alwaysOnTop, setAlwaysOnTopState] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_always_on_top") !== "false";
-  });
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
     return localStorage.getItem("notefast_show_menubar") !== "false";
   });
@@ -201,15 +198,6 @@ export function CommandPalette({
     onClose();
   };
 
-  const handleToggleAlwaysOnTop = () => {
-    const val = !alwaysOnTop;
-    setAlwaysOnTopState(val);
-    localStorage.setItem("notefast_always_on_top", val ? "true" : "false");
-    setAlwaysOnTopDb(val).catch(console.error);
-    broadcastSync({ type: "always_on_top", value: val });
-    onShowToast?.(val ? "Always on Top enabled" : "Always on Top disabled");
-    onClose();
-  };
 
   const handleToggleMenuBar = () => {
     const val = !showMenuBar;
@@ -350,50 +338,7 @@ export function CommandPalette({
         setSelectedIndex(0);
       },
     },
-    {
-      id: "theme-dark",
-      category: "Settings: Appearance",
-      label: "Appearance: Dark Mode",
-      badge: currentTheme === "dark" ? "Active" : undefined,
-      icon: <Moon size={14} />,
-      keywords: ["appearance", "theme", "dark", "night", "mode", "black", "obsidian", "darkmode"],
-      action: () => handleApplyTheme("dark"),
-    },
-    {
-      id: "theme-light",
-      category: "Settings: Appearance",
-      label: "Appearance: Light Mode",
-      badge: currentTheme === "light" ? "Active" : undefined,
-      icon: <Sun size={14} />,
-      keywords: ["appearance", "theme", "light", "day", "mode", "white", "bright", "lightmode"],
-      action: () => handleApplyTheme("light"),
-    },
-    {
-      id: "theme-system",
-      category: "Settings: Appearance",
-      label: "Appearance: System Mode (Auto macOS)",
-      badge: currentTheme === "system" ? "Active" : undefined,
-      icon: <Monitor size={14} />,
-      keywords: ["appearance", "theme", "system", "auto", "mac", "os", "match"],
-      action: () => handleApplyTheme("system"),
-    },
-    ...ACCENT_OPTIONS.map((acc) => ({
-      id: `accent-${acc.id}`,
-      category: "Settings: Appearance",
-      label: `Accent: ${acc.name}`,
-      subtitle: `Apply ${acc.name} Liquid Glass illumination immediately`,
-      badge: currentAccent === acc.id ? "Active" : undefined,
-      icon: (
-        <span
-          className="w-3.5 h-3.5 rounded-full inline-block border border-white/20 shadow-sm"
-          style={{ backgroundColor: acc.color }}
-        />
-      ),
-      keywords: ["theme", "accent", "color", acc.name.toLowerCase(), "palette", "liquid"],
-      action: () => handleApplyAccent(acc.id),
-    })),
-
-    // ─── 3. SETTINGS: TYPOGRAPHY & FONT (Instant Apply / Sub-View) ───
+    // ─── 3. SETTINGS: TYPOGRAPHY & FONT (Sub-Menu) ───
     {
       id: "sub-font-picker",
       category: "Settings: Typography",
@@ -401,25 +346,15 @@ export function CommandPalette({
       subtitle: "Open palette to choose from 6 optimized typographies",
       badge: "Sub-Menu",
       icon: <Type size={14} />,
-      keywords: ["font", "typeface", "typography", "text", "choose", "select", "options"],
+      keywords: ["font", "typeface", "typography", "text", "choose", "select", "options", "comic", "nunito", "virgil", "mono", "jetbrains", "inter", "outfit"],
       action: () => {
         setView("sub_fonts");
         setSearch("");
         setSelectedIndex(0);
       },
     },
-    ...FONT_OPTIONS.map((font) => ({
-      id: `font-${font.id}`,
-      category: "Settings: Typography",
-      label: `Font: ${font.name}`,
-      subtitle: `Switch editor typeface to ${font.name} immediately`,
-      badge: currentFont === font.id ? "Active" : undefined,
-      icon: <Type size={14} />,
-      keywords: ["font", "typography", "text", "typeface", font.name.toLowerCase()],
-      action: () => handleApplyFont(font.id),
-    })),
 
-    // ─── 4. SETTINGS: ZOOM & SCALE (Instant Apply / Sub-View) ───
+    // ─── 4. SETTINGS: ZOOM & SCALE (Sub-Menu & Controls) ───
     {
       id: "sub-zoom-picker",
       category: "Settings: Zoom",
@@ -427,58 +362,12 @@ export function CommandPalette({
       subtitle: `Currently ${Math.round(zoomLevel * 100)}% • Choose from 80% to 160%`,
       badge: "Sub-Menu",
       icon: <Sliders size={14} />,
-      keywords: ["zoom", "scale", "size", "magnify", "adjust", "options"],
+      keywords: ["zoom", "scale", "size", "magnify", "adjust", "options", "80", "100", "120", "140", "160", "compact", "standard", "enlarged", "large"],
       action: () => {
         setView("sub_zoom");
         setSearch("");
         setSelectedIndex(0);
       },
-    },
-    {
-      id: "zoom-80",
-      category: "Settings: Zoom",
-      label: "Zoom: 80% (Compact)",
-      badge: Math.round(zoomLevel * 100) === 80 ? "Active" : undefined,
-      icon: <ZoomOut size={14} />,
-      keywords: ["zoom", "80", "compact", "small"],
-      action: () => handleApplyZoom(0.8),
-    },
-    {
-      id: "zoom-100",
-      category: "Settings: Zoom",
-      label: "Zoom: 100% (Standard)",
-      badge: Math.round(zoomLevel * 100) === 100 ? "Active" : undefined,
-      icon: <ZoomIn size={14} />,
-      keywords: ["zoom", "100", "standard", "normal"],
-      action: () => handleApplyZoom(1.0),
-    },
-    {
-      id: "zoom-120",
-      category: "Settings: Zoom",
-      label: "Zoom: 120% (Default)",
-      badge: Math.round(zoomLevel * 100) === 120 ? "Active" : undefined,
-      icon: <RotateCcw size={14} />,
-      shortcut: ["⌘", "0"],
-      keywords: ["zoom", "120", "default", "reset"],
-      action: () => handleApplyZoom(1.2),
-    },
-    {
-      id: "zoom-140",
-      category: "Settings: Zoom",
-      label: "Zoom: 140% (Enlarged)",
-      badge: Math.round(zoomLevel * 100) === 140 ? "Active" : undefined,
-      icon: <ZoomIn size={14} />,
-      keywords: ["zoom", "140", "enlarged", "large"],
-      action: () => handleApplyZoom(1.4),
-    },
-    {
-      id: "zoom-160",
-      category: "Settings: Zoom",
-      label: "Zoom: 160% (Extra Large)",
-      badge: Math.round(zoomLevel * 100) === 160 ? "Active" : undefined,
-      icon: <ZoomIn size={14} />,
-      keywords: ["zoom", "160", "extra large", "huge"],
-      action: () => handleApplyZoom(1.6),
     },
     {
       id: "zoom-in-step",
@@ -518,16 +407,6 @@ export function CommandPalette({
     },
 
     // ─── 5. SETTINGS: WINDOW & SYSTEM TOGGLES (Instant Apply) ───
-    {
-      id: "toggle-always-on-top",
-      category: "Settings: Window",
-      label: `Always on Top: ${alwaysOnTop ? "Enabled (Click to Disable)" : "Disabled (Click to Enable)"}`,
-      subtitle: "Keep NoteFast floating above all workspaces and fullscreen apps",
-      badge: alwaysOnTop ? "ON" : "OFF",
-      icon: <Pin size={14} className={alwaysOnTop ? "text-pink-400" : "text-[var(--text-muted)]"} />,
-      keywords: ["always on top", "floating", "panel", "window", "auxiliary", "fullscreen", "spaces"],
-      action: handleToggleAlwaysOnTop,
-    },
     {
       id: "toggle-esc-loses-focus",
       category: "Settings: Window",
@@ -936,6 +815,18 @@ export function CommandPalette({
     }
   };
 
+  const listRef = useRef<HTMLDivElement>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  const handleItemMouseMove = useCallback((idx: number, e: React.MouseEvent) => {
+    const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+    const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+    if (dx > 3 || dy > 3) {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      setSelectedIndex((prev) => (prev === idx ? prev : idx));
+    }
+  }, []);
+
   const isSubView =
     view === "sub_appearance" ||
     view === "sub_accents" ||
@@ -949,7 +840,9 @@ export function CommandPalette({
       setSearch("");
       setSelectedIndex(0);
       setView(initialView);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
     }
   }, [isOpen, initialView]);
 
@@ -957,9 +850,20 @@ export function CommandPalette({
     setSelectedIndex(0);
   }, [search, view]);
 
+  // Auto-scroll selected item into view instantly
+  useEffect(() => {
+    if (!listRef.current) return;
+    const selectedEl = listRef.current.querySelector(".is-selected") as HTMLElement | null;
+    if (selectedEl) {
+      selectedEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [selectedIndex]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
         if (view !== "actions" && initialView === "actions") {
           setView("actions");
           setSearch("");
@@ -971,6 +875,7 @@ export function CommandPalette({
       }
       if (e.key === "Tab") {
         e.preventDefault();
+        e.stopPropagation();
         setView((prev) => (prev === "actions" ? "browse" : "actions"));
         setSearch("");
         setSelectedIndex(0);
@@ -978,21 +883,25 @@ export function CommandPalette({
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => (i < currentItems.length - 1 ? i + 1 : 0));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((i) => (i > 0 ? i - 1 : Math.max(0, currentItems.length - 1)));
         return;
       }
       if (e.key === "Backspace" && isSubView && !search) {
         e.preventDefault();
+        e.stopPropagation();
         setView("actions");
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         if (view === "browse") {
           const note = filteredNotes[selectedIndex];
           if (note) {
@@ -1004,12 +913,12 @@ export function CommandPalette({
             view === "sub_appearance"
               ? filteredAppearance
               : view === "sub_accents"
-              ? filteredAccents
-              : view === "sub_fonts"
-              ? filteredFonts
-              : view === "sub_zoom"
-              ? filteredZoom
-              : filteredActions;
+                ? filteredAccents
+                : view === "sub_fonts"
+                  ? filteredFonts
+                  : view === "sub_zoom"
+                    ? filteredZoom
+                    : filteredActions;
 
           const action = list[selectedIndex];
           if (action && !action.disabled) action.action();
@@ -1022,7 +931,7 @@ export function CommandPalette({
       initialView,
       isSubView,
       search,
-      currentItems,
+      currentItems.length,
       selectedIndex,
       filteredActions,
       filteredAppearance,
@@ -1065,18 +974,19 @@ export function CommandPalette({
           <input
             ref={inputRef}
             type="text"
+            onKeyDown={handleKeyDown}
             placeholder={
               view === "actions"
                 ? "Search commands & settings…"
                 : view === "browse"
-                ? "Search notes by title or content…"
-                : view === "sub_appearance"
-                ? "Choose appearance (Dark, Light, System)…"
-                : view === "sub_accents"
-                ? "Search accent themes…"
-                : view === "sub_fonts"
-                ? "Search typography…"
-                : "Search zoom levels…"
+                  ? "Search notes by title or content…"
+                  : view === "sub_appearance"
+                    ? "Choose appearance (Dark, Light, System)…"
+                    : view === "sub_accents"
+                      ? "Search accent themes…"
+                      : view === "sub_fonts"
+                        ? "Search typography…"
+                        : "Search zoom levels…"
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1111,7 +1021,7 @@ export function CommandPalette({
         </div>
 
         {/* List of actions or notes */}
-        <div className="command-list">
+        <div className="command-list" ref={listRef}>
           {/* Actions & Settings View */}
           {view === "actions" &&
             filteredActions.map((item, idx) => {
@@ -1131,7 +1041,7 @@ export function CommandPalette({
                     onClick={() => {
                       if (!item.disabled) item.action();
                     }}
-                    onMouseEnter={() => setSelectedIndex(idx)}
+                    onMouseMove={(e) => handleItemMouseMove(idx, e)}
                     style={item.disabled ? { opacity: 0.35, cursor: "default" } : undefined}
                   >
                     <div className="command-item-icon">{item.icon}</div>
@@ -1173,7 +1083,7 @@ export function CommandPalette({
                   key={item.id}
                   className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
                   onClick={() => item.action()}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
                   <div className="command-item-text flex flex-col justify-center min-w-0">
@@ -1195,7 +1105,7 @@ export function CommandPalette({
                   key={item.id}
                   className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
                   onClick={() => item.action()}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
                   <div className="command-item-text flex flex-col justify-center">
@@ -1217,7 +1127,7 @@ export function CommandPalette({
                   key={item.id}
                   className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
                   onClick={() => item.action()}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
                   <div className="command-item-text flex flex-col justify-center">
@@ -1239,7 +1149,7 @@ export function CommandPalette({
                   key={item.id}
                   className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
                   onClick={() => item.action()}
-                  onMouseEnter={() => setSelectedIndex(idx)}
+                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
                   <div className="command-item-text">
@@ -1256,14 +1166,13 @@ export function CommandPalette({
             filteredNotes.map((note, idx) => (
               <button
                 key={note.id}
-                className={`browse-note-item ${idx === selectedIndex ? "is-selected" : ""} ${
-                  note.id === activeNoteId ? "is-active" : ""
-                }`}
+                className={`browse-note-item ${idx === selectedIndex ? "is-selected" : ""} ${note.id === activeNoteId ? "is-active" : ""
+                  }`}
                 onClick={() => {
                   onSelectNote(note.id);
                   onClose();
                 }}
-                onMouseEnter={() => setSelectedIndex(idx)}
+                onMouseMove={(e) => handleItemMouseMove(idx, e)}
               >
                 {note.is_pinned && (
                   <Pin
@@ -1285,8 +1194,8 @@ export function CommandPalette({
               {view === "actions"
                 ? `No matching settings or actions for "${search}"`
                 : view === "browse"
-                ? `No notes matching "${search}"`
-                : "No matching options"}
+                  ? `No notes matching "${search}"`
+                  : "No matching options"}
             </div>
           )}
         </div>
