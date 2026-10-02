@@ -2511,17 +2511,89 @@ html[data-smooth-caret="false"] .tiptap {
   font-weight: 500;
 }
 
+.settings-cmd-kbd-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
 .settings-cmd-kbd {
   font-family: inherit;
   font-size: 11.5px;
-  padding: 2px 7px;
+  padding: 3px 8px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   border-radius: 6px;
   color: var(--text-secondary);
   font-weight: 500;
-  min-width: 32px;
+  min-width: 36px;
   text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  outline: none;
+}
+
+.settings-cmd-kbd:hover {
+  background: var(--btn-liquid-bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.settings-cmd-kbd.is-recording {
+  background: rgba(var(--accent-rgb, 108, 92, 231), 0.16);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 108, 92, 231), 0.3);
+  animation: pulseRecording 1.4s ease-in-out infinite;
+}
+
+.recording-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: blinkDot 1s infinite alternate;
+  display: inline-block;
+}
+
+@keyframes pulseRecording {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb, 108, 92, 231), 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(var(--accent-rgb, 108, 92, 231), 0.12);
+  }
+}
+
+@keyframes blinkDot {
+  0% { opacity: 0.4; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1.1); }
+}
+
+.settings-cmd-reset-btn {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  transition: all 0.12s ease;
+}
+
+.settings-cmd-reset-btn:hover {
+  color: var(--text-primary);
+  background: var(--btn-liquid-bg);
 }
 
 .settings-cmd-checkbox {

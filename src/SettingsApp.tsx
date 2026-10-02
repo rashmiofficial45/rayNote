@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   ChevronLeft,
@@ -41,10 +41,17 @@ import {
   deleteNote,
   setAlwaysOnTop as setAlwaysOnTopNative,
 } from "./lib/db";
-import { broadcastSync, listenToSettingsSync } from "./lib/settingsSync";
+import {
+  broadcastSync,
+  listenToSettingsSync,
+  formatKeystrokeFromEvent,
+  getKeystrokeModifierString,
+} from "./lib/settingsSync";
 import { downloadFile, noteContentToMarkdown } from "./lib/utils";
 
 type SettingsPane = "general" | "commands" | "storage" | "about";
+
+const PANES: SettingsPane[] = ["general", "commands", "storage", "about"];
 
 interface CommandRow {
   id: string;
@@ -57,14 +64,27 @@ interface CommandRow {
 
 const DEFAULT_COMMANDS: CommandRow[] = [
   { id: "create", title: "Create Note", alias: "", hotkey: "⌘N", enabled: true, category: "commands" },
-  { id: "toggle", title: "NoteFast (Toggle Notes)", alias: "ntoe", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
-  { id: "search", title: "Search Notes", alias: "", hotkey: "⌘K", enabled: true, category: "commands" },
+  { id: "browse", title: "Quick Open / Browse Notes", alias: "", hotkey: "⌘P", enabled: true, category: "commands" },
+  { id: "search", title: "Search Notes / Command Palette", alias: "", hotkey: "⌘K", enabled: true, category: "commands" },
   { id: "find", title: "Find in Note", alias: "", hotkey: "⌘F", enabled: true, category: "commands" },
   { id: "duplicate", title: "Duplicate Note", alias: "", hotkey: "⌘D", enabled: true, category: "commands" },
+  { id: "pin", title: "Pin / Unpin Note", alias: "", hotkey: "⇧⌘P", enabled: true, category: "commands" },
   { id: "delete", title: "Delete Note", alias: "", hotkey: "⇧⌘⌫", enabled: true, category: "commands" },
+  { id: "next_note", title: "Next Note in List", alias: "", hotkey: "⌥↓", enabled: true, category: "commands" },
+  { id: "prev_note", title: "Previous Note in List", alias: "", hotkey: "⌥↑", enabled: true, category: "commands" },
+  { id: "history_back", title: "Go Back in History", alias: "", hotkey: "⌘[", enabled: true, category: "commands" },
+  { id: "history_forward", title: "Go Forward in History", alias: "", hotkey: "⌘]", enabled: true, category: "commands" },
+  { id: "copy_markdown", title: "Copy Note as Markdown", alias: "", hotkey: "⇧⌘C", enabled: true, category: "commands" },
+  { id: "copy_deeplink", title: "Copy Deeplink", alias: "", hotkey: "⇧⌘D", enabled: true, category: "commands" },
+  { id: "export_note", title: "Export Note", alias: "", hotkey: "⇧⌘E", enabled: true, category: "commands" },
+  { id: "zoom_in", title: "Zoom In", alias: "", hotkey: "⌘=", enabled: true, category: "commands" },
+  { id: "zoom_out", title: "Zoom Out", alias: "", hotkey: "⌘-", enabled: true, category: "commands" },
+  { id: "reset_zoom", title: "Reset Zoom", alias: "", hotkey: "⌘0", enabled: true, category: "commands" },
+  { id: "shortcuts_help", title: "Shortcuts Cheatsheet", alias: "", hotkey: "⌘/", enabled: true, category: "commands" },
   { id: "settings", title: "Open Settings", alias: "", hotkey: "⌘,", enabled: true, category: "commands" },
   { id: "hide", title: "Hide Window", alias: "", hotkey: "⌘W", enabled: true, category: "commands" },
   { id: "quit", title: "Quit NoteFast", alias: "", hotkey: "⌘Q", enabled: true, category: "commands" },
+  { id: "toggle", title: "NoteFast (Toggle Notes)", alias: "ntoe", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
   { id: "slash", title: "Slash Commands Menu", alias: "", hotkey: "/", enabled: true, category: "extensions" },
   { id: "tables", title: "Tables & Embeds", alias: "", hotkey: "/table & /video", enabled: true, category: "extensions" },
 ];
@@ -113,13 +133,23 @@ export default function SettingsApp() {
     const saved = localStorage.getItem("notefast_commands_config");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return DEFAULT_COMMANDS.map((def) => {
+            const found = parsed.find((p: any) => p.id === def.id);
+            return found ? { ...def, ...found } : def;
+          });
+        }
       } catch {
         return DEFAULT_COMMANDS;
       }
     }
     return DEFAULT_COMMANDS;
   });
+
+  // State for recording custom shortcuts
+  const [recordingCommandId, setRecordingCommandId] = useState<string | null>(null);
+  const [recordedModifiers, setRecordedModifiers] = useState<string>("");
 
   // Storage Stats
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
@@ -237,9 +267,95 @@ export default function SettingsApp() {
     }
   };
 
-  // Keyboard shortcut handler inside Settings (⌘W to close, ⌘, to keep, Esc to close)
+  const startRecording = (id: string) => {
+    setRecordingCommandId(id);
+    setRecordedModifiers("");
+  };
+
+  const handleUpdateHotkey = useCallback((id: string, newHotkey: string) => {
+    setCommands((prev) => {
+      const updated = prev.map((c) => (c.id === id ? { ...c, hotkey: newHotkey } : c));
+      localStorage.setItem("notefast_commands_config", JSON.stringify(updated));
+      broadcastSync({ type: "commands_config", value: updated });
+      return updated;
+    });
+  }, []);
+
+  const handleResetHotkey = useCallback((id: string) => {
+    const defaultCmd = DEFAULT_COMMANDS.find((c) => c.id === id);
+    if (!defaultCmd) return;
+    handleUpdateHotkey(id, defaultCmd.hotkey);
+  }, [handleUpdateHotkey]);
+
+  // Shortcut recording key listener
+  useEffect(() => {
+    if (!recordingCommandId) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Escape cancels recording
+      if (e.key === "Escape" && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        setRecordingCommandId(null);
+        setRecordedModifiers("");
+        return;
+      }
+
+      // Backspace or Delete resets to default
+      if ((e.key === "Backspace" || e.key === "Delete") && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+        handleResetHotkey(recordingCommandId);
+        setRecordingCommandId(null);
+        setRecordedModifiers("");
+        return;
+      }
+
+      const { isModifierOnly, result } = formatKeystrokeFromEvent(e);
+
+      if (isModifierOnly) {
+        setRecordedModifiers(result);
+        return;
+      }
+
+      if (result) {
+        handleUpdateHotkey(recordingCommandId, result);
+        setRecordingCommandId(null);
+        setRecordedModifiers("");
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const mods = getKeystrokeModifierString(e);
+      setRecordedModifiers(mods);
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".settings-cmd-kbd")) {
+        setRecordingCommandId(null);
+        setRecordedModifiers("");
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    window.addEventListener("mousedown", handleMouseDown, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+      window.removeEventListener("mousedown", handleMouseDown, true);
+    };
+  }, [recordingCommandId, handleUpdateHotkey, handleResetHotkey]);
+
+  // Keyboard shortcut handler inside Settings (⌘W to close, ⌘, to keep, Esc to close, Left/Right arrow to cycle menu tabs)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept while recording a shortcut
+      if (recordingCommandId !== null) return;
+
       const isCmd = e.metaKey || e.ctrlKey;
       if (isCmd && (e.key === "w" || e.key === "W")) {
         e.preventDefault();
@@ -269,11 +385,35 @@ export default function SettingsApp() {
         e.preventDefault();
         handlePaneChange("about");
       }
+
+      // Left and Right keys navigate between all menubar options in Settings tab
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        activeEl?.getAttribute("contenteditable") === "true";
+
+      if (!isInput && !isCmd && !e.altKey && !e.shiftKey) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          const curr = PANES.indexOf(activePane);
+          const prev = (curr - 1 + PANES.length) % PANES.length;
+          handlePaneChange(PANES[prev]);
+          return;
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          const curr = PANES.indexOf(activePane);
+          const next = (curr + 1) % PANES.length;
+          handlePaneChange(PANES[next]);
+          return;
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [paneHistory, historyIndex, activePane]);
+  }, [paneHistory, historyIndex, activePane, recordingCommandId]);
 
   // Synchronize Theme Changes
   const handleThemeModeChange = (mode: ThemeMode) => {
@@ -742,39 +882,82 @@ export default function SettingsApp() {
           <div className="settings-pane-content">
             <div className="settings-section-header">
               <h2>Commands</h2>
+              <span className="settings-section-subtitle">
+                Double-click any shortcut badge to record a new key combination.
+              </span>
             </div>
 
             <div className="settings-card commands-table-card">
               {commands
                 .filter((c) => c.category === "commands")
-                .map((cmd, idx, arr) => (
-                  <React.Fragment key={cmd.id}>
-                    <div className="settings-command-row">
-                      <div className="settings-cmd-left">
-                        <div className="settings-cmd-icon">
-                          <span className="settings-cmd-icon-symbol">T</span>
-                        </div>
-                        <span className="settings-cmd-title">{cmd.title}</span>
-                      </div>
+                .map((cmd, idx, arr) => {
+                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
+                  const isCustom = cmd.hotkey !== defaultHotkey;
+                  const isRecording = recordingCommandId === cmd.id;
 
-                      <div className="settings-cmd-right">
-                        <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
-                          {cmd.alias || "Add Alias"}
-                        </span>
-                        <kbd className="settings-cmd-kbd">{cmd.hotkey}</kbd>
-                        <button
-                          type="button"
-                          className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                          onClick={() => handleToggleCommand(cmd.id)}
-                          aria-label={`Toggle ${cmd.title}`}
-                        >
-                          {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                        </button>
+                  return (
+                    <React.Fragment key={cmd.id}>
+                      <div className="settings-command-row">
+                        <div className="settings-cmd-left">
+                          <div className="settings-cmd-icon">
+                            <span className="settings-cmd-icon-symbol">T</span>
+                          </div>
+                          <span className="settings-cmd-title">{cmd.title}</span>
+                        </div>
+
+                        <div className="settings-cmd-right">
+                          <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
+                            {cmd.alias || "Add Alias"}
+                          </span>
+
+                          <div className="settings-cmd-kbd-wrapper">
+                            <button
+                              type="button"
+                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                startRecording(cmd.id);
+                              }}
+                              title="Double-click to record shortcut"
+                            >
+                              {isRecording ? (
+                                <span className="flex items-center gap-1.5">
+                                  <span className="recording-pulse-dot" />
+                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
+                                </span>
+                              ) : (
+                                cmd.hotkey || "None"
+                              )}
+                            </button>
+                            {isCustom && !isRecording && (
+                              <button
+                                type="button"
+                                className="settings-cmd-reset-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResetHotkey(cmd.id);
+                                }}
+                                title="Reset to default shortcut"
+                              >
+                                <RotateCcw size={11} />
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
+                            onClick={() => handleToggleCommand(cmd.id)}
+                            aria-label={`Toggle ${cmd.title}`}
+                          >
+                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                  </React.Fragment>
-                ))}
+                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                    </React.Fragment>
+                  );
+                })}
             </div>
 
             <div className="settings-section-header" style={{ marginTop: 24 }}>
@@ -784,34 +967,74 @@ export default function SettingsApp() {
             <div className="settings-card commands-table-card">
               {commands
                 .filter((c) => c.category === "extensions")
-                .map((cmd, idx, arr) => (
-                  <React.Fragment key={cmd.id}>
-                    <div className="settings-command-row">
-                      <div className="settings-cmd-left">
-                        <div className="settings-cmd-icon">
-                          <Sparkles size={12} />
-                        </div>
-                        <span className="settings-cmd-title">{cmd.title}</span>
-                      </div>
+                .map((cmd, idx, arr) => {
+                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
+                  const isCustom = cmd.hotkey !== defaultHotkey;
+                  const isRecording = recordingCommandId === cmd.id;
 
-                      <div className="settings-cmd-right">
-                        <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
-                          {cmd.alias || "Add Alias"}
-                        </span>
-                        <kbd className="settings-cmd-kbd">{cmd.hotkey}</kbd>
-                        <button
-                          type="button"
-                          className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                          onClick={() => handleToggleCommand(cmd.id)}
-                          aria-label={`Toggle ${cmd.title}`}
-                        >
-                          {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                        </button>
+                  return (
+                    <React.Fragment key={cmd.id}>
+                      <div className="settings-command-row">
+                        <div className="settings-cmd-left">
+                          <div className="settings-cmd-icon">
+                            <Sparkles size={12} />
+                          </div>
+                          <span className="settings-cmd-title">{cmd.title}</span>
+                        </div>
+
+                        <div className="settings-cmd-right">
+                          <span className={`settings-cmd-alias ${cmd.alias ? "has-alias" : ""}`}>
+                            {cmd.alias || "Add Alias"}
+                          </span>
+
+                          <div className="settings-cmd-kbd-wrapper">
+                            <button
+                              type="button"
+                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
+                              onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                startRecording(cmd.id);
+                              }}
+                              title="Double-click to record shortcut"
+                            >
+                              {isRecording ? (
+                                <span className="flex items-center gap-1.5">
+                                  <span className="recording-pulse-dot" />
+                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
+                                </span>
+                              ) : (
+                                cmd.hotkey || "None"
+                              )}
+                            </button>
+                            {isCustom && !isRecording && (
+                              <button
+                                type="button"
+                                className="settings-cmd-reset-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResetHotkey(cmd.id);
+                                }}
+                                title="Reset to default shortcut"
+                              >
+                                <RotateCcw size={11} />
+                              </button>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
+                            onClick={() => handleToggleCommand(cmd.id)}
+                            aria-label={`Toggle ${cmd.title}`}
+                          >
+                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                    {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                  </React.Fragment>
-                ))}
+                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                    </React.Fragment>
+                  );
+                })}
             </div>
           </div>
         )}

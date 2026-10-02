@@ -187,3 +187,114 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
     window.removeEventListener("storage", handleStorage);
   };
 }
+
+export interface ParsedHotkey {
+  ctrl: boolean;
+  alt: boolean;
+  shift: boolean;
+  meta: boolean;
+  key: string;
+}
+
+export function parseHotkey(hotkeyStr: string): ParsedHotkey | null {
+  if (!hotkeyStr) return null;
+  const ctrl = hotkeyStr.includes("⌃");
+  const alt = hotkeyStr.includes("⌥");
+  const shift = hotkeyStr.includes("⇧");
+  const meta = hotkeyStr.includes("⌘");
+
+  let rawKey = hotkeyStr.replace(/[⌃⌥⇧⌘]/g, "").trim().toLowerCase();
+  if (rawKey === "⌫" || rawKey === "backspace") rawKey = "backspace";
+  else if (rawKey === "space" || rawKey === "spacebar") rawKey = " ";
+  else if (rawKey === "esc" || rawKey === "escape") rawKey = "escape";
+  else if (rawKey === "enter" || rawKey === "return" || rawKey === "↵") rawKey = "enter";
+  else if (rawKey === "tab") rawKey = "tab";
+  else if (rawKey === "↑") rawKey = "arrowup";
+  else if (rawKey === "↓") rawKey = "arrowdown";
+  else if (rawKey === "←") rawKey = "arrowleft";
+  else if (rawKey === "→") rawKey = "arrowright";
+
+  return { ctrl, alt, shift, meta, key: rawKey };
+}
+
+export function matchesEvent(e: KeyboardEvent, hotkeyStr: string): boolean {
+  if (!hotkeyStr) return false;
+  const parsed = parseHotkey(hotkeyStr);
+  if (!parsed) return false;
+
+  const isMeta = e.metaKey || (e.ctrlKey && !e.metaKey && !parsed.ctrl);
+  if (parsed.meta !== isMeta) return false;
+  if (parsed.shift !== e.shiftKey) return false;
+  if (parsed.alt !== e.altKey) return false;
+  if (parsed.ctrl && !e.ctrlKey) return false;
+
+  const eventKey = e.key.toLowerCase();
+  if (parsed.key === "=" || parsed.key === "+") {
+    return eventKey === "=" || eventKey === "+";
+  }
+  if (parsed.key === "/" || parsed.key === "?") {
+    return eventKey === "/" || eventKey === "?";
+  }
+
+  return eventKey === parsed.key;
+}
+
+export function getKeystrokeModifierString(e: KeyboardEvent): string {
+  let mods = "";
+  if (e.ctrlKey) mods += "⌃";
+  if (e.altKey) mods += "⌥";
+  if (e.shiftKey) mods += "⇧";
+  if (e.metaKey) mods += "⌘";
+  return mods;
+}
+
+export function formatKeystrokeFromEvent(e: KeyboardEvent): { isModifierOnly: boolean; result: string } {
+  const isModifierKey = ["Meta", "Control", "Alt", "Shift"].includes(e.key);
+  const mods = getKeystrokeModifierString(e);
+
+  if (isModifierKey) {
+    return { isModifierOnly: true, result: mods };
+  }
+
+  let keySymbol = "";
+  switch (e.key) {
+    case "ArrowUp":
+      keySymbol = "↑";
+      break;
+    case "ArrowDown":
+      keySymbol = "↓";
+      break;
+    case "ArrowLeft":
+      keySymbol = "←";
+      break;
+    case "ArrowRight":
+      keySymbol = "→";
+      break;
+    case "Enter":
+      keySymbol = "↵";
+      break;
+    case " ":
+    case "Spacebar":
+      keySymbol = "Space";
+      break;
+    case "Backspace":
+      keySymbol = "⌫";
+      break;
+    case "Tab":
+      keySymbol = "Tab";
+      break;
+    case "Escape":
+      keySymbol = "Esc";
+      break;
+    default:
+      if (e.key.length === 1) {
+        keySymbol = e.key.toUpperCase();
+      } else {
+        keySymbol = e.key;
+      }
+      break;
+  }
+
+  return { isModifierOnly: false, result: mods ? `${mods}${keySymbol}` : keySymbol };
+}
+

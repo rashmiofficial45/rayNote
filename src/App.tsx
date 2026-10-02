@@ -23,7 +23,7 @@ import {
   Note,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
-import { broadcastSync, listenToSettingsSync } from "./lib/settingsSync";
+import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
 import {
   Check,
   Copy,
@@ -422,74 +422,75 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmd = e.metaKey || e.ctrlKey;
 
-      const isCmdEnabled = (id: string) => {
-        if (!commandsConfig || commandsConfig.length === 0) return true;
-        const found = commandsConfig.find((c: any) => c.id === id);
-        return found ? found.enabled !== false : true;
+      const getCmd = (id: string, defaultHotkey: string) => {
+        const found = commandsConfig?.find((c: any) => c.id === id);
+        return {
+          enabled: found ? found.enabled !== false : true,
+          hotkey: found?.hotkey ?? defaultHotkey,
+        };
       };
 
-      // ⌘W: Hide NoteFast window (same as clicking the red close button)
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "w") {
-        if (!isCmdEnabled("hide")) return;
+      const isTriggered = (id: string, defaultHotkey: string) => {
+        const cmd = getCmd(id, defaultHotkey);
+        if (!cmd.enabled) return false;
+        return matchesEvent(e, cmd.hotkey);
+      };
+
+      // Hide NoteFast window
+      if (isTriggered("hide", "⌘W")) {
         e.preventDefault();
         e.stopPropagation();
         hideWindow().catch(console.error);
         return;
       }
 
-      // ⌘Q: Quit the whole app completely
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "q") {
-        if (!isCmdEnabled("quit")) return;
+      // Quit the whole app completely
+      if (isTriggered("quit", "⌘Q")) {
         e.preventDefault();
         e.stopPropagation();
         quitApp().catch(console.error);
         return;
       }
 
-      // ⌘K: Toggle Command Palette (actions)
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "k") {
-        if (!isCmdEnabled("search")) return;
+      // Search Notes / Toggle Command Palette (actions)
+      if (isTriggered("search", "⌘K")) {
         e.preventDefault();
         setPaletteInitialView("actions");
         setIsCommandPaletteOpen((prev) => !prev);
         return;
       }
 
-      // ⌘P: Quick Open / Browse Notes
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "p") {
-        if (!isCmdEnabled("search")) return;
+      // Quick Open / Browse Notes
+      if (isTriggered("browse", "⌘P")) {
         e.preventDefault();
         setPaletteInitialView("browse");
         setIsCommandPaletteOpen(true);
         return;
       }
 
-      // ⌘N: New Note
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "n") {
-        if (!isCmdEnabled("create")) return;
+      // New Note
+      if (isTriggered("create", "⌘N")) {
         e.preventDefault();
         handleNewNote();
         return;
       }
 
-      // ⌘D: Duplicate Note
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "d") {
-        if (!isCmdEnabled("duplicate")) return;
+      // Duplicate Note
+      if (isTriggered("duplicate", "⌘D")) {
         e.preventDefault();
         handleDuplicateNote();
         return;
       }
 
-      // ⌘F: Find in Note
-      if (isCmd && !e.shiftKey && e.key.toLowerCase() === "f") {
-        if (!isCmdEnabled("find")) return;
+      // Find in Note
+      if (isTriggered("find", "⌘F")) {
         e.preventDefault();
         setIsFindOpen(true);
         return;
       }
 
-      // ⇧⌘P: Pin / Unpin Note
-      if (isCmd && e.shiftKey && e.key.toLowerCase() === "p") {
+      // Pin / Unpin Note
+      if (isTriggered("pin", "⇧⌘P")) {
         e.preventDefault();
         if (activeNoteId) {
           handleTogglePin(activeNoteId);
@@ -497,30 +498,29 @@ function App() {
         return;
       }
 
-      // ⇧⌘C: Copy Note as Markdown
-      if (isCmd && e.shiftKey && e.key.toLowerCase() === "c") {
+      // Copy Note as Markdown
+      if (isTriggered("copy_markdown", "⇧⌘C")) {
         e.preventDefault();
         handleCopyNoteAsMarkdown();
         return;
       }
 
-      // ⇧⌘D: Copy Deeplink
-      if (isCmd && e.shiftKey && e.key.toLowerCase() === "d") {
+      // Copy Deeplink
+      if (isTriggered("copy_deeplink", "⇧⌘D")) {
         e.preventDefault();
         handleCopyDeeplink();
         return;
       }
 
-      // ⇧⌘E: Export Note
-      if (isCmd && e.shiftKey && e.key.toLowerCase() === "e") {
+      // Export Note
+      if (isTriggered("export_note", "⇧⌘E")) {
         e.preventDefault();
         handleExportNote();
         return;
       }
 
-      // ⇧⌘⌫ (Cmd+Shift+Backspace): Delete current note
-      if (isCmd && e.shiftKey && e.key === "Backspace") {
-        if (!isCmdEnabled("delete")) return;
+      // Delete current note
+      if (isTriggered("delete", "⇧⌘⌫")) {
         e.preventDefault();
         if (activeNoteId) {
           promptDeleteNote(activeNoteId);
@@ -530,79 +530,80 @@ function App() {
 
       // ⌘⌫ (Cmd+Backspace): Delete note only if not currently typing in text/inputs
       if (isCmd && !e.shiftKey && e.key === "Backspace") {
-        if (!isCmdEnabled("delete")) return;
-        const active = document.activeElement;
-        const isEditingText =
-          active?.tagName === "INPUT" ||
-          active?.tagName === "TEXTAREA" ||
-          Boolean(active?.closest(".tiptap"));
+        const cmd = getCmd("delete", "⇧⌘⌫");
+        if (cmd.enabled) {
+          const active = document.activeElement;
+          const isEditingText =
+            active?.tagName === "INPUT" ||
+            active?.tagName === "TEXTAREA" ||
+            Boolean(active?.closest(".tiptap"));
 
-        if (!isEditingText && activeNoteId) {
-          e.preventDefault();
-          promptDeleteNote(activeNoteId);
+          if (!isEditingText && activeNoteId) {
+            e.preventDefault();
+            promptDeleteNote(activeNoteId);
+            return;
+          }
         }
-        return;
       }
 
-      // ⌥↓ (Option + Down): Next note
-      if (e.altKey && !isCmd && e.key === "ArrowDown") {
+      // Next note
+      if (isTriggered("next_note", "⌥↓")) {
         e.preventDefault();
         handleNextNote();
         return;
       }
 
-      // ⌥↑ (Option + Up): Previous note
-      if (e.altKey && !isCmd && e.key === "ArrowUp") {
+      // Previous note
+      if (isTriggered("prev_note", "⌥↑")) {
         e.preventDefault();
         handlePreviousNote();
         return;
       }
 
-      // ⌘[ : Go back in history
-      if (isCmd && e.key === "[") {
+      // Go back in history
+      if (isTriggered("history_back", "⌘[")) {
         e.preventDefault();
         handleGoBack();
         return;
       }
 
-      // ⌘] : Go forward in history
-      if (isCmd && e.key === "]") {
+      // Go forward in history
+      if (isTriggered("history_forward", "⌘]")) {
         e.preventDefault();
         handleGoForward();
         return;
       }
 
-      // ⌘= or ⌘+: Zoom In
-      if (isCmd && (e.key === "=" || e.key === "+")) {
+      // Zoom In
+      if (isTriggered("zoom_in", "⌘=")) {
         e.preventDefault();
         handleZoomIn();
         return;
       }
 
-      // ⌘-: Zoom Out
-      if (isCmd && e.key === "-") {
+      // Zoom Out
+      if (isTriggered("zoom_out", "⌘-")) {
         e.preventDefault();
         handleZoomOut();
         return;
       }
 
-      // ⌘0: Reset Zoom
-      if (isCmd && e.key === "0") {
+      // Reset Zoom
+      if (isTriggered("reset_zoom", "⌘0")) {
         e.preventDefault();
         handleResetZoom();
         return;
       }
 
-      // ⌘/ or ⌘?: Toggle Shortcuts Cheatsheet
-      if (isCmd && (e.key === "/" || e.key === "?")) {
+      // Toggle Shortcuts Cheatsheet
+      if (isTriggered("shortcuts_help", "⌘/")) {
         e.preventDefault();
         setIsShortcutsModalOpen((prev) => !prev);
         return;
       }
 
-      // ⌘, : Open Settings
-      if (isCmd && e.key === ",") {
-        if (!isCmdEnabled("settings")) return;
+      // Open Settings
+      if (isTriggered("settings", "⌘,")) {
         e.preventDefault();
         openSettingsWindow().catch(console.error);
         return;
