@@ -826,7 +826,7 @@ function App() {
       )}
 
       <TitleBar
-        title={activeNote ? getNoteTitle(activeNote.title, activeNote.content) : "NoteFast"}
+        title={activeNote ? getNoteTitle(activeNote.title, activeNote.content) : "rayNote"}
         onNewNote={handleNewNote}
         onOpenCommandPalette={() => {
           setPaletteInitialView("actions");
@@ -898,7 +898,7 @@ function App() {
               </div>
             </div>
             <p className="drop-prompt-desc">
-              Would you like to import this Markdown document into your NoteFast notes or just view it?
+              Would you like to import this Markdown document into your rayNote notes or just view it?
             </p>
             <div className="drop-prompt-actions">
               <button
@@ -930,7 +930,7 @@ function App() {
                 <Upload size={16} />
                 <div className="btn-text-block">
                   <span className="btn-main-label">Upload to Notes</span>
-                  <span className="btn-sub-label">Save into NoteFast notes database</span>
+                  <span className="btn-sub-label">Save into rayNote notes database</span>
                 </div>
               </button>
             </div>

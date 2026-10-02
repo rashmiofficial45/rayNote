@@ -1,12 +1,12 @@
 [package]
-name = "notefast"
+name = "raynote"
 version = "0.1.0"
-description = "NoteFast — A minimal, always-on-top note-taking app for macOS"
+description = "rayNote — A minimal, always-on-top note-taking app for macOS (Raycast Notes style)"
 authors = ["you"]
 edition = "2021"
 
 [lib]
-name = "notefast_lib"
+name = "raynote_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -11,7 +11,7 @@ use tauri_nspanel::{tauri_panel, WebviewWindowExt};
 
 #[cfg(target_os = "macos")]
 tauri_panel! {
-    panel!(NoteFastPanel {
+    panel!(RayNotePanel {
         config: {
             can_become_key_window: true,
             can_become_main_window: true,
@@ -27,7 +27,7 @@ fn setup_macos_panel(app: &tauri::App) {
     use objc2_app_kit::NSWindowCollectionBehavior;
 
     let window = app.get_webview_window("main").unwrap();
-    let panel = window.to_panel::<NoteFastPanel>().expect("failed to convert window to panel");
+    let panel = window.to_panel::<RayNotePanel>().expect("failed to convert window to panel");
 
     // Configure low-level Cocoa properties on the NSPanel
     let ns_window_ptr = window.ns_window().unwrap() as *mut AnyObject;
@@ -307,7 +307,7 @@ pub fn run() {
             export_notes_to_folder
         ])
         .build(tauri::generate_context!())
-        .expect("error while building NoteFast");
+        .expect("error while building rayNote");
 
     app.run(|app_handle, event| {
         match event {

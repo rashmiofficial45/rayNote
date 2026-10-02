@@ -20,8 +20,23 @@ pub struct Database {
 impl Database {
     pub fn new(app_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&app_dir).ok();
-        let db_path = app_dir.join("notefast.db");
-        let conn = Connection::open(db_path)?;
+        let db_path = app_dir.join("raynote.db");
+
+        // Seamless migration: copy notes from legacy notefast.db if raynote.db doesn't exist yet
+        if !db_path.exists() {
+            let local_legacy = app_dir.join("notefast.db");
+            if local_legacy.exists() {
+                let _ = std::fs::copy(&local_legacy, &db_path);
+            } else if let Some(parent) = app_dir.parent() {
+                let old_app_dir = parent.join("com.notefast.app");
+                let old_db = old_app_dir.join("notefast.db");
+                if old_db.exists() {
+                    let _ = std::fs::copy(&old_db, &db_path);
+                }
+            }
+        }
+
+        let conn = Connection::open(&db_path)?;
 
         conn.execute_batch(
             "PRAGMA journal_mode = WAL;

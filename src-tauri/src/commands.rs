@@ -140,7 +140,7 @@ pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
     {
         use tauri_nspanel::WebviewWindowExt;
         // Get the panel and hide it — app stays alive as Accessory process
-        if let Ok(panel) = window.to_panel::<crate::NoteFastPanel>() {
+        if let Ok(panel) = window.to_panel::<crate::RayNotePanel>() {
             panel.hide();
         } else {
             // Fallback: just hide the window
@@ -284,7 +284,7 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         "settings",
         tauri::WebviewUrl::App("index.html?window=settings".into()),
     )
-    .title("NoteFast Settings")
+    .title("rayNote Settings")
     .inner_size(580.0, 720.0)
     .min_inner_size(500.0, 520.0)
     .resizable(true)
@@ -401,7 +401,7 @@ pub fn export_notes_to_folder(
         .or_else(|_| app.path().app_data_dir())
         .map_err(|e| e.to_string())?;
 
-    let export_dir = download_dir.join("NoteFast_Exports");
+    let export_dir = download_dir.join("rayNote_Exports");
     std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
 
     for (idx, note) in notes.into_iter().enumerate() {
@@ -440,7 +440,7 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
     }
 
     if visible {
-        let mut builder = TrayIconBuilder::with_id("main-tray").tooltip("NoteFast");
+        let mut builder = TrayIconBuilder::with_id("main-tray").tooltip("rayNote");
         if let Some(icon) = app.default_window_icon().cloned() {
             builder = builder.icon(icon);
         }
@@ -486,7 +486,11 @@ pub fn get_storage_stats(
     let notes = db.get_all_notes().map_err(|e| e.to_string())?;
     let count = notes.len();
     let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let db_path = app_dir.join("notefast.db");
+    let db_path = if app_dir.join("raynote.db").exists() {
+        app_dir.join("raynote.db")
+    } else {
+        app_dir.join("notefast.db")
+    };
     let size_bytes = if let Ok(meta) = std::fs::metadata(&db_path) {
         meta.len()
     } else {

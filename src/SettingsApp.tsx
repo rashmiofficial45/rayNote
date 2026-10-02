@@ -77,8 +77,8 @@ const DEFAULT_COMMANDS: CommandRow[] = [
   { id: "shortcuts_help", title: "Shortcuts Cheatsheet", hotkey: "⌘/", enabled: true, category: "commands" },
   { id: "settings", title: "Open Settings", hotkey: "⌘,", enabled: true, category: "commands" },
   { id: "hide", title: "Hide Window", hotkey: "⌘W", enabled: true, category: "commands" },
-  { id: "quit", title: "Quit NoteFast", hotkey: "⌘Q", enabled: true, category: "commands" },
-  { id: "toggle", title: "NoteFast (Toggle Notes)", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
+  { id: "quit", title: "Quit rayNote", hotkey: "⌘Q", enabled: true, category: "commands" },
+  { id: "toggle", title: "rayNote (Toggle Notes)", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
   { id: "slash", title: "Slash Commands Menu", hotkey: "/", enabled: true, category: "extensions" },
   { id: "tables", title: "Tables & Embeds", hotkey: "/table & /video", enabled: true, category: "extensions" },
 ];
@@ -421,7 +421,7 @@ export default function SettingsApp() {
       }));
 
       await invoke("export_notes_to_folder", { notes: exportNotes });
-      setActionMessage(`Exported ${notes.length} note(s) to Downloads/NoteFast_Exports.`);
+      setActionMessage(`Exported ${notes.length} note(s) to Downloads/rayNote_Exports.`);
       setTimeout(() => setActionMessage(null), 3500);
     } catch (err) {
       console.error(err);
@@ -548,8 +548,8 @@ export default function SettingsApp() {
               <span className="settings-hero-icon-letter">T</span>
             </div>
           </div>
-          <h1 className="settings-hero-title">NoteFast</h1>
-          <p className="settings-hero-subtitle">Create and manage your notes.</p>
+          <h1 className="settings-hero-title">rayNote</h1>
+          <p className="settings-hero-subtitle">Raycast-inspired notes accessory for macOS.</p>
         </div>
 
         {actionMessage && (
@@ -1026,7 +1026,7 @@ export default function SettingsApp() {
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">NoteFast</div>
+                  <div className="settings-row-title">rayNote</div>
                   <div className="settings-row-desc">
                     Version 0.1.0 • macOS Apple Silicon (Universal)
                   </div>

@@ -125,7 +125,7 @@ export function MarkdownViewerModal({
               type="button"
               className="md-viewer-tool-btn"
               onClick={() => openSettingsWindow().catch(console.error)}
-              title="NoteFast Settings (⌘,)"
+              title="rayNote Settings (⌘,)"
               aria-label="Settings"
             >
               <Settings size={14} />
@@ -192,7 +192,7 @@ export function MarkdownViewerModal({
               type="button"
               className="md-viewer-btn md-viewer-import-btn"
               onClick={handleImport}
-              title="Save this document permanently into your NoteFast notes database"
+              title="Save this document permanently into your rayNote notes database"
             >
               <Plus size={14} />
               <span>Import to Notes</span>

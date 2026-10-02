@@ -126,7 +126,7 @@ export function TitleBar({
           onMouseLeave={() => setIsCloseHovered(false)}
           className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
           title="Hide (⌘W)"
-          aria-label="Hide NoteFast"
+          aria-label="Hide rayNote"
         >
           <svg
             width="8"

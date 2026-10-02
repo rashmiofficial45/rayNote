@@ -25,7 +25,7 @@ const SHORTCUTS: ShortcutItem[] = [
   { keys: ["⌘", "]"], description: "Go Forward in History", category: "Navigation & App" },
   { keys: ["⌘", ","], description: "Open Settings / Preferences", category: "Navigation & App" },
   { keys: ["⌘", "W"], description: "Hide Window (Run in Background)", category: "Navigation & App" },
-  { keys: ["⌘", "Q"], description: "Quit NoteFast Completely", category: "Navigation & App" },
+  { keys: ["⌘", "Q"], description: "Quit rayNote Completely", category: "Navigation & App" },
   { keys: ["⇧", "⌘", "⌫"], description: "Delete Current Note", category: "Navigation & App" },
 
   // Formatting
