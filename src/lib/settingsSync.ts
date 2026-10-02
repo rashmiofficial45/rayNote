@@ -15,6 +15,7 @@ export type SettingsSyncPayload =
   | { type: "esc_loses_focus"; value: boolean }
   | { type: "always_on_top"; value: boolean }
   | { type: "commands_config"; value: any }
+  | { type: "aliases_config"; value: Record<string, string> }
   | { type: "notes_cleared" }
   | { type: "notes_updated" };
 
@@ -68,6 +69,7 @@ export interface SettingsSyncCallbacks {
   onEscLosesFocusChange?: (val: boolean) => void;
   onAlwaysOnTopChange?: (val: boolean) => void;
   onCommandsConfigChange?: (commands: any) => void;
+  onAliasesConfigChange?: (aliases: Record<string, string>) => void;
   onNotesCleared?: () => void;
   onNotesUpdated?: () => void;
 }
@@ -110,6 +112,9 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
         break;
       case "commands_config":
         callbacks?.onCommandsConfigChange?.(payload.value);
+        break;
+      case "aliases_config":
+        callbacks?.onAliasesConfigChange?.(payload.value);
         break;
       case "notes_cleared":
         callbacks?.onNotesCleared?.();

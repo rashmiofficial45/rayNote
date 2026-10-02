@@ -16,6 +16,9 @@ import {
   Sun,
   Monitor,
   Sparkles,
+  Tag,
+  Search,
+  X,
 } from "lucide-react";
 import {
   ThemeMode,
@@ -45,8 +48,13 @@ import {
   formatKeystrokeFromEvent,
   getKeystrokeModifierString,
 } from "./lib/settingsSync";
+import {
+  ALL_PALETTE_COMMANDS,
+  getStoredAliases,
+  setStoredAliases,
+} from "./lib/aliases";
 
-type SettingsPane = "general" | "commands" | "storage" | "about";
+type SettingsPane = "general" | "commands" | "aliases" | "storage" | "about";
 
 interface CommandRow {
   id: string;
@@ -87,7 +95,7 @@ export default function SettingsApp() {
   // Restore most recently viewed pane (Apple standard)
   const [activePane, setActivePane] = useState<SettingsPane>(() => {
     const saved = localStorage.getItem("notefast_settings_active_pane") as SettingsPane | null;
-    if (saved && ["general", "commands", "storage", "about"].includes(saved)) {
+    if (saved && ["general", "commands", "aliases", "storage", "about"].includes(saved)) {
       return saved;
     }
     return "general";
@@ -135,6 +143,13 @@ export default function SettingsApp() {
     return DEFAULT_COMMANDS;
   });
 
+  // Aliases state
+  const [aliases, setAliases] = useState<Record<string, string>>(getStoredAliases);
+  const [aliasSearch, setAliasSearch] = useState("");
+  const [editingAliasId, setEditingAliasId] = useState<string | null>(null);
+  const [editingAliasValue, setEditingAliasValue] = useState("");
+  const aliasInputRef = useRef<HTMLInputElement>(null);
+
   // State for recording custom shortcuts
   const [recordingCommandId, setRecordingCommandId] = useState<string | null>(null);
   const [recordedModifiers, setRecordedModifiers] = useState<string>("");
@@ -161,6 +176,9 @@ export default function SettingsApp() {
       onZoomChange: setZoomLevel,
       onEscLosesFocusChange: setEscLosesFocus,
       onCommandsConfigChange: setCommands,
+      onAliasesConfigChange: (newAliases) => {
+        setAliases(newAliases || {});
+      },
     });
   }, []);
 
@@ -310,11 +328,61 @@ export default function SettingsApp() {
     };
   }, [recordingCommandId, handleUpdateHotkey, handleResetHotkey]);
 
+  // Aliases management handlers
+  const handleStartEditAlias = (cmdId: string) => {
+    setEditingAliasId(cmdId);
+    setEditingAliasValue(aliases[cmdId] || "");
+  };
+
+  const handleSaveAlias = (cmdId: string, val: string) => {
+    const clean = val.trim().toLowerCase().replace(/\s+/g, "-");
+    const updated = { ...aliases };
+    if (clean) {
+      updated[cmdId] = clean;
+    } else {
+      delete updated[cmdId];
+    }
+    setAliases(updated);
+    setStoredAliases(updated);
+    broadcastSync({ type: "aliases_config", value: updated });
+    setEditingAliasId(null);
+    const cmd = ALL_PALETTE_COMMANDS.find((c) => c.id === cmdId);
+    if (cmd) {
+      setActionMessage(clean ? `Alias for "${cmd.label}" set to "${clean}"` : `Alias for "${cmd.label}" removed`);
+      setTimeout(() => setActionMessage(null), 2500);
+    }
+  };
+
+  const handleClearAlias = (cmdId: string) => {
+    const updated = { ...aliases };
+    delete updated[cmdId];
+    setAliases(updated);
+    setStoredAliases(updated);
+    broadcastSync({ type: "aliases_config", value: updated });
+    const cmd = ALL_PALETTE_COMMANDS.find((c) => c.id === cmdId);
+    if (cmd) {
+      setActionMessage(`Alias cleared for "${cmd.label}"`);
+      setTimeout(() => setActionMessage(null), 2000);
+    }
+  };
+
+  const handleResetAllAliases = () => {
+    const defaults: Record<string, string> = {};
+    ALL_PALETTE_COMMANDS.forEach((c) => {
+      if (c.defaultAlias) defaults[c.id] = c.defaultAlias;
+    });
+    setAliases(defaults);
+    setStoredAliases(defaults);
+    broadcastSync({ type: "aliases_config", value: defaults });
+    setActionMessage("Reset all command aliases to defaults");
+    setTimeout(() => setActionMessage(null), 2500);
+  };
+
   // Keyboard shortcut handler inside Settings (⌘W to close, ⌘, to keep, Esc to close, Left/Right arrow to cycle menu tabs)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't intercept while recording a shortcut
-      if (recordingCommandId !== null) return;
+      // Don't intercept while recording a shortcut or editing an alias
+      if (recordingCommandId !== null || editingAliasId !== null) return;
 
       const isCmd = e.metaKey || e.ctrlKey;
       if (isCmd && (e.key === "w" || e.key === "W")) {
@@ -331,7 +399,7 @@ export default function SettingsApp() {
         e.preventDefault();
         return;
       }
-      // Pane switcher shortcuts: ⌘1, ⌘2, ⌘3, ⌘4
+      // Pane switcher shortcuts: ⌘1, ⌘2, ⌘3, ⌘4, ⌘5
       if (isCmd && e.key === "1") {
         e.preventDefault();
         handlePaneChange("general");
@@ -340,8 +408,11 @@ export default function SettingsApp() {
         handlePaneChange("commands");
       } else if (isCmd && e.key === "3") {
         e.preventDefault();
-        handlePaneChange("storage");
+        handlePaneChange("aliases");
       } else if (isCmd && e.key === "4") {
+        e.preventDefault();
+        handlePaneChange("storage");
+      } else if (isCmd && e.key === "5") {
         e.preventDefault();
         handlePaneChange("about");
       }
@@ -349,7 +420,7 @@ export default function SettingsApp() {
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [activePane, recordingCommandId]);
+  }, [activePane, recordingCommandId, editingAliasId]);
 
   // Synchronize Theme Changes
   const handleThemeModeChange = (mode: ThemeMode) => {
@@ -510,6 +581,14 @@ export default function SettingsApp() {
           >
             <Keyboard size={12} />
             <span>Commands</span>
+          </button>
+          <button
+            type="button"
+            className={`settings-tab-pill liquid-btn ${activePane === "aliases" ? "is-active" : ""}`}
+            onClick={() => handlePaneChange("aliases")}
+          >
+            <Tag size={12} />
+            <span>Aliases</span>
           </button>
           <button
             type="button"
@@ -900,7 +979,159 @@ export default function SettingsApp() {
           </div>
         )}
 
-        {/* ─── PANE 3: STORAGE & DATA ─── */}
+        {/* ─── PANE 3: ALIASES ─── */}
+        {activePane === "aliases" && (
+          <div className="settings-pane-content">
+            <div className="settings-aliases-toolbar">
+              <div className="settings-aliases-search-box">
+                <Search size={13} className="settings-aliases-search-icon" />
+                <input
+                  type="text"
+                  placeholder="Filter commands or aliases..."
+                  value={aliasSearch}
+                  onChange={(e) => setAliasSearch(e.target.value)}
+                  className="settings-aliases-search-input"
+                  spellCheck={false}
+                />
+                {aliasSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setAliasSearch("")}
+                    className="settings-aliases-search-clear"
+                    title="Clear filter"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="settings-action-btn liquid-btn"
+                onClick={handleResetAllAliases}
+                title="Reset all command aliases to defaults"
+              >
+                <RotateCcw size={11} />
+                <span>Reset Defaults</span>
+              </button>
+            </div>
+
+            <div className="settings-aliases-hint-bar">
+              <Tag size={12} className="settings-aliases-hint-icon" />
+              <span>
+                Double-click on any alias field to set a shorthand trigger. Press <strong>Enter</strong> to save, <strong>Esc</strong> to cancel.
+              </span>
+            </div>
+
+            <div className="settings-card commands-table-card">
+              {ALL_PALETTE_COMMANDS
+                .filter((cmd) => {
+                  const q = aliasSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  const alias = aliases[cmd.id] || "";
+                  const shortcutStr = cmd.shortcut ? cmd.shortcut.join("") : "";
+                  return (
+                    cmd.label.toLowerCase().includes(q) ||
+                    cmd.category.toLowerCase().includes(q) ||
+                    alias.toLowerCase().includes(q) ||
+                    shortcutStr.toLowerCase().includes(q)
+                  );
+                })
+                .map((cmd, idx, arr) => {
+                  const currentAlias = aliases[cmd.id];
+                  const isEditing = editingAliasId === cmd.id;
+
+                  return (
+                    <React.Fragment key={cmd.id}>
+                      <div
+                        className="settings-command-row settings-alias-row"
+                        onDoubleClick={() => !isEditing && handleStartEditAlias(cmd.id)}
+                      >
+                        <div className="settings-cmd-left min-w-0 flex-1">
+                          <span className="settings-alias-cat-badge">{cmd.category}</span>
+                          <span className="settings-cmd-title truncate">{cmd.label}</span>
+                          {cmd.shortcut && (
+                            <div className="settings-alias-shortcut-keys">
+                              {cmd.shortcut.map((k, i) => (
+                                <kbd key={i}>{k}</kbd>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="settings-cmd-right flex-shrink-0">
+                          {isEditing ? (
+                            <div className="settings-alias-inline-editor">
+                              <input
+                                ref={aliasInputRef}
+                                type="text"
+                                value={editingAliasValue}
+                                onChange={(e) => setEditingAliasValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleSaveAlias(cmd.id, editingAliasValue);
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingAliasId(null);
+                                  }
+                                }}
+                                onBlur={() => handleSaveAlias(cmd.id, editingAliasValue)}
+                                placeholder="type alias..."
+                                className="settings-alias-input"
+                                spellCheck={false}
+                                autoComplete="off"
+                              />
+                            </div>
+                          ) : (
+                            <div className="settings-alias-display-group">
+                              <button
+                                type="button"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  handleStartEditAlias(cmd.id);
+                                }}
+                                onClick={() => {
+                                  if (!currentAlias) {
+                                    handleStartEditAlias(cmd.id);
+                                  }
+                                }}
+                                className={`settings-alias-badge-btn liquid-btn ${currentAlias ? "has-alias" : "is-empty"}`}
+                                title="Double-click to set or edit alias"
+                              >
+                                {currentAlias ? (
+                                  <span className="settings-alias-pill-val">{currentAlias}</span>
+                                ) : (
+                                  <span className="settings-alias-placeholder">Double-click to set</span>
+                                )}
+                              </button>
+
+                              {currentAlias && (
+                                <button
+                                  type="button"
+                                  className="settings-alias-clear-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClearAlias(cmd.id);
+                                  }}
+                                  title="Remove alias"
+                                >
+                                  <X size={11} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                    </React.Fragment>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* ─── PANE 4: STORAGE & DATA ─── */}
         {activePane === "storage" && (
           <div className="settings-pane-content">
             <div className="settings-card">

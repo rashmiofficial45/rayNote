@@ -48,7 +48,8 @@ import {
   setStoredThemeMode,
   getStoredThemeMode,
 } from "../lib/theme";
-import { broadcastSync } from "../lib/settingsSync";
+import { broadcastSync, listenToSettingsSync } from "../lib/settingsSync";
+import { getStoredAliases } from "../lib/aliases";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface CommandPaletteProps {
@@ -168,6 +169,19 @@ export function CommandPalette({
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
     return localStorage.getItem("notefast_show_menubar") !== "false";
   });
+  const [aliases, setAliases] = useState<Record<string, string>>(getStoredAliases);
+
+  useEffect(() => {
+    return listenToSettingsSync({
+      onAliasesConfigChange: (newAliases) => {
+        setAliases(newAliases || {});
+      },
+      onThemeModeChange: (mode) => setCurrentTheme(mode),
+      onAccentChange: (acc) => setCurrentAccent(acc),
+      onFontChange: (f) => setCurrentFont(f),
+      onEscLosesFocusChange: (v) => setEscLosesFocus(v),
+    });
+  }, []);
 
   const activeNote = notes.find((n) => n.id === activeNoteId);
 
@@ -194,7 +208,7 @@ export function CommandPalette({
     setCurrentFont(fontId);
     broadcastSync({ type: "font", value: fontId });
     const name = FONT_OPTIONS.find((f) => f.id === fontId)?.name || fontId;
-    onShowToast?.(`Editor font set to ${name}`, <Type size={14} />);
+    onShowToast?.(`Font set to ${name}`, <Type size={14} />);
     onClose();
   };
 
@@ -220,7 +234,6 @@ export function CommandPalette({
     onClose();
   };
 
-
   const handleToggleMenuBar = () => {
     const val = !showMenuBar;
     setShowMenuBar(val);
@@ -232,15 +245,14 @@ export function CommandPalette({
     onClose();
   };
 
-  // Main Action List (All Activities + Settings Searchability)
+  // Main Action List (Streamlined, Minimal, Zero Subtitles)
   const actions: ActionItem[] = [
-    // ─── 1. FILE OPERATIONS (Upload & Preview) ───
+    // ─── 1. FILE OPERATIONS ───
     {
       id: "upload-md-file",
       category: "File Operations",
-      label: "Upload / Import Local Markdown File…",
-      subtitle: "Choose a .md file from your Mac to save directly into SQLite notes",
-      badge: "Local Import",
+      label: "Import Markdown File",
+      badge: "Import",
       keywords: ["upload", "import", "local", "file", "markdown", "md", "open", "read", "mac", "disk"],
       icon: <Upload size={14} className="text-sky-400" />,
       action: () => {
@@ -251,9 +263,8 @@ export function CommandPalette({
     {
       id: "view-md-file-no-upload",
       category: "File Operations",
-      label: "Quick View Local Markdown File… (No Upload)",
-      subtitle: "Open any local .md file in Liquid Glass viewer without storing to database",
-      badge: "Preview Mode",
+      label: "Quick View Markdown File",
+      badge: "Preview",
       keywords: ["view", "preview", "read", "inspect", "scratch", "no upload", "without saving", "local", "md", "file"],
       icon: <Eye size={14} className="text-violet-400" />,
       action: () => {
@@ -264,8 +275,7 @@ export function CommandPalette({
     {
       id: "copy-md",
       category: "File Operations",
-      label: "Copy Whole Note as Markdown (Zero Format Loss)",
-      subtitle: "Copies entire note as clean GitHub-Flavored Markdown to clipboard",
+      label: "Copy Note as Markdown",
       badge: "GFM",
       icon: <ClipboardCopy size={14} className="text-emerald-400" />,
       shortcut: ["⇧", "⌘", "C"],
@@ -292,7 +302,6 @@ export function CommandPalette({
       id: "copy-deeplink",
       category: "File Operations",
       label: "Copy Note Deeplink",
-      subtitle: "notefast://note/... link for Raycast, Alfred, or Apple Shortcuts",
       icon: <Link2 size={14} />,
       shortcut: ["⇧", "⌘", "D"],
       disabled: !activeNoteId,
@@ -305,7 +314,7 @@ export function CommandPalette({
     {
       id: "export-single",
       category: "File Operations",
-      label: "Export Current Note as .md",
+      label: "Export Note as Markdown",
       badge: "Download",
       icon: <FileDown size={14} />,
       shortcut: ["⇧", "⌘", "E"],
@@ -319,8 +328,7 @@ export function CommandPalette({
     {
       id: "export-all",
       category: "File Operations",
-      label: "Export All Notes as Markdown (.md)",
-      subtitle: "Writes all notes to Downloads/rayNote_Exports and reveals in Finder",
+      label: "Export All Notes",
       badge: "Batch",
       icon: <FileDown size={14} />,
       disabled: notes.length === 0,
@@ -331,13 +339,12 @@ export function CommandPalette({
       },
     },
 
-    // ─── 2. SETTINGS: APPEARANCE & THEME (Instant Apply / Sub-View) ───
+    // ─── 2. SETTINGS: APPEARANCE & THEME ───
     {
       id: "sub-appearance-picker",
-      category: "Settings: Appearance",
-      label: "Choose Appearance Mode…",
-      subtitle: `Currently ${currentTheme.charAt(0).toUpperCase() + currentTheme.slice(1)} Mode • Select Dark, Light, or System`,
-      badge: "Sub-Menu",
+      category: "Appearance",
+      label: "Appearance Mode (Dark / Light / System)",
+      badge: "Submenu",
       icon: <Sun size={14} className="text-amber-400" />,
       keywords: ["appearance", "theme", "dark", "light", "system", "mode", "color", "choose", "select", "options", "submenu"],
       action: () => {
@@ -348,10 +355,9 @@ export function CommandPalette({
     },
     {
       id: "sub-theme-picker",
-      category: "Settings: Appearance",
-      label: "Choose Accent Theme…",
-      subtitle: "Open palette to choose from 6 curated Liquid Glass colorways",
-      badge: "Sub-Menu",
+      category: "Appearance",
+      label: "Accent Theme Color",
+      badge: "Submenu",
       icon: <Palette size={14} style={{ color: "var(--color-accent)" }} />,
       keywords: ["accent", "theme", "color", "palette", "choose", "select", "options", "liquid", "glass"],
       action: () => {
@@ -360,31 +366,26 @@ export function CommandPalette({
         setSelectedIndex(0);
       },
     },
-    // ─── 3. SETTINGS: TYPOGRAPHY & FONT (Sub-Menu) ───
     {
       id: "sub-font-picker",
-      category: "Settings: Typography",
-      label: "Choose Editor Font…",
-      subtitle: "Open palette to choose from 6 optimized typographies",
-      badge: "Sub-Menu",
+      category: "Appearance",
+      label: "Editor Font Family",
+      badge: "Submenu",
       icon: <Type size={14} />,
-      keywords: ["font", "typeface", "typography", "text", "choose", "select", "options", "comic", "nunito", "virgil", "mono", "jetbrains", "inter", "outfit"],
+      keywords: ["font", "typeface", "typography", "text", "choose", "select", "options", "mono", "jetbrains", "inter", "outfit"],
       action: () => {
         setView("sub_fonts");
         setSearch("");
         setSelectedIndex(0);
       },
     },
-
-    // ─── 4. SETTINGS: ZOOM & SCALE (Sub-Menu & Controls) ───
     {
       id: "sub-zoom-picker",
-      category: "Settings: Zoom",
-      label: "Adjust Zoom Level…",
-      subtitle: `Currently ${Math.round(zoomLevel * 100)}% • Choose from 80% to 160%`,
-      badge: "Sub-Menu",
+      category: "Appearance",
+      label: "Zoom Level Options",
+      badge: "Submenu",
       icon: <Sliders size={14} />,
-      keywords: ["zoom", "scale", "size", "magnify", "adjust", "options", "80", "100", "120", "140", "160", "compact", "standard", "enlarged", "large"],
+      keywords: ["zoom", "scale", "size", "magnify", "adjust", "options", "80", "100", "120", "140", "160"],
       action: () => {
         setView("sub_zoom");
         setSearch("");
@@ -393,7 +394,7 @@ export function CommandPalette({
     },
     {
       id: "zoom-in-step",
-      category: "Settings: Zoom",
+      category: "Appearance",
       label: "Zoom In (+10%)",
       icon: <ZoomIn size={14} />,
       shortcut: ["⌘", "="],
@@ -405,7 +406,7 @@ export function CommandPalette({
     },
     {
       id: "zoom-out-step",
-      category: "Settings: Zoom",
+      category: "Appearance",
       label: "Zoom Out (-10%)",
       icon: <ZoomOut size={14} />,
       shortcut: ["⌘", "-"],
@@ -417,7 +418,7 @@ export function CommandPalette({
     },
     {
       id: "zoom-reset-step",
-      category: "Settings: Zoom",
+      category: "Appearance",
       label: "Reset Zoom (120%)",
       icon: <RotateCcw size={14} />,
       shortcut: ["⌘", "0"],
@@ -428,22 +429,20 @@ export function CommandPalette({
       },
     },
 
-    // ─── 5. SETTINGS: WINDOW & SYSTEM TOGGLES (Instant Apply) ───
+    // ─── 3. PREFERENCES & WINDOW ───
     {
       id: "toggle-esc-loses-focus",
-      category: "Settings: Window",
-      label: `Escape Key: ${escLosesFocus ? "Loses Focus (Click to Hide)" : "Hides Window (Click to Lose Focus)"}`,
-      subtitle: "When enabled, pressing Escape drops focus without hiding rayNote",
-      badge: escLosesFocus ? "Lose Focus" : "Hide Window",
+      category: "Preferences",
+      label: `Escape Key: ${escLosesFocus ? "Drops Focus" : "Hides Window"}`,
+      badge: escLosesFocus ? "Lose Focus" : "Hide",
       icon: <Keyboard size={14} />,
       keywords: ["escape", "esc", "focus", "lose focus", "hide", "blur"],
       action: handleToggleEscLosesFocus,
     },
     {
       id: "toggle-menu-bar",
-      category: "Settings: Window",
-      label: `Menu Bar Icon: ${showMenuBar ? "Visible (Click to Hide)" : "Hidden (Click to Show)"}`,
-      subtitle: "Display toggle button in the macOS status menu bar",
+      category: "Preferences",
+      label: `Menu Bar Icon: ${showMenuBar ? "Visible" : "Hidden"}`,
       badge: showMenuBar ? "Visible" : "Hidden",
       icon: <Sliders size={14} />,
       keywords: ["menu bar", "status bar", "tray", "icon", "toggle", "macos", "menubar"],
@@ -451,8 +450,8 @@ export function CommandPalette({
     },
     {
       id: "toggle-smooth-caret",
-      category: "Settings: Window",
-      label: "Editor: Smooth Cursor Caret",
+      category: "Preferences",
+      label: "Smooth Cursor Caret",
       badge: (typeof window !== "undefined" && localStorage.getItem("notefast_smooth_caret") === "false") ? "OFF" : "ON",
       icon: <Sparkles size={14} />,
       keywords: ["cursor", "caret", "smooth", "animation", "vscode", "typing"],
@@ -471,13 +470,10 @@ export function CommandPalette({
         onClose();
       },
     },
-
-    // ─── 6. SETTINGS: STORAGE & DATA ───
     {
       id: "open-finder-storage",
-      category: "Settings: Storage",
-      label: "Open SQLite Database Folder in Finder",
-      subtitle: "~/Library/Application Support/com.notefast.app",
+      category: "Storage",
+      label: "Open Storage in Finder",
       badge: "Local",
       icon: <FolderOpen size={14} />,
       keywords: ["storage", "finder", "folder", "sqlite", "database", "file", "open", "data"],
@@ -488,9 +484,8 @@ export function CommandPalette({
     },
     {
       id: "danger-clear-notes",
-      category: "Settings: Storage",
-      label: "Clear All Notes… (Danger Zone)",
-      subtitle: "Permanently erase all notes from local SQLite database",
+      category: "Storage",
+      label: "Clear All Notes…",
       badge: "Danger",
       icon: <AlertTriangle size={14} className="text-red-400" />,
       keywords: ["clear", "delete all", "erase", "danger", "reset", "wipe"],
@@ -500,7 +495,7 @@ export function CommandPalette({
       },
     },
 
-    // ─── 7. NOTE ACTIONS & NAVIGATION ───
+    // ─── 4. NOTE ACTIONS ───
     {
       id: "new-note",
       category: "Note Actions",
@@ -516,7 +511,7 @@ export function CommandPalette({
     {
       id: "browse-notes",
       category: "Note Actions",
-      label: "Browse / Switch Notes List",
+      label: "Browse Notes List",
       icon: <BookOpen size={14} />,
       shortcut: ["⌘", "P"],
       keywords: ["browse", "switch", "open", "notes", "list", "find"],
@@ -631,16 +626,15 @@ export function CommandPalette({
       },
     },
 
-    // ─── 8. APP CONTROLS ───
+    // ─── 5. APP CONTROLS ───
     {
       id: "open-full-settings",
       category: "App Controls",
-      label: "Open Full Settings Window…",
-      subtitle: "Open standard multi-tab macOS Settings window",
+      label: "Open Settings Window",
       badge: "Window",
       icon: <Settings size={14} />,
       shortcut: ["⌘", ","],
-      keywords: ["settings", "preferences", "config", "window", "options", "setup"],
+      keywords: ["settings", "preferences", "config", "window", "options", "setup", "aliases"],
       action: () => {
         onClose();
         openSettingsWindow().catch(console.error);
@@ -649,7 +643,7 @@ export function CommandPalette({
     {
       id: "shortcuts-sheet",
       category: "App Controls",
-      label: "Keyboard Shortcuts Cheatsheet",
+      label: "Shortcuts Cheatsheet",
       icon: <Keyboard size={14} />,
       shortcut: ["⌘", "/"],
       keywords: ["shortcuts", "cheatsheet", "hotkeys", "keys", "help"],
@@ -661,7 +655,7 @@ export function CommandPalette({
     {
       id: "hide-window",
       category: "App Controls",
-      label: "Hide Window (Keep Running in Background)",
+      label: "Hide Window",
       icon: <X size={14} />,
       shortcut: ["⌘", "W"],
       keywords: ["hide", "close", "minimize", "dismiss", "background"],
@@ -673,12 +667,11 @@ export function CommandPalette({
     {
       id: "quit-app",
       category: "App Controls",
-      label: "Quit rayNote Completely",
+      label: "Quit rayNote",
       icon: <Power size={14} className="text-red-400" />,
       shortcut: ["⌘", "Q"],
       keywords: ["quit", "exit", "close app", "terminate", "kill"],
       action: () => {
-        onClose();
         quitApp().catch(console.error);
       },
     },
@@ -690,7 +683,6 @@ export function CommandPalette({
       id: "sub-app-dark",
       category: "Appearance",
       label: "Dark Mode",
-      subtitle: "Deep contrast glassmorphism with glowing illumination",
       badge: currentTheme === "dark" ? "Selected" : undefined,
       icon: <Moon size={14} className="text-indigo-400" />,
       keywords: ["dark", "mode", "night", "black", "obsidian"],
@@ -700,7 +692,6 @@ export function CommandPalette({
       id: "sub-app-light",
       category: "Appearance",
       label: "Light Mode",
-      subtitle: "Crisp, bright paper aesthetic with clean high-contrast text",
       badge: currentTheme === "light" ? "Selected" : undefined,
       icon: <Sun size={14} className="text-amber-400" />,
       keywords: ["light", "mode", "day", "white", "bright"],
@@ -710,7 +701,6 @@ export function CommandPalette({
       id: "sub-app-system",
       category: "Appearance",
       label: "System Auto (Follow macOS)",
-      subtitle: "Automatically match your system appearance setting",
       badge: currentTheme === "system" ? "Selected" : undefined,
       icon: <Monitor size={14} className="text-sky-400" />,
       keywords: ["system", "auto", "mac", "os", "match"],
@@ -723,7 +713,6 @@ export function CommandPalette({
     id: `sub-acc-${acc.id}`,
     category: "Accent Themes",
     label: acc.name,
-    subtitle: `Set ${acc.name} Liquid Glass theme`,
     badge: currentAccent === acc.id ? "Selected" : undefined,
     icon: (
       <span
@@ -740,7 +729,6 @@ export function CommandPalette({
     id: `sub-font-${font.id}`,
     category: "Editor Fonts",
     label: font.name,
-    subtitle: font.family,
     badge: currentFont === font.id ? "Selected" : undefined,
     icon: <Type size={14} />,
     keywords: ["font", font.name.toLowerCase()],
@@ -791,17 +779,34 @@ export function CommandPalette({
     },
   ];
 
-  // Filtering
+  // Filtering with Alias Support and Prioritization
   const filterList = (list: ActionItem[]) => {
     const q = search.toLowerCase().trim();
     if (!q) return list;
-    return list.filter((a) => {
+
+    const matched = list.filter((a) => {
+      const alias = (aliases[a.id] || "").toLowerCase();
+      if (alias && (alias === q || alias.startsWith(q) || alias.includes(q))) return true;
       if (a.label.toLowerCase().includes(q)) return true;
       if (a.category.toLowerCase().includes(q)) return true;
-      if (a.subtitle && a.subtitle.toLowerCase().includes(q)) return true;
       if (a.badge && a.badge.toLowerCase().includes(q)) return true;
       if (a.keywords && a.keywords.some((k) => k.toLowerCase().includes(q))) return true;
       return false;
+    });
+
+    // Prioritize exact alias match or alias prefix match
+    return matched.sort((a, b) => {
+      const aAlias = (aliases[a.id] || "").toLowerCase();
+      const bAlias = (aliases[b.id] || "").toLowerCase();
+      const aExact = aAlias === q;
+      const bExact = bAlias === q;
+      if (aExact && !bExact) return -1;
+      if (!aExact && bExact) return 1;
+      const aPrefix = aAlias.startsWith(q);
+      const bPrefix = bAlias.startsWith(q);
+      if (aPrefix && !bPrefix) return -1;
+      if (!aPrefix && bPrefix) return 1;
+      return 0;
     });
   };
 
@@ -1067,6 +1072,7 @@ export function CommandPalette({
               // Group divider header when category changes
               const prevItem = filteredActions[idx - 1];
               const showCategoryHeader = !search.trim() && (!prevItem || prevItem.category !== item.category);
+              const itemAlias = aliases[item.id];
 
               return (
                 <div key={item.id}>
@@ -1084,16 +1090,18 @@ export function CommandPalette({
                     style={item.disabled ? { opacity: 0.35, cursor: "default" } : undefined}
                   >
                     <div className="command-item-icon">{item.icon}</div>
-                    <div className="command-item-text flex flex-col justify-center min-w-0">
-                      <span className={`command-item-label ${item.disabled ? "disabled" : ""}`}>
+                    <div className="command-item-text flex items-center min-w-0 flex-1">
+                      <span className={`command-item-label truncate ${item.disabled ? "disabled" : ""}`}>
                         {item.label}
                       </span>
-                      {item.subtitle && (
-                        <span className="command-item-subtitle">{item.subtitle}</span>
-                      )}
                     </div>
-                    {(item.badge || item.shortcut) && (
+                    {(itemAlias || item.badge || item.shortcut) && (
                       <div className="command-item-meta">
+                        {itemAlias && (
+                          <span className="command-alias-badge" title={`Alias: ${itemAlias}`}>
+                            {itemAlias}
+                          </span>
+                        )}
                         {item.badge && (
                           <span className={`command-badge ${item.badge === "ON" ? "is-on" : ""}`}>
                             {item.badge}
@@ -1116,7 +1124,7 @@ export function CommandPalette({
           {/* Sub-View: Appearance (Dark / Light / System) */}
           {view === "sub_appearance" && (
             <div>
-              <div className="command-category-header">Select Appearance Mode (Applies Immediately)</div>
+              <div className="command-category-header">Select Appearance Mode</div>
               {filteredAppearance.map((item, idx) => (
                 <button
                   key={item.id}
@@ -1125,9 +1133,8 @@ export function CommandPalette({
                   onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex flex-col justify-center min-w-0">
-                    <span className="command-item-label">{item.label}</span>
-                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  <div className="command-item-text flex items-center min-w-0 flex-1">
+                    <span className="command-item-label truncate">{item.label}</span>
                   </div>
                   {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
                 </button>
@@ -1138,7 +1145,7 @@ export function CommandPalette({
           {/* Sub-View: Accents */}
           {view === "sub_accents" && (
             <div>
-              <div className="command-category-header">Select Accent Theme (Applies Immediately)</div>
+              <div className="command-category-header">Select Accent Theme</div>
               {filteredAccents.map((item, idx) => (
                 <button
                   key={item.id}
@@ -1147,11 +1154,10 @@ export function CommandPalette({
                   onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex flex-col justify-center">
-                    <span className="command-item-label">{item.label}</span>
-                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  <div className="command-item-text flex items-center min-w-0 flex-1">
+                    <span className="command-item-label truncate">{item.label}</span>
                   </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
                 </button>
               ))}
             </div>
@@ -1160,7 +1166,7 @@ export function CommandPalette({
           {/* Sub-View: Fonts */}
           {view === "sub_fonts" && (
             <div>
-              <div className="command-category-header">Select Editor Font (Applies Immediately)</div>
+              <div className="command-category-header">Select Editor Font</div>
               {filteredFonts.map((item, idx) => (
                 <button
                   key={item.id}
@@ -1169,11 +1175,10 @@ export function CommandPalette({
                   onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex flex-col justify-center">
-                    <span className="command-item-label">{item.label}</span>
-                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  <div className="command-item-text flex items-center min-w-0 flex-1">
+                    <span className="command-item-label truncate">{item.label}</span>
                   </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
                 </button>
               ))}
             </div>
@@ -1182,7 +1187,7 @@ export function CommandPalette({
           {/* Sub-View: Zoom */}
           {view === "sub_zoom" && (
             <div>
-              <div className="command-category-header">Select Zoom Level (Applies Immediately)</div>
+              <div className="command-category-header">Select Zoom Level</div>
               {filteredZoom.map((item, idx) => (
                 <button
                   key={item.id}
@@ -1191,10 +1196,10 @@ export function CommandPalette({
                   onMouseMove={(e) => handleItemMouseMove(idx, e)}
                 >
                   <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text">
-                    <span className="command-item-label">{item.label}</span>
+                  <div className="command-item-text flex items-center min-w-0 flex-1">
+                    <span className="command-item-label truncate">{item.label}</span>
                   </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
                 </button>
               ))}
             </div>
