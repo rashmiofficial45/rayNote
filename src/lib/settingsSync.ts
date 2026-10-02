@@ -236,6 +236,14 @@ export function matchesEvent(e: KeyboardEvent, hotkeyStr: string): boolean {
     return eventKey === "/" || eventKey === "?";
   }
 
+  // Handle macOS Alt/Option key character mutations (e.g. Option+P -> 'π')
+  if (e.code && e.code.startsWith("Key")) {
+    const codeKey = e.code.replace("Key", "").toLowerCase();
+    if (codeKey === parsed.key) {
+      return true;
+    }
+  }
+
   return eventKey === parsed.key;
 }
 

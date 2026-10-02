@@ -4,6 +4,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { NoteEditor } from "./components/NoteEditor";
 import { Toast, ToastData } from "./components/Toast";
 import { ShortcutsModal } from "./components/ShortcutsModal";
+import { MarkdownViewerModal, PreviewFileData } from "./components/MarkdownViewerModal";
 import {
   getNoteTitle,
   noteContentToMarkdown,
@@ -35,6 +36,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Upload,
+  Eye,
+  FileText,
 } from "lucide-react";
 
 function App() {
@@ -129,6 +133,115 @@ function App() {
       setToast(null);
     }, 1900);
   }, []);
+
+  // Local Markdown File Import & Preview States
+  const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
+  const [droppedFilePrompt, setDroppedFilePrompt] = useState<{ file: File; text: string } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const viewFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTriggerImportFile = useCallback(() => {
+    importFileInputRef.current?.click();
+  }, []);
+
+  const handleTriggerViewFile = useCallback(() => {
+    viewFileInputRef.current?.click();
+  }, []);
+
+  const processImportFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        const lines = text.split("\n");
+        let title = file.name.replace(/\.(md|markdown|txt)$/i, "");
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("# ")) {
+            title = trimmed.replace(/^#+\s*/, "").trim();
+            break;
+          }
+        }
+        const newNote = await createNote();
+        await updateNote(newNote.id, title, text);
+        newNote.title = title;
+        newNote.content = text;
+        setNotes((prev) => [newNote, ...prev]);
+        setActiveNoteId(newNote.id);
+        showToast(`Imported "${file.name}" to notes`, <Check size={14} />);
+      } catch (err) {
+        console.error("Failed to import file:", err);
+        showToast("Failed to import file", <Trash2 size={14} />);
+      }
+    },
+    [showToast]
+  );
+
+  const processViewFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text();
+        setPreviewFile({
+          name: file.name,
+          content: text,
+          size: file.size,
+        });
+      } catch (err) {
+        console.error("Failed to preview file:", err);
+        showToast("Failed to preview file", <Trash2 size={14} />);
+      }
+    },
+    [showToast]
+  );
+
+  const handleImportFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processImportFile(file);
+    }
+    e.target.value = "";
+  };
+
+  const handleViewFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processViewFile(file);
+    }
+    e.target.value = "";
+  };
+
+  // Drag & drop file handler
+  const handleDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("Files")) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      const isMd =
+        file.name.endsWith(".md") ||
+        file.name.endsWith(".markdown") ||
+        file.name.endsWith(".txt") ||
+        file.type.includes("markdown") ||
+        file.type.includes("text");
+      if (isMd) {
+        const text = await file.text();
+        setDroppedFilePrompt({ file, text });
+      }
+    }
+  };
 
   // Load notes & initialize theme on mount
   useEffect(() => {
@@ -452,8 +565,13 @@ function App() {
         return;
       }
 
-      // Search Notes / Toggle Command Palette (actions)
-      if (isTriggered("search", "⌘K")) {
+      // Search Notes / Toggle Command & Settings Palette (Option+P or Cmd+K)
+      const isAltP =
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        (e.code === "KeyP" || e.key.toLowerCase() === "p" || e.key === "π");
+      if (isAltP || isTriggered("search", "⌥P") || isTriggered("search", "⌘K")) {
         e.preventDefault();
         setPaletteInitialView("actions");
         setIsCommandPaletteOpen((prev) => !prev);
@@ -611,6 +729,14 @@ function App() {
 
       // Escape: Close overlays in order of hierarchy, or unfocus editor if escLosesFocus enabled
       if (e.key === "Escape") {
+        if (droppedFilePrompt) {
+          setDroppedFilePrompt(null);
+          return;
+        }
+        if (previewFile) {
+          setPreviewFile(null);
+          return;
+        }
         if (deleteConfirm) {
           setDeleteConfirm(null);
           return;
@@ -652,6 +778,8 @@ function App() {
     activeNoteId,
     commandsConfig,
     deleteConfirm,
+    droppedFilePrompt,
+    previewFile,
     escLosesFocus,
     handleNewNote,
     handleDuplicateNote,
@@ -684,7 +812,25 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & drop visual overlay */}
+      {isDragOver && (
+        <div className="drag-drop-overlay">
+          <div className="drag-drop-modal">
+            <Upload size={38} className="text-[#6C5CE7] animate-bounce" />
+            <h3 className="drag-drop-title">Drop Markdown File</h3>
+            <p className="drag-drop-subtitle">
+              Drop here to choose between Upload to notes or Quick View
+            </p>
+          </div>
+        </div>
+      )}
+
       <TitleBar
         title={activeNote ? getNoteTitle(activeNote.title, activeNote.content) : "NoteFast"}
         onNewNote={handleNewNote}
@@ -695,6 +841,8 @@ function App() {
         onDuplicateNote={handleDuplicateNote}
         onDeleteNote={() => activeNoteId && promptDeleteNote(activeNoteId)}
         onCopyMarkdown={handleCopyNoteAsMarkdown}
+        onTriggerImportFile={handleTriggerImportFile}
+        onTriggerViewFile={handleTriggerViewFile}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -742,6 +890,68 @@ function App() {
         </div>
       )}
 
+      {/* Dropped File Choice Modal (Upload vs View Only) */}
+      {droppedFilePrompt && (
+        <div className="command-overlay" onClick={() => setDroppedFilePrompt(null)}>
+          <div className="drop-prompt-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="drop-prompt-header">
+              <div className="drop-prompt-icon">
+                <FileText size={22} className="text-[#6C5CE7]" />
+              </div>
+              <div>
+                <h3 className="drop-prompt-title">Open Markdown Document</h3>
+                <p className="drop-prompt-filename">{droppedFilePrompt.file.name}</p>
+              </div>
+            </div>
+            <p className="drop-prompt-desc">
+              Would you like to import this Markdown document into your NoteFast notes or just view it?
+            </p>
+            <div className="drop-prompt-actions">
+              <button
+                className="drop-prompt-btn view-btn"
+                onClick={() => {
+                  setPreviewFile({
+                    name: droppedFilePrompt.file.name,
+                    content: droppedFilePrompt.text,
+                    size: droppedFilePrompt.file.size,
+                  });
+                  setDroppedFilePrompt(null);
+                }}
+              >
+                <Eye size={16} />
+                <div className="btn-text-block">
+                  <span className="btn-main-label">Quick View (No Upload)</span>
+                  <span className="btn-sub-label">Preview without saving to database</span>
+                </div>
+              </button>
+
+              <button
+                className="drop-prompt-btn upload-btn"
+                onClick={async () => {
+                  const file = droppedFilePrompt.file;
+                  setDroppedFilePrompt(null);
+                  await processImportFile(file);
+                }}
+              >
+                <Upload size={16} />
+                <div className="btn-text-block">
+                  <span className="btn-main-label">Upload to Notes</span>
+                  <span className="btn-sub-label">Save into NoteFast notes database</span>
+                </div>
+              </button>
+            </div>
+            <div className="drop-prompt-footer">
+              <button
+                className="drop-prompt-cancel"
+                onClick={() => setDroppedFilePrompt(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <NoteEditor
           note={activeNote}
@@ -778,11 +988,69 @@ function App() {
         onZoomOut={handleZoomOut}
         onResetZoom={handleResetZoom}
         onShowShortcuts={() => setIsShortcutsModalOpen(true)}
+        onTriggerImportFile={handleTriggerImportFile}
+        onTriggerViewFile={handleTriggerViewFile}
+        zoomLevel={zoomLevel}
+        onSetZoom={(zoom) => {
+          setZoomLevel(zoom);
+          broadcastSync({ type: "zoom", value: zoom });
+        }}
+        onPromptClearAllNotes={() => {
+          if (notes.length === 0) {
+            showToast("No notes to clear", <Check size={14} />);
+            return;
+          }
+          if (window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) {
+            Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
+              setNotes([]);
+              setActiveNoteId(null);
+              showToast("All notes cleared", <Trash2 size={14} />);
+            }).catch(console.error);
+          }
+        }}
       />
 
       <ShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
+      />
+
+      {/* Markdown Quick Viewer Modal (No Upload) */}
+      <MarkdownViewerModal
+        fileData={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onShowToast={showToast}
+        onImportToNotes={async (title, markdown) => {
+          try {
+            const newNote = await createNote();
+            await updateNote(newNote.id, title, markdown);
+            newNote.title = title;
+            newNote.content = markdown;
+            setNotes((prev) => [newNote, ...prev]);
+            setActiveNoteId(newNote.id);
+            setPreviewFile(null);
+            showToast(`Imported "${title}" to notes`, <Check size={14} />);
+          } catch (err) {
+            console.error(err);
+            showToast("Failed to import note", <Trash2 size={14} />);
+          }
+        }}
+      />
+
+      {/* Hidden file inputs for local markdown file selection */}
+      <input
+        type="file"
+        ref={importFileInputRef}
+        onChange={handleImportFileInputChange}
+        accept=".md,.markdown,.txt"
+        style={{ display: "none" }}
+      />
+      <input
+        type="file"
+        ref={viewFileInputRef}
+        onChange={handleViewFileInputChange}
+        accept=".md,.markdown,.txt"
+        style={{ display: "none" }}
       />
 
       <Toast toast={toast} />

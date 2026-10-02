@@ -1,4 +1,4 @@
-import { Command, Copy, Plus, Trash2, Settings, FileText } from "lucide-react";
+import { Command, Copy, Plus, Trash2, Settings, FileText, Upload, Eye } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { openSettingsWindow } from "../lib/db";
@@ -10,6 +10,8 @@ interface TitleBarProps {
   onDuplicateNote: () => void;
   onDeleteNote: () => void;
   onCopyMarkdown: () => void;
+  onTriggerImportFile?: () => void;
+  onTriggerViewFile?: () => void;
 }
 
 export function TitleBar({
@@ -19,6 +21,8 @@ export function TitleBar({
   onDuplicateNote,
   onDeleteNote,
   onCopyMarkdown,
+  onTriggerImportFile,
+  onTriggerViewFile,
 }: TitleBarProps) {
   const titleBarRef = useRef<HTMLDivElement>(null);
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
@@ -183,6 +187,28 @@ export function TitleBar({
                 <span>Copy as Markdown</span>
                 <kbd className="popover-kbd">⇧⌘C</kbd>
               </button>
+              <div className="command-popover-divider" />
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  setCommandMenuOpen(false);
+                  onTriggerImportFile?.();
+                }}
+              >
+                <Upload size={13} className="text-sky-400" />
+                <span>Import .md File (Upload)</span>
+              </button>
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  setCommandMenuOpen(false);
+                  onTriggerViewFile?.();
+                }}
+              >
+                <Eye size={13} className="text-violet-400" />
+                <span>View .md File (No Upload)</span>
+              </button>
+              <div className="command-popover-divider" />
               <button
                 className="command-popover-item"
                 onClick={() => {
@@ -192,6 +218,7 @@ export function TitleBar({
               >
                 <Copy size={13} />
                 <span>Duplicate</span>
+                <kbd className="popover-kbd">⌘D</kbd>
               </button>
               <button
                 className="command-popover-item"
@@ -202,6 +229,7 @@ export function TitleBar({
               >
                 <Plus size={13} />
                 <span>New Note</span>
+                <kbd className="popover-kbd">⌘N</kbd>
               </button>
               <div className="command-popover-divider" />
               <button
@@ -212,8 +240,8 @@ export function TitleBar({
                 }}
               >
                 <Command size={13} />
-                <span>Command Palette</span>
-                <kbd className="popover-kbd">⌘K</kbd>
+                <span>Command & Settings Palette</span>
+                <kbd className="popover-kbd">⌥P</kbd>
               </button>
               <div className="command-popover-divider" />
               <button

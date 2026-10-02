@@ -64,7 +64,15 @@ export function Editor({
   const editor = useEditor(
     {
       extensions: getExtensions(SlashCommand),
-      content: content ? JSON.parse(content) : undefined,
+      content: content
+        ? (() => {
+            try {
+              return JSON.parse(content);
+            } catch {
+              return markdownToTipTapHtml(content);
+            }
+          })()
+        : undefined,
       onUpdate: ({ editor }) => {
         handleUpdate(editor.getJSON());
       },

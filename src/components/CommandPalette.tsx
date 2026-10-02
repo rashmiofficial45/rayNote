@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Note, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
+import { Note, hideWindow, quitApp, openSettingsWindow, setAlwaysOnTop as setAlwaysOnTopDb } from "../lib/db";
 import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
@@ -29,21 +29,35 @@ import {
   Moon,
   Monitor,
   Settings,
+  FolderOpen,
+  Upload,
+  Eye,
+  Sliders,
+  Check,
+  AlertTriangle,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
   FONT_OPTIONS,
+  AccentColor,
+  ThemeMode,
   setStoredAccent,
+  getStoredAccent,
   setStoredFont,
+  getStoredFont,
   setStoredThemeMode,
+  getStoredThemeMode,
 } from "../lib/theme";
+import { broadcastSync } from "../lib/settingsSync";
+import { invoke } from "@tauri-apps/api/core";
 
-interface CommandPaletteProps {
+export interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   notes: Note[];
   activeNoteId: string | null;
-  initialView?: "actions" | "browse";
+  initialView?: "actions" | "browse" | "settings";
+  zoomLevel: number;
   onNewNote: () => void;
   onDuplicateNote: () => void;
   onSelectNote: (id: string) => void;
@@ -63,14 +77,20 @@ interface CommandPaletteProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onResetZoom?: () => void;
+  onSetZoom?: (zoom: number) => void;
   onShowShortcuts?: () => void;
+  onTriggerImportFile?: () => void;
+  onTriggerViewFile?: () => void;
+  onPromptClearAllNotes?: () => void;
 }
 
-type PaletteView = "actions" | "browse";
+type PaletteView = "actions" | "browse" | "settings" | "sub_accents" | "sub_fonts" | "sub_zoom";
 
-interface ActionItem {
+export interface ActionItem {
   id: string;
+  category: string;
   label: string;
+  subtitle?: string;
   badge?: string;
   keywords?: string[];
   icon: React.ReactNode;
@@ -85,6 +105,7 @@ export function CommandPalette({
   notes,
   activeNoteId,
   initialView = "actions",
+  zoomLevel,
   onNewNote,
   onDuplicateNote,
   onSelectNote,
@@ -104,78 +125,142 @@ export function CommandPalette({
   onZoomIn,
   onZoomOut,
   onResetZoom,
+  onSetZoom,
   onShowShortcuts,
+  onTriggerImportFile,
+  onTriggerViewFile,
+  onPromptClearAllNotes,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [view, setView] = useState<PaletteView>(initialView);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Live settings state for immediate badge/toggle feedback
+  const [currentTheme, setCurrentTheme] = useState<ThemeMode>(getStoredThemeMode);
+  const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
+  const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
+  const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
+    return localStorage.getItem("notefast_esc_loses_focus") === "true";
+  });
+  const [alwaysOnTop, setAlwaysOnTopState] = useState<boolean>(() => {
+    return localStorage.getItem("notefast_always_on_top") !== "false";
+  });
+  const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
+    return localStorage.getItem("notefast_show_menubar") !== "false";
+  });
+
   const activeNote = notes.find((n) => n.id === activeNoteId);
 
+  // Immediate Action Handlers
+  const handleApplyTheme = (mode: ThemeMode) => {
+    setStoredThemeMode(mode);
+    setCurrentTheme(mode);
+    broadcastSync({ type: "theme_mode", value: mode });
+    onShowToast?.(`Appearance set to ${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`, <Sun size={14} />);
+    onClose();
+  };
+
+  const handleApplyAccent = (acc: AccentColor) => {
+    setStoredAccent(acc);
+    setCurrentAccent(acc);
+    broadcastSync({ type: "accent", value: acc });
+    const name = ACCENT_OPTIONS.find((a) => a.id === acc)?.name || acc;
+    onShowToast?.(`Accent theme set to ${name}`, <Palette size={14} />);
+    onClose();
+  };
+
+  const handleApplyFont = (fontId: string) => {
+    setStoredFont(fontId);
+    setCurrentFont(fontId);
+    broadcastSync({ type: "font", value: fontId });
+    const name = FONT_OPTIONS.find((f) => f.id === fontId)?.name || fontId;
+    onShowToast?.(`Editor font set to ${name}`, <Type size={14} />);
+    onClose();
+  };
+
+  const handleApplyZoom = (zoom: number) => {
+    const clamped = Math.max(0.6, Math.min(2.0, Math.round(zoom * 10) / 10));
+    onSetZoom?.(clamped);
+    localStorage.setItem("notefast_zoom_level", clamped.toString());
+    broadcastSync({ type: "zoom", value: clamped });
+    onShowToast?.(`Zoom set to ${Math.round(clamped * 100)}%`, <ZoomIn size={14} />);
+    onClose();
+  };
+
+  const handleToggleEscLosesFocus = () => {
+    const val = !escLosesFocus;
+    setEscLosesFocus(val);
+    localStorage.setItem("notefast_esc_loses_focus", val ? "true" : "false");
+    broadcastSync({ type: "esc_loses_focus", value: val });
+    onShowToast?.(
+      val
+        ? "Escape key will now drop focus (not hide)"
+        : "Escape key will now hide Notes window"
+    );
+    onClose();
+  };
+
+  const handleToggleAlwaysOnTop = () => {
+    const val = !alwaysOnTop;
+    setAlwaysOnTopState(val);
+    localStorage.setItem("notefast_always_on_top", val ? "true" : "false");
+    setAlwaysOnTopDb(val).catch(console.error);
+    broadcastSync({ type: "always_on_top", value: val });
+    onShowToast?.(val ? "Always on Top enabled" : "Always on Top disabled");
+    onClose();
+  };
+
+  const handleToggleMenuBar = () => {
+    const val = !showMenuBar;
+    setShowMenuBar(val);
+    localStorage.setItem("notefast_show_menubar", val ? "true" : "false");
+    invoke("set_menu_bar_visible", { visible: val }).catch(console.error);
+    onShowToast?.(
+      val ? "Menu bar toggle button enabled" : "Menu bar toggle button disabled"
+    );
+    onClose();
+  };
+
+  // Main Action List (All Activities + Settings Searchability)
   const actions: ActionItem[] = [
+    // ─── 1. FILE OPERATIONS (Upload & Preview) ───
     {
-      id: "new",
-      label: "New Note",
-      icon: <Plus size={14} />,
-      shortcut: ["⌘", "N"],
-      action: () => {
-        onNewNote();
-        onClose();
-      },
-    },
-    {
-      id: "browse",
-      label: "Browse / Switch Notes",
-      icon: <BookOpen size={14} />,
-      shortcut: ["⌘", "P"],
-      action: () => {
-        setView("browse");
-        setSearch("");
-        setSelectedIndex(0);
-      },
-    },
-    {
-      id: "find",
-      label: "Find in Note",
-      icon: <Search size={14} />,
-      shortcut: ["⌘", "F"],
-      disabled: !activeNoteId,
+      id: "upload-md-file",
+      category: "File Operations",
+      label: "Upload / Import Local Markdown File…",
+      subtitle: "Choose a .md file from your Mac to save directly into SQLite notes",
+      badge: "Local Import",
+      keywords: ["upload", "import", "local", "file", "markdown", "md", "open", "read", "mac", "disk"],
+      icon: <Upload size={14} className="text-sky-400" />,
       action: () => {
         onClose();
-        onFindInNote?.();
+        onTriggerImportFile?.();
       },
     },
     {
-      id: "duplicate",
-      label: "Duplicate Note",
-      icon: <Copy size={14} />,
-      shortcut: ["⌘", "D"],
-      disabled: !activeNoteId,
+      id: "view-md-file-no-upload",
+      category: "File Operations",
+      label: "Quick View Local Markdown File… (No Upload)",
+      subtitle: "Open any local .md file in Liquid Glass viewer without storing to database",
+      badge: "Preview Mode",
+      keywords: ["view", "preview", "read", "inspect", "scratch", "no upload", "without saving", "local", "md", "file"],
+      icon: <Eye size={14} className="text-violet-400" />,
       action: () => {
-        onDuplicateNote();
         onClose();
-      },
-    },
-    {
-      id: "pin",
-      label: activeNote?.is_pinned ? "Unpin Note" : "Pin Note to Top",
-      icon: <Pin size={14} />,
-      shortcut: ["⇧", "⌘", "P"],
-      disabled: !activeNoteId,
-      action: () => {
-        if (activeNoteId) {
-          onTogglePin(activeNoteId);
-          onClose();
-        }
+        onTriggerViewFile?.();
       },
     },
     {
       id: "copy-md",
-      label: "Copy Note as Markdown",
-      icon: <ClipboardCopy size={14} />,
+      category: "File Operations",
+      label: "Copy Whole Note as Markdown (Zero Format Loss)",
+      subtitle: "Copies entire note as clean GitHub-Flavored Markdown to clipboard",
+      badge: "GFM",
+      icon: <ClipboardCopy size={14} className="text-emerald-400" />,
       shortcut: ["⇧", "⌘", "C"],
       disabled: !activeNoteId,
+      keywords: ["copy", "markdown", "md", "clipboard", "format", "whole", "all"],
       action: () => {
         onClose();
         onCopyNoteAsMarkdown?.();
@@ -183,33 +268,39 @@ export function CommandPalette({
     },
     {
       id: "copy-txt",
+      category: "File Operations",
       label: "Copy Note as Plain Text",
       icon: <FileText size={14} />,
       disabled: !activeNoteId,
+      keywords: ["copy", "plain", "text", "raw"],
       action: () => {
         onClose();
         onCopyNoteAsText?.();
       },
     },
     {
-      id: "deeplink",
-      label: "Copy Deeplink",
+      id: "copy-deeplink",
+      category: "File Operations",
+      label: "Copy Note Deeplink",
+      subtitle: "notefast://note/... link for Raycast, Alfred, or Apple Shortcuts",
       icon: <Link2 size={14} />,
       shortcut: ["⇧", "⌘", "D"],
       disabled: !activeNoteId,
+      keywords: ["deeplink", "link", "url", "raycast", "alfred", "shortcut"],
       action: () => {
         onClose();
         onCopyDeeplink?.();
       },
     },
     {
-      id: "export",
-      label: "Export Current Note as Markdown (.md)",
-      badge: "Local",
-      keywords: ["export", "markdown", "md", "save", "download", "file"],
+      id: "export-single",
+      category: "File Operations",
+      label: "Export Current Note as .md",
+      badge: "Download",
       icon: <FileDown size={14} />,
       shortcut: ["⇧", "⌘", "E"],
       disabled: !activeNoteId,
+      keywords: ["export", "markdown", "md", "save", "download", "file"],
       action: () => {
         onClose();
         onExportNote?.();
@@ -217,116 +308,239 @@ export function CommandPalette({
     },
     {
       id: "export-all",
+      category: "File Operations",
       label: "Export All Notes as Markdown (.md)",
-      badge: "Local",
-      keywords: ["export", "all", "markdown", "md", "save", "download", "backup"],
+      subtitle: "Writes all notes to Downloads/NoteFast_Exports and reveals in Finder",
+      badge: "Batch",
       icon: <FileDown size={14} />,
       disabled: notes.length === 0,
+      keywords: ["export", "all", "markdown", "md", "save", "download", "backup", "batch", "finder"],
       action: () => {
         onClose();
         onExportAllNotes?.();
       },
     },
+
+    // ─── 2. SETTINGS: APPEARANCE & THEME (Instant Apply / Sub-View) ───
     {
-      id: "storage-info",
-      label: "Storage: 100% On-Device Local SQLite",
-      badge: "macOS",
-      keywords: ["storage", "local", "database", "sqlite", "on device", "mac", "privacy", "file"],
-      icon: <BookOpen size={14} />,
+      id: "sub-theme-picker",
+      category: "Settings: Appearance",
+      label: "Choose Accent Theme…",
+      subtitle: "Open palette to choose from 6 curated Liquid Glass colorways",
+      badge: "Sub-Menu",
+      icon: <Palette size={14} style={{ color: "var(--color-accent)" }} />,
+      keywords: ["accent", "theme", "color", "palette", "choose", "select", "options", "liquid", "glass"],
       action: () => {
-        onClose();
-        onShowToast?.("Storage: ~/Library/Application Support/com.notefast.app/notefast.db (On-Device Local)", <BookOpen size={14} />);
+        setView("sub_accents");
+        setSearch("");
+        setSelectedIndex(0);
       },
     },
     {
-      id: "prev-note",
-      label: "Previous Note",
-      icon: <ArrowUp size={14} />,
-      shortcut: ["⌥", "↑"],
+      id: "theme-dark",
+      category: "Settings: Appearance",
+      label: "Appearance: Dark Mode",
+      badge: currentTheme === "dark" ? "Active" : undefined,
+      icon: <Moon size={14} />,
+      keywords: ["appearance", "theme", "dark", "night", "mode", "black", "obsidian", "darkmode"],
+      action: () => handleApplyTheme("dark"),
+    },
+    {
+      id: "theme-light",
+      category: "Settings: Appearance",
+      label: "Appearance: Light Mode",
+      badge: currentTheme === "light" ? "Active" : undefined,
+      icon: <Sun size={14} />,
+      keywords: ["appearance", "theme", "light", "day", "mode", "white", "bright", "lightmode"],
+      action: () => handleApplyTheme("light"),
+    },
+    {
+      id: "theme-system",
+      category: "Settings: Appearance",
+      label: "Appearance: System Mode (Auto macOS)",
+      badge: currentTheme === "system" ? "Active" : undefined,
+      icon: <Monitor size={14} />,
+      keywords: ["appearance", "theme", "system", "auto", "mac", "os", "match"],
+      action: () => handleApplyTheme("system"),
+    },
+    ...ACCENT_OPTIONS.map((acc) => ({
+      id: `accent-${acc.id}`,
+      category: "Settings: Appearance",
+      label: `Accent: ${acc.name}`,
+      subtitle: `Apply ${acc.name} Liquid Glass illumination immediately`,
+      badge: currentAccent === acc.id ? "Active" : undefined,
+      icon: (
+        <span
+          className="w-3.5 h-3.5 rounded-full inline-block border border-white/20 shadow-sm"
+          style={{ backgroundColor: acc.color }}
+        />
+      ),
+      keywords: ["theme", "accent", "color", acc.name.toLowerCase(), "palette", "liquid"],
+      action: () => handleApplyAccent(acc.id),
+    })),
+
+    // ─── 3. SETTINGS: TYPOGRAPHY & FONT (Instant Apply / Sub-View) ───
+    {
+      id: "sub-font-picker",
+      category: "Settings: Typography",
+      label: "Choose Editor Font…",
+      subtitle: "Open palette to choose from 6 optimized typographies",
+      badge: "Sub-Menu",
+      icon: <Type size={14} />,
+      keywords: ["font", "typeface", "typography", "text", "choose", "select", "options"],
       action: () => {
-        onClose();
-        onPreviousNote?.();
+        setView("sub_fonts");
+        setSearch("");
+        setSelectedIndex(0);
+      },
+    },
+    ...FONT_OPTIONS.map((font) => ({
+      id: `font-${font.id}`,
+      category: "Settings: Typography",
+      label: `Font: ${font.name}`,
+      subtitle: `Switch editor typeface to ${font.name} immediately`,
+      badge: currentFont === font.id ? "Active" : undefined,
+      icon: <Type size={14} />,
+      keywords: ["font", "typography", "text", "typeface", font.name.toLowerCase()],
+      action: () => handleApplyFont(font.id),
+    })),
+
+    // ─── 4. SETTINGS: ZOOM & SCALE (Instant Apply / Sub-View) ───
+    {
+      id: "sub-zoom-picker",
+      category: "Settings: Zoom",
+      label: "Adjust Zoom Level…",
+      subtitle: `Currently ${Math.round(zoomLevel * 100)}% • Choose from 80% to 160%`,
+      badge: "Sub-Menu",
+      icon: <Sliders size={14} />,
+      keywords: ["zoom", "scale", "size", "magnify", "adjust", "options"],
+      action: () => {
+        setView("sub_zoom");
+        setSearch("");
+        setSelectedIndex(0);
       },
     },
     {
-      id: "next-note",
-      label: "Next Note",
-      icon: <ArrowDown size={14} />,
-      shortcut: ["⌥", "↓"],
-      action: () => {
-        onClose();
-        onNextNote?.();
-      },
+      id: "zoom-80",
+      category: "Settings: Zoom",
+      label: "Zoom: 80% (Compact)",
+      badge: Math.round(zoomLevel * 100) === 80 ? "Active" : undefined,
+      icon: <ZoomOut size={14} />,
+      keywords: ["zoom", "80", "compact", "small"],
+      action: () => handleApplyZoom(0.8),
     },
     {
-      id: "back",
-      label: "Go Back",
-      icon: <ChevronLeft size={14} />,
-      shortcut: ["⌘", "["],
-      action: () => {
-        onGoBack();
-        onClose();
-      },
-    },
-    {
-      id: "forward",
-      label: "Go Forward",
-      icon: <ChevronRight size={14} />,
-      shortcut: ["⌘", "]"],
-      action: () => {
-        onGoForward();
-        onClose();
-      },
-    },
-    {
-      id: "delete",
-      label: "Delete Note",
-      icon: <Trash2 size={14} />,
-      shortcut: ["⇧", "⌘", "⌫"],
-      disabled: !activeNoteId,
-      action: () => {
-        if (activeNoteId) {
-          onDeleteNote(activeNoteId);
-          onClose();
-        }
-      },
-    },
-    {
-      id: "zoom-in",
-      label: "Zoom In",
+      id: "zoom-100",
+      category: "Settings: Zoom",
+      label: "Zoom: 100% (Standard)",
+      badge: Math.round(zoomLevel * 100) === 100 ? "Active" : undefined,
       icon: <ZoomIn size={14} />,
-      shortcut: ["⌘", "+"],
+      keywords: ["zoom", "100", "standard", "normal"],
+      action: () => handleApplyZoom(1.0),
+    },
+    {
+      id: "zoom-120",
+      category: "Settings: Zoom",
+      label: "Zoom: 120% (Default)",
+      badge: Math.round(zoomLevel * 100) === 120 ? "Active" : undefined,
+      icon: <RotateCcw size={14} />,
+      shortcut: ["⌘", "0"],
+      keywords: ["zoom", "120", "default", "reset"],
+      action: () => handleApplyZoom(1.2),
+    },
+    {
+      id: "zoom-140",
+      category: "Settings: Zoom",
+      label: "Zoom: 140% (Enlarged)",
+      badge: Math.round(zoomLevel * 100) === 140 ? "Active" : undefined,
+      icon: <ZoomIn size={14} />,
+      keywords: ["zoom", "140", "enlarged", "large"],
+      action: () => handleApplyZoom(1.4),
+    },
+    {
+      id: "zoom-160",
+      category: "Settings: Zoom",
+      label: "Zoom: 160% (Extra Large)",
+      badge: Math.round(zoomLevel * 100) === 160 ? "Active" : undefined,
+      icon: <ZoomIn size={14} />,
+      keywords: ["zoom", "160", "extra large", "huge"],
+      action: () => handleApplyZoom(1.6),
+    },
+    {
+      id: "zoom-in-step",
+      category: "Settings: Zoom",
+      label: "Zoom In (+10%)",
+      icon: <ZoomIn size={14} />,
+      shortcut: ["⌘", "="],
+      keywords: ["zoom in", "bigger", "enlarge", "plus"],
       action: () => {
-        onZoomIn?.();
         onClose();
+        onZoomIn?.();
       },
     },
     {
-      id: "zoom-out",
-      label: "Zoom Out",
+      id: "zoom-out-step",
+      category: "Settings: Zoom",
+      label: "Zoom Out (-10%)",
       icon: <ZoomOut size={14} />,
       shortcut: ["⌘", "-"],
+      keywords: ["zoom out", "smaller", "shrink", "minus"],
       action: () => {
-        onZoomOut?.();
         onClose();
+        onZoomOut?.();
       },
     },
     {
-      id: "zoom-reset",
+      id: "zoom-reset-step",
+      category: "Settings: Zoom",
       label: "Reset Zoom (120%)",
       icon: <RotateCcw size={14} />,
       shortcut: ["⌘", "0"],
+      keywords: ["reset zoom", "default", "normal", "120%"],
       action: () => {
-        onResetZoom?.();
         onClose();
+        onResetZoom?.();
       },
     },
+
+    // ─── 5. SETTINGS: WINDOW & SYSTEM TOGGLES (Instant Apply) ───
     {
-      id: "smooth-caret",
-      label: "Editor: Cursor Smooth Caret Animation",
-      badge: (typeof window !== "undefined" && localStorage.getItem("notefast_smooth_caret") === "false") ? "off" : "smooth",
-      keywords: ["editor: cursor smooth caret animation", "smooth", "caret", "cursor", "animation", "vscode", "typing", "smooth caret"],
+      id: "toggle-always-on-top",
+      category: "Settings: Window",
+      label: `Always on Top: ${alwaysOnTop ? "Enabled (Click to Disable)" : "Disabled (Click to Enable)"}`,
+      subtitle: "Keep NoteFast floating above all workspaces and fullscreen apps",
+      badge: alwaysOnTop ? "ON" : "OFF",
+      icon: <Pin size={14} className={alwaysOnTop ? "text-pink-400" : "text-[var(--text-muted)]"} />,
+      keywords: ["always on top", "floating", "panel", "window", "auxiliary", "fullscreen", "spaces"],
+      action: handleToggleAlwaysOnTop,
+    },
+    {
+      id: "toggle-esc-loses-focus",
+      category: "Settings: Window",
+      label: `Escape Key: ${escLosesFocus ? "Loses Focus (Click to Hide)" : "Hides Window (Click to Lose Focus)"}`,
+      subtitle: "When enabled, pressing Escape drops focus without hiding NoteFast",
+      badge: escLosesFocus ? "Lose Focus" : "Hide Window",
+      icon: <Keyboard size={14} />,
+      keywords: ["escape", "esc", "focus", "lose focus", "hide", "blur"],
+      action: handleToggleEscLosesFocus,
+    },
+    {
+      id: "toggle-menu-bar",
+      category: "Settings: Window",
+      label: `Menu Bar Icon: ${showMenuBar ? "Visible (Click to Hide)" : "Hidden (Click to Show)"}`,
+      subtitle: "Display toggle button in the macOS status menu bar",
+      badge: showMenuBar ? "Visible" : "Hidden",
+      icon: <Sliders size={14} />,
+      keywords: ["menu bar", "status bar", "tray", "icon", "toggle", "macos", "menubar"],
+      action: handleToggleMenuBar,
+    },
+    {
+      id: "toggle-smooth-caret",
+      category: "Settings: Window",
+      label: "Editor: Smooth Cursor Caret",
+      badge: (typeof window !== "undefined" && localStorage.getItem("notefast_smooth_caret") === "false") ? "OFF" : "ON",
       icon: <Sparkles size={14} />,
+      keywords: ["cursor", "caret", "smooth", "animation", "vscode", "typing"],
       action: () => {
         const current = localStorage.getItem("notefast_smooth_caret") !== "false";
         const next = !current;
@@ -336,42 +550,206 @@ export function CommandPalette({
           new CustomEvent("notefast_toggle_smooth_caret", { detail: { enabled: next } })
         );
         onShowToast?.(
-          next
-            ? "Editor: Smooth Caret Animation Enabled (VS Code smooth)"
-            : "Editor: Smooth Caret Animation Disabled (Native)",
+          next ? "Smooth Caret Animation Enabled" : "Smooth Caret Animation Disabled",
           <Sparkles size={14} />
         );
         onClose();
       },
     },
+
+    // ─── 6. SETTINGS: STORAGE & DATA ───
     {
-      id: "shortcuts",
-      label: "Keyboard Shortcuts Cheatsheet",
-      icon: <Keyboard size={14} />,
-      shortcut: ["⌘", "/"],
+      id: "open-finder-storage",
+      category: "Settings: Storage",
+      label: "Open SQLite Database Folder in Finder",
+      subtitle: "~/Library/Application Support/com.notefast.app",
+      badge: "Local",
+      icon: <FolderOpen size={14} />,
+      keywords: ["storage", "finder", "folder", "sqlite", "database", "file", "open", "data"],
       action: () => {
         onClose();
-        onShowShortcuts?.();
+        invoke("open_app_data_folder").catch(console.error);
       },
     },
     {
-      id: "settings",
-      label: "Settings / Preferences…",
-      badge: "macOS",
+      id: "danger-clear-notes",
+      category: "Settings: Storage",
+      label: "Clear All Notes… (Danger Zone)",
+      subtitle: "Permanently erase all notes from local SQLite database",
+      badge: "Danger",
+      icon: <AlertTriangle size={14} className="text-red-400" />,
+      keywords: ["clear", "delete all", "erase", "danger", "reset", "wipe"],
+      action: () => {
+        onClose();
+        onPromptClearAllNotes?.();
+      },
+    },
+
+    // ─── 7. NOTE ACTIONS & NAVIGATION ───
+    {
+      id: "new-note",
+      category: "Note Actions",
+      label: "New Note",
+      icon: <Plus size={14} />,
+      shortcut: ["⌘", "N"],
+      keywords: ["new", "create", "note", "add"],
+      action: () => {
+        onNewNote();
+        onClose();
+      },
+    },
+    {
+      id: "browse-notes",
+      category: "Note Actions",
+      label: "Browse / Switch Notes List",
+      icon: <BookOpen size={14} />,
+      shortcut: ["⌘", "P"],
+      keywords: ["browse", "switch", "open", "notes", "list", "find"],
+      action: () => {
+        setView("browse");
+        setSearch("");
+        setSelectedIndex(0);
+      },
+    },
+    {
+      id: "find-in-note",
+      category: "Note Actions",
+      label: "Find in Current Note",
+      icon: <Search size={14} />,
+      shortcut: ["⌘", "F"],
+      disabled: !activeNoteId,
+      keywords: ["find", "search", "in note", "text", "replace"],
+      action: () => {
+        onClose();
+        onFindInNote?.();
+      },
+    },
+    {
+      id: "duplicate-note",
+      category: "Note Actions",
+      label: "Duplicate Note",
+      icon: <Copy size={14} />,
+      shortcut: ["⌘", "D"],
+      disabled: !activeNoteId,
+      keywords: ["duplicate", "clone", "copy note"],
+      action: () => {
+        onDuplicateNote();
+        onClose();
+      },
+    },
+    {
+      id: "pin-note",
+      category: "Note Actions",
+      label: activeNote?.is_pinned ? "Unpin Note from Top" : "Pin Note to Top",
+      icon: <Pin size={14} />,
+      shortcut: ["⇧", "⌘", "P"],
+      disabled: !activeNoteId,
+      keywords: ["pin", "unpin", "top", "sticky", "favorite"],
+      action: () => {
+        if (activeNoteId) {
+          onTogglePin(activeNoteId);
+          onClose();
+        }
+      },
+    },
+    {
+      id: "delete-note",
+      category: "Note Actions",
+      label: "Delete Note",
+      icon: <Trash2 size={14} className="text-red-400" />,
+      shortcut: ["⇧", "⌘", "⌫"],
+      disabled: !activeNoteId,
+      keywords: ["delete", "trash", "remove", "erase"],
+      action: () => {
+        if (activeNoteId) {
+          onDeleteNote(activeNoteId);
+          onClose();
+        }
+      },
+    },
+    {
+      id: "prev-note",
+      category: "Note Actions",
+      label: "Previous Note in List",
+      icon: <ArrowUp size={14} />,
+      shortcut: ["⌥", "↑"],
+      keywords: ["previous", "prev", "up", "note"],
+      action: () => {
+        onClose();
+        onPreviousNote?.();
+      },
+    },
+    {
+      id: "next-note",
+      category: "Note Actions",
+      label: "Next Note in List",
+      icon: <ArrowDown size={14} />,
+      shortcut: ["⌥", "↓"],
+      keywords: ["next", "down", "note"],
+      action: () => {
+        onClose();
+        onNextNote?.();
+      },
+    },
+    {
+      id: "history-back",
+      category: "Note Actions",
+      label: "Go Back in History",
+      icon: <ChevronLeft size={14} />,
+      shortcut: ["⌘", "["],
+      keywords: ["back", "history"],
+      action: () => {
+        onGoBack();
+        onClose();
+      },
+    },
+    {
+      id: "history-forward",
+      category: "Note Actions",
+      label: "Go Forward in History",
+      icon: <ChevronRight size={14} />,
+      shortcut: ["⌘", "]"],
+      keywords: ["forward", "history"],
+      action: () => {
+        onGoForward();
+        onClose();
+      },
+    },
+
+    // ─── 8. APP CONTROLS ───
+    {
+      id: "open-full-settings",
+      category: "App Controls",
+      label: "Open Full Settings Window…",
+      subtitle: "Open standard multi-tab macOS Settings window",
+      badge: "Window",
       icon: <Settings size={14} />,
       shortcut: ["⌘", ","],
-      keywords: ["settings", "preferences", "config", "appearance", "theme", "options"],
+      keywords: ["settings", "preferences", "config", "window", "options", "setup"],
       action: () => {
         onClose();
         openSettingsWindow().catch(console.error);
       },
     },
     {
+      id: "shortcuts-sheet",
+      category: "App Controls",
+      label: "Keyboard Shortcuts Cheatsheet",
+      icon: <Keyboard size={14} />,
+      shortcut: ["⌘", "/"],
+      keywords: ["shortcuts", "cheatsheet", "hotkeys", "keys", "help"],
+      action: () => {
+        onClose();
+        onShowShortcuts?.();
+      },
+    },
+    {
       id: "hide-window",
-      label: "Hide Window (Run in Background)",
+      category: "App Controls",
+      label: "Hide Window (Keep Running in Background)",
       icon: <X size={14} />,
       shortcut: ["⌘", "W"],
-      keywords: ["hide", "close", "minimize", "background", "dismiss"],
+      keywords: ["hide", "close", "minimize", "dismiss", "background"],
       action: () => {
         onClose();
         hideWindow().catch(console.error);
@@ -379,8 +757,9 @@ export function CommandPalette({
     },
     {
       id: "quit-app",
+      category: "App Controls",
       label: "Quit NoteFast Completely",
-      icon: <Power size={14} />,
+      icon: <Power size={14} className="text-red-400" />,
       shortcut: ["⌘", "Q"],
       keywords: ["quit", "exit", "close app", "terminate", "kill"],
       action: () => {
@@ -388,71 +767,99 @@ export function CommandPalette({
         quitApp().catch(console.error);
       },
     },
-    {
-      id: "theme-dark",
-      label: "Appearance: Dark Mode",
-      icon: <Moon size={14} />,
-      keywords: ["appearance", "theme", "dark", "night", "mode", "black", "obsidian"],
-      action: () => {
-        setStoredThemeMode("dark");
-        onShowToast?.("Appearance set to Dark Mode", <Moon size={14} />);
-        onClose();
-      },
-    },
-    {
-      id: "theme-light",
-      label: "Appearance: Light Mode",
-      icon: <Sun size={14} />,
-      keywords: ["appearance", "theme", "light", "day", "mode", "white", "bright"],
-      action: () => {
-        setStoredThemeMode("light");
-        onShowToast?.("Appearance set to Light Mode", <Sun size={14} />);
-        onClose();
-      },
-    },
-    {
-      id: "theme-system",
-      label: "Appearance: System Mode (Auto macOS)",
-      icon: <Monitor size={14} />,
-      keywords: ["appearance", "theme", "system", "auto", "mac", "os", "match"],
-      action: () => {
-        setStoredThemeMode("system");
-        onShowToast?.("Appearance set to System Mode", <Monitor size={14} />);
-        onClose();
-      },
-    },
-    ...ACCENT_OPTIONS.map((acc) => ({
-      id: `accent-${acc.id}`,
-      label: `Theme: ${acc.name}`,
-      icon: <Palette size={14} style={{ color: acc.color }} />,
-      keywords: ["theme", "accent", "color", "red", "violet", "emerald", "ocean", "amber", "rose", "pink", "blue", "green", acc.name.toLowerCase()],
-      action: () => {
-        setStoredAccent(acc.id);
-        onShowToast?.(`Theme changed to ${acc.name}`);
-        onClose();
-      },
-    })),
-    ...FONT_OPTIONS.map((font) => ({
-      id: `font-${font.id}`,
-      label: `Font: ${font.name}`,
-      icon: <Type size={14} />,
-      keywords: ["font", "typography", "text", "typeface", font.name.toLowerCase()],
-      action: () => {
-        setStoredFont(font.id);
-        onShowToast?.(`Font changed to ${font.name}`);
-        onClose();
-      },
-    })),
   ];
 
-  const filteredActions = actions.filter((a) => {
+  // Sub-view: Accent color options
+  const accentSubActions: ActionItem[] = ACCENT_OPTIONS.map((acc) => ({
+    id: `sub-acc-${acc.id}`,
+    category: "Accent Themes",
+    label: acc.name,
+    subtitle: `Set ${acc.name} Liquid Glass theme`,
+    badge: currentAccent === acc.id ? "Selected" : undefined,
+    icon: (
+      <span
+        className="w-4 h-4 rounded-full inline-block border-2 border-white/30 shadow-md"
+        style={{ backgroundColor: acc.color }}
+      />
+    ),
+    keywords: ["accent", "theme", "color", acc.name.toLowerCase()],
+    action: () => handleApplyAccent(acc.id),
+  }));
+
+  // Sub-view: Font options
+  const fontSubActions: ActionItem[] = FONT_OPTIONS.map((font) => ({
+    id: `sub-font-${font.id}`,
+    category: "Editor Fonts",
+    label: font.name,
+    subtitle: font.family,
+    badge: currentFont === font.id ? "Selected" : undefined,
+    icon: <Type size={14} />,
+    keywords: ["font", font.name.toLowerCase()],
+    action: () => handleApplyFont(font.id),
+  }));
+
+  // Sub-view: Zoom options
+  const zoomSubActions: ActionItem[] = [
+    {
+      id: "sub-z-80",
+      category: "Zoom Levels",
+      label: "80% (Compact)",
+      badge: Math.round(zoomLevel * 100) === 80 ? "Selected" : undefined,
+      icon: <ZoomOut size={14} />,
+      action: () => handleApplyZoom(0.8),
+    },
+    {
+      id: "sub-z-100",
+      category: "Zoom Levels",
+      label: "100% (Standard)",
+      badge: Math.round(zoomLevel * 100) === 100 ? "Selected" : undefined,
+      icon: <ZoomIn size={14} />,
+      action: () => handleApplyZoom(1.0),
+    },
+    {
+      id: "sub-z-120",
+      category: "Zoom Levels",
+      label: "120% (Default)",
+      badge: Math.round(zoomLevel * 100) === 120 ? "Selected" : undefined,
+      icon: <RotateCcw size={14} />,
+      action: () => handleApplyZoom(1.2),
+    },
+    {
+      id: "sub-z-140",
+      category: "Zoom Levels",
+      label: "140% (Enlarged)",
+      badge: Math.round(zoomLevel * 100) === 140 ? "Selected" : undefined,
+      icon: <ZoomIn size={14} />,
+      action: () => handleApplyZoom(1.4),
+    },
+    {
+      id: "sub-z-160",
+      category: "Zoom Levels",
+      label: "160% (Large)",
+      badge: Math.round(zoomLevel * 100) === 160 ? "Selected" : undefined,
+      icon: <ZoomIn size={14} />,
+      action: () => handleApplyZoom(1.6),
+    },
+  ];
+
+  // Filtering
+  const filterList = (list: ActionItem[]) => {
     const q = search.toLowerCase().trim();
-    if (!q) return true;
-    if (a.label.toLowerCase().includes(q)) return true;
-    if (a.badge && a.badge.toLowerCase().includes(q)) return true;
-    if (a.keywords && a.keywords.some((k) => k.toLowerCase().includes(q))) return true;
-    return false;
-  });
+    if (!q) return list;
+    return list.filter((a) => {
+      if (a.label.toLowerCase().includes(q)) return true;
+      if (a.category.toLowerCase().includes(q)) return true;
+      if (a.subtitle && a.subtitle.toLowerCase().includes(q)) return true;
+      if (a.badge && a.badge.toLowerCase().includes(q)) return true;
+      if (a.keywords && a.keywords.some((k) => k.toLowerCase().includes(q))) return true;
+      return false;
+    });
+  };
+
+  const filteredActions = filterList(actions);
+  const filteredAccents = filterList(accentSubActions);
+  const filteredFonts = filterList(fontSubActions);
+  const filteredZoom = filterList(zoomSubActions);
 
   const filteredNotes = notes.filter((n) => {
     if (!search.trim()) return true;
@@ -462,7 +869,23 @@ export function CommandPalette({
     return title.includes(q) || content.includes(q);
   });
 
-  const currentItems = view === "actions" ? filteredActions : filteredNotes;
+  const getActiveItems = () => {
+    switch (view) {
+      case "browse":
+        return filteredNotes;
+      case "sub_accents":
+        return filteredAccents;
+      case "sub_fonts":
+        return filteredFonts;
+      case "sub_zoom":
+        return filteredZoom;
+      case "actions":
+      default:
+        return filteredActions;
+    }
+  };
+
+  const currentItems = getActiveItems();
 
   useEffect(() => {
     if (isOpen) {
@@ -480,9 +903,10 @@ export function CommandPalette({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (view === "browse" && initialView !== "browse") {
+        if (view !== "actions" && initialView === "actions") {
           setView("actions");
           setSearch("");
+          setSelectedIndex(0);
         } else {
           onClose();
         }
@@ -492,33 +916,38 @@ export function CommandPalette({
         e.preventDefault();
         setView((prev) => (prev === "actions" ? "browse" : "actions"));
         setSearch("");
+        setSelectedIndex(0);
         return;
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((i) =>
-          i < currentItems.length - 1 ? i + 1 : 0
-        );
+        setSelectedIndex((i) => (i < currentItems.length - 1 ? i + 1 : 0));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex((i) =>
-          i > 0 ? i - 1 : Math.max(0, currentItems.length - 1)
-        );
+        setSelectedIndex((i) => (i > 0 ? i - 1 : Math.max(0, currentItems.length - 1)));
         return;
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (view === "actions") {
-          const action = filteredActions[selectedIndex];
-          if (action && !action.disabled) action.action();
-        } else {
+        if (view === "browse") {
           const note = filteredNotes[selectedIndex];
           if (note) {
             onSelectNote(note.id);
             onClose();
           }
+        } else {
+          const list = view === "sub_accents"
+            ? filteredAccents
+            : view === "sub_fonts"
+            ? filteredFonts
+            : view === "sub_zoom"
+            ? filteredZoom
+            : filteredActions;
+
+          const action = list[selectedIndex];
+          if (action && !action.disabled) action.action();
         }
         return;
       }
@@ -529,6 +958,9 @@ export function CommandPalette({
       currentItems,
       selectedIndex,
       filteredActions,
+      filteredAccents,
+      filteredFonts,
+      filteredZoom,
       filteredNotes,
       onClose,
       onSelectNote,
@@ -537,6 +969,8 @@ export function CommandPalette({
 
   if (!isOpen) return null;
 
+  const isSubView = view === "sub_accents" || view === "sub_fonts" || view === "sub_zoom";
+
   return (
     <div className="command-overlay" onClick={onClose}>
       <div
@@ -544,69 +978,193 @@ export function CommandPalette({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Search input with view toggle */}
+        {/* Search Header */}
         <div className="command-search">
-          <Search size={14} className="text-[var(--text-muted)] flex-shrink-0" />
+          {isSubView ? (
+            <button
+              type="button"
+              className="mr-1.5 p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--btn-liquid-bg)] transition-colors"
+              onClick={() => {
+                setView("actions");
+                setSearch("");
+              }}
+              title="Back to All Actions"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          ) : (
+            <Search size={14} className="text-[var(--text-muted)] flex-shrink-0" />
+          )}
+
           <input
             ref={inputRef}
             type="text"
             placeholder={
               view === "actions"
-                ? "Type a command or search actions…"
-                : "Search notes by title or content…"
+                ? "Type a command or search settings (⌥P)…"
+                : view === "browse"
+                ? "Search notes by title or content…"
+                : view === "sub_accents"
+                ? "Search accent themes…"
+                : view === "sub_fonts"
+                ? "Search typography…"
+                : "Search zoom levels…"
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
           />
-          <button
-            type="button"
-            className="command-view-switch-btn"
-            onClick={() => {
-              setView((prev) => (prev === "actions" ? "browse" : "actions"));
-              setSearch("");
-              setTimeout(() => inputRef.current?.focus(), 20);
-            }}
-            title="Press Tab to switch mode"
-          >
-            {view === "actions" ? "Notes (⌘P)" : "Actions (⌘K)"}
-          </button>
+
+          {isSubView ? (
+            <button
+              type="button"
+              className="command-view-switch-btn"
+              onClick={() => {
+                setView("actions");
+                setSearch("");
+              }}
+            >
+              Back to Actions
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-muted)]">
+                ⌥P
+              </span>
+              <button
+                type="button"
+                className="command-view-switch-btn"
+                onClick={() => {
+                  setView((prev) => (prev === "actions" ? "browse" : "actions"));
+                  setSearch("");
+                  setTimeout(() => inputRef.current?.focus(), 20);
+                }}
+                title="Press Tab to switch mode"
+              >
+                {view === "actions" ? "Notes (⌘P)" : "Settings (⌥P)"}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Items list */}
+        {/* List of actions or notes */}
         <div className="command-list">
+          {/* Actions & Settings View */}
           {view === "actions" &&
-            filteredActions.map((item, idx) => (
-              <button
-                key={item.id}
-                className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
-                onClick={() => {
-                  if (!item.disabled) item.action();
-                }}
-                onMouseEnter={() => setSelectedIndex(idx)}
-                style={item.disabled ? { opacity: 0.35, cursor: "default" } : undefined}
-              >
-                <div className="command-item-icon">{item.icon}</div>
-                <div className="command-item-text flex items-center">
-                  <span className={`command-item-label ${item.disabled ? "disabled" : ""}`}>
-                    {item.label}
-                  </span>
-                  {item.badge && (
-                    <span className="text-[10px] px-2 py-0.5 ml-2 rounded-full bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-secondary)] font-mono tracking-tight">
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
-                {item.shortcut && (
-                  <div className="command-item-shortcut">
-                    {item.shortcut.map((k, i) => (
-                      <kbd key={i}>{k}</kbd>
-                    ))}
-                  </div>
-                )}
-              </button>
-            ))}
+            filteredActions.map((item, idx) => {
+              // Group divider header when category changes
+              const prevItem = filteredActions[idx - 1];
+              const showCategoryHeader = !search.trim() && (!prevItem || prevItem.category !== item.category);
 
+              return (
+                <div key={item.id}>
+                  {showCategoryHeader && (
+                    <div className="command-category-header">
+                      {item.category}
+                    </div>
+                  )}
+                  <button
+                    className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                    onClick={() => {
+                      if (!item.disabled) item.action();
+                    }}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    style={item.disabled ? { opacity: 0.35, cursor: "default" } : undefined}
+                  >
+                    <div className="command-item-icon">{item.icon}</div>
+                    <div className="command-item-text flex flex-col justify-center min-w-0">
+                      <div className="flex items-center">
+                        <span className={`command-item-label ${item.disabled ? "disabled" : ""}`}>
+                          {item.label}
+                        </span>
+                        {item.badge && (
+                          <span className={`command-badge ${item.badge === "ON" ? "is-on" : ""}`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                      {item.subtitle && (
+                        <span className="command-item-subtitle">{item.subtitle}</span>
+                      )}
+                    </div>
+                    {item.shortcut && (
+                      <div className="command-item-shortcut">
+                        {item.shortcut.map((k, i) => (
+                          <kbd key={i}>{k}</kbd>
+                        ))}
+                      </div>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+
+          {/* Sub-View: Accents */}
+          {view === "sub_accents" && (
+            <div>
+              <div className="command-category-header">Select Accent Theme (Applies Immediately)</div>
+              {filteredAccents.map((item, idx) => (
+                <button
+                  key={item.id}
+                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                  onClick={() => item.action()}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <div className="command-item-icon">{item.icon}</div>
+                  <div className="command-item-text flex flex-col justify-center">
+                    <span className="command-item-label">{item.label}</span>
+                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  </div>
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sub-View: Fonts */}
+          {view === "sub_fonts" && (
+            <div>
+              <div className="command-category-header">Select Editor Font (Applies Immediately)</div>
+              {filteredFonts.map((item, idx) => (
+                <button
+                  key={item.id}
+                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                  onClick={() => item.action()}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <div className="command-item-icon">{item.icon}</div>
+                  <div className="command-item-text flex flex-col justify-center">
+                    <span className="command-item-label">{item.label}</span>
+                    <span className="command-item-subtitle">{item.subtitle}</span>
+                  </div>
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Sub-View: Zoom */}
+          {view === "sub_zoom" && (
+            <div>
+              <div className="command-category-header">Select Zoom Level (Applies Immediately)</div>
+              {filteredZoom.map((item, idx) => (
+                <button
+                  key={item.id}
+                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                  onClick={() => item.action()}
+                  onMouseEnter={() => setSelectedIndex(idx)}
+                >
+                  <div className="command-item-icon">{item.icon}</div>
+                  <div className="command-item-text">
+                    <span className="command-item-label">{item.label}</span>
+                  </div>
+                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto" />}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Browse Notes View */}
           {view === "browse" &&
             filteredNotes.map((note, idx) => (
               <button
@@ -636,8 +1194,12 @@ export function CommandPalette({
             ))}
 
           {currentItems.length === 0 && (
-            <div style={{ padding: "16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
-              {view === "actions" ? "No matching actions" : "No notes found"}
+            <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
+              {view === "actions"
+                ? `No matching settings or actions for "${search}"`
+                : view === "browse"
+                ? `No notes matching "${search}"`
+                : "No matching options"}
             </div>
           )}
         </div>
