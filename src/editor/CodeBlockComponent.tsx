@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 
@@ -41,9 +41,9 @@ export function CodeBlockComponent({
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const currentLang = node?.attrs?.language || "bash";
+  const currentLang = (node?.attrs?.language || "bash").toLowerCase();
 
-  const handleCopy = (e: React.MouseEvent) => {
+  const handleCopy = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const text = node?.textContent || "";
@@ -53,47 +53,60 @@ export function CodeBlockComponent({
         setTimeout(() => setCopied(false), 2000);
       });
     }
-  };
+  }, [node?.textContent]);
 
-  const currentOption = POPULAR_LANGUAGES.find(
-    (l) => l.value.toLowerCase() === currentLang.toLowerCase()
-  );
+  const currentOption = useMemo(() => {
+    return POPULAR_LANGUAGES.find(
+      (l) => l.value.toLowerCase() === currentLang
+    );
+  }, [currentLang]);
+
   const displayLabel = currentOption
     ? currentOption.label
     : currentLang
     ? currentLang.charAt(0).toUpperCase() + currentLang.slice(1)
     : "Bash";
 
-  const filteredLanguages = POPULAR_LANGUAGES.filter((item) => {
-    if (!searchQuery.trim()) return true;
+  const filteredLanguages = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return (
-      item.label.toLowerCase().includes(q) ||
-      item.value.toLowerCase().includes(q) ||
-      item.ext.toLowerCase().includes(q)
+    if (!q) return POPULAR_LANGUAGES;
+    return POPULAR_LANGUAGES.filter(
+      (item) =>
+        item.label.toLowerCase().includes(q) ||
+        item.value.toLowerCase().includes(q) ||
+        item.ext.toLowerCase().includes(q)
     );
-  });
+  }, [searchQuery]);
 
-  const toggleDropdown = (e: React.MouseEvent) => {
+  const toggleDropdown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isOpen) {
-      // Check if code block header is near the bottom of viewport
-      if (dropdownRef.current) {
-        const rect = dropdownRef.current.getBoundingClientRect();
-        const spaceBelow = window.innerHeight - rect.bottom;
-        setOpenUpward(spaceBelow < 260 && rect.top > 260);
+
+    setIsOpen((prev) => {
+      const willOpen = !prev;
+      if (willOpen) {
+        if (dropdownRef.current) {
+          const rect = dropdownRef.current.getBoundingClientRect();
+          const spaceBelow = window.innerHeight - rect.bottom;
+          setOpenUpward(spaceBelow < 260 && rect.top > 260);
+        }
+        setSearchQuery("");
+        // Highlight ONLY the currently active language initially (not index 0)
+        const activeIdx = POPULAR_LANGUAGES.findIndex(
+          (l) => l.value.toLowerCase() === currentLang
+        );
+        setSelectedIndex(activeIdx >= 0 ? activeIdx : 0);
       }
-      setSearchQuery("");
-      setSelectedIndex(0);
-      setIsOpen(true);
-    } else {
-      setIsOpen(false);
-    }
-  };
+      return willOpen;
+    });
+  }, [currentLang]);
 
   const handleSelectLanguage = useCallback(
-    (langValue: string) => {
+    (langValue: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       updateAttributes({ language: langValue });
       setIsOpen(false);
     },
@@ -113,23 +126,24 @@ export function CodeBlockComponent({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside, true);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside, true);
     };
   }, [isOpen]);
 
   // Focus search input when opened
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         searchInputRef.current?.focus();
       }, 50);
+      return () => clearTimeout(timer);
     }
   }, [isOpen]);
 
   // Keyboard navigation inside dropdown
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isOpen) return;
 
     if (e.key === "Escape") {
@@ -141,33 +155,34 @@ export function CodeBlockComponent({
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
+      e.stopPropagation();
       setSelectedIndex((prev) =>
-        prev >= filteredLanguages.length - 1 ? 0 : prev + 1
+        Math.min(filteredLanguages.length - 1, prev + 1)
       );
       return;
     }
 
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) =>
-        prev <= 0 ? filteredLanguages.length - 1 : prev - 1
-      );
+      e.stopPropagation();
+      setSelectedIndex((prev) => Math.max(0, prev - 1));
       return;
     }
 
     if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       const target = filteredLanguages[selectedIndex];
       if (target) {
-        handleSelectLanguage(target.value);
+        handleSelectLanguage(target.value, e);
       }
     }
-  };
+  }, [isOpen, filteredLanguages, selectedIndex, handleSelectLanguage]);
 
-  // Scroll active item into view
+  // Scroll active item into view when selectedIndex changes
   useEffect(() => {
     if (!isOpen || !menuRef.current) return;
-    const items = menuRef.current.querySelectorAll(".slash-command-item");
+    const items = menuRef.current.querySelectorAll(".code-lang-item");
     const activeItem = items[selectedIndex] as HTMLElement | undefined;
     if (activeItem) {
       activeItem.scrollIntoView({ block: "nearest" });
@@ -176,11 +191,24 @@ export function CodeBlockComponent({
 
   return (
     <NodeViewWrapper className="code-block-wrapper">
-      <div className="code-block-header" contentEditable={false}>
+      <div
+        className="code-block-header"
+        contentEditable={false}
+        onMouseDown={(e) => {
+          // Prevent ProseMirror from taking focus or creating a range selection on header clicks
+          if ((e.target as HTMLElement).tagName !== "INPUT") {
+            e.stopPropagation();
+          }
+        }}
+      >
         <div className="code-block-header-right">
           <div className="code-block-lang-dropdown" ref={dropdownRef}>
             <button
               type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               onClick={toggleDropdown}
               className={`code-block-lang-btn ${isOpen ? "is-active" : ""}`}
               title="Select programming language"
@@ -201,10 +229,14 @@ export function CodeBlockComponent({
                 className={`slash-command-menu code-lang-liquid-menu ${
                   openUpward ? "is-upward" : ""
                 }`}
+                onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={handleKeyDown}
                 role="listbox"
               >
-                <div className="code-lang-search-box">
+                <div
+                  className="code-lang-search-box"
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   <Search size={11} className="code-lang-search-icon" />
                   <input
                     ref={searchInputRef}
@@ -220,13 +252,16 @@ export function CodeBlockComponent({
                   />
                 </div>
 
-                <div className="code-lang-items-container" ref={menuRef}>
+                <div
+                  className="code-lang-items-container"
+                  ref={menuRef}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
                   {filteredLanguages.length === 0 ? (
                     <div className="slash-command-empty">No languages found</div>
                   ) : (
                     filteredLanguages.map((lang, idx) => {
-                      const isCurrent =
-                        lang.value.toLowerCase() === currentLang.toLowerCase();
+                      const isCurrent = lang.value.toLowerCase() === currentLang;
                       const isHighlighted = idx === selectedIndex;
                       return (
                         <button
@@ -235,8 +270,16 @@ export function CodeBlockComponent({
                           className={`slash-command-item code-lang-item ${
                             isHighlighted ? "is-selected" : ""
                           } ${isCurrent ? "is-current-active" : ""}`}
-                          onClick={() => handleSelectLanguage(lang.value)}
-                          onMouseEnter={() => setSelectedIndex(idx)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                          onClick={(e) => handleSelectLanguage(lang.value, e)}
+                          onMouseMove={() => {
+                            if (selectedIndex !== idx) {
+                              setSelectedIndex(idx);
+                            }
+                          }}
                         >
                           <div className="slash-command-item-icon code-lang-icon-cell">
                             {isCurrent ? (
@@ -262,6 +305,10 @@ export function CodeBlockComponent({
 
           <button
             type="button"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             onClick={handleCopy}
             className={`code-block-copy-btn ${copied ? "is-copied" : ""}`}
             title={copied ? "Copied!" : "Copy code"}

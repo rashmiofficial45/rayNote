@@ -265,14 +265,12 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }: { event: KeyboardEvent }) => {
         if (event.key === "ArrowUp") {
-          setSelectedIndex((prev) =>
-            prev <= 0 ? items.length - 1 : prev - 1
-          );
+          setSelectedIndex((prev) => Math.max(0, prev - 1));
           return true;
         }
         if (event.key === "ArrowDown") {
           setSelectedIndex((prev) =>
-            prev >= items.length - 1 ? 0 : prev + 1
+            Math.min(items.length - 1, prev + 1)
           );
           return true;
         }

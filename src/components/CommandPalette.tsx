@@ -928,13 +928,13 @@ export function CommandPalette({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        setSelectedIndex((i) => (i < currentItems.length - 1 ? i + 1 : 0));
+        setSelectedIndex((i) => Math.min(currentItems.length - 1, i + 1));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
-        setSelectedIndex((i) => (i > 0 ? i - 1 : Math.max(0, currentItems.length - 1)));
+        setSelectedIndex((i) => Math.max(0, i - 1));
         return;
       }
       if (e.key === "Backspace" && isSubView && !search) {

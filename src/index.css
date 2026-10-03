@@ -935,10 +935,24 @@ html[data-smooth-caret="false"] .tiptap {
 
 .code-lang-item {
   cursor: pointer;
+  transition: background 0.08s ease, color 0.08s ease, border-color 0.08s ease;
+}
+
+/* Ensure only ONE item is highlighted at a time: the item with .is-selected */
+.code-lang-item:not(.is-selected):hover {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.code-lang-item.is-selected {
+  background: var(--color-accent-muted) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--text-primary) !important;
 }
 
 .code-lang-icon-cell {
   color: var(--color-accent);
+  transition: background 0.08s ease, border-color 0.08s ease, color 0.08s ease;
 }
 
 .code-lang-dot {
@@ -959,6 +973,12 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .code-lang-item.is-current-active .code-lang-icon-cell {
+  background: var(--color-accent);
+  border-color: var(--color-accent-hover);
+  color: #ffffff;
+}
+
+.code-lang-item:not(.is-current-active).is-selected .code-lang-icon-cell {
   background: var(--color-accent);
   border-color: var(--color-accent-hover);
   color: #ffffff;
@@ -1333,9 +1353,9 @@ html[data-smooth-caret="false"] .tiptap {
   overflow: hidden;
 }
 
-.command-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.06);
+.command-item:not(.is-selected):hover {
+  background: transparent !important;
+  border-color: transparent !important;
 }
 
 .command-item.is-selected {
@@ -1494,7 +1514,11 @@ html[data-smooth-caret="false"] .tiptap {
   user-select: none;
 }
 
-.slash-command-item:hover,
+.slash-command-item:not(.is-selected):hover {
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
 .slash-command-item.is-selected {
   background: var(--color-accent-muted);
   border-color: var(--color-accent);
