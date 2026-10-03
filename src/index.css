@@ -854,7 +854,11 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 [data-theme="light"] .code-block-lang-btn:hover,
-[data-theme="light"] .code-block-lang-btn.is-active {
+[data-theme="light"] .code-block-lang-btn.is-active,
+.light .code-block-lang-btn:hover,
+.light .code-block-lang-btn.is-active,
+[data-resolved-theme="light"] .code-block-lang-btn:hover,
+[data-resolved-theme="light"] .code-block-lang-btn.is-active {
   background: rgba(0, 0, 0, 0.06);
   border-color: rgba(0, 0, 0, 0.05);
 }
@@ -4350,8 +4354,11 @@ html[data-smooth-caret="false"] .tiptap {
   width: 16px;
 }
 
+.light .doc-tick-item,
+[data-resolved-theme="light"] .doc-tick-item,
+[data-theme-mode="light"] .doc-tick-item,
 [data-theme="light"] .doc-tick-item {
-  background: rgba(0, 0, 0, 0.18);
+  background: rgba(15, 23, 42, 0.22);
 }
 
 /* Crossed parts: smoothly highlighted as you scroll past them */
@@ -4359,8 +4366,11 @@ html[data-smooth-caret="false"] .tiptap {
   background: rgba(255, 255, 255, 0.42);
 }
 
+.light .doc-tick-item.is-crossed,
+[data-resolved-theme="light"] .doc-tick-item.is-crossed,
+[data-theme-mode="light"] .doc-tick-item.is-crossed,
 [data-theme="light"] .doc-tick-item.is-crossed {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.5);
 }
 
 .doc-tick-slider-track:hover .doc-tick-item {
@@ -4371,8 +4381,11 @@ html[data-smooth-caret="false"] .tiptap {
   background: rgba(255, 255, 255, 0.75) !important;
 }
 
+.light .doc-tick-item:hover,
+[data-resolved-theme="light"] .doc-tick-item:hover,
+[data-theme-mode="light"] .doc-tick-item:hover,
 [data-theme="light"] .doc-tick-item:hover {
-  background: rgba(0, 0, 0, 0.6) !important;
+  background: rgba(15, 23, 42, 0.85) !important;
 }
 
 /* Active Highlighted Part: glows up accordingly whether small or big */
@@ -4395,9 +4408,13 @@ html[data-smooth-caret="false"] .tiptap {
   width: 16px !important;
 }
 
+.light .doc-tick-item.is-active,
+[data-resolved-theme="light"] .doc-tick-item.is-active,
+[data-theme-mode="light"] .doc-tick-item.is-active,
 [data-theme="light"] .doc-tick-item.is-active {
   background: var(--color-accent, #0284c7) !important;
-  box-shadow: 0 0 5px rgba(2, 132, 199, 0.45), 0 0 1px rgba(2, 132, 199, 0.75) !important;
+  box-shadow: 0 0 6px var(--color-accent, rgba(2, 132, 199, 0.65)), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  opacity: 1 !important;
 }
 
 
