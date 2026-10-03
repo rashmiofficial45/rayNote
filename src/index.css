@@ -4417,6 +4417,93 @@ html[data-smooth-caret="false"] .tiptap {
   opacity: 1 !important;
 }
 
+/* ── Window Edge & Corner Resize Handles (Always Reliable) ── */
+.window-resize-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.window-resize-handle {
+  position: absolute;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  background: transparent;
+}
+
+.window-resize-handle.edge-n {
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.window-resize-handle.edge-s {
+  bottom: 0;
+  left: 16px;
+  right: 16px;
+  height: 8px;
+  cursor: ns-resize;
+}
+
+.window-resize-handle.edge-w {
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.window-resize-handle.edge-e {
+  right: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.window-resize-handle.corner-nw {
+  top: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 9999;
+}
+
+.window-resize-handle.corner-ne {
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  z-index: 9999;
+}
+
+.window-resize-handle.corner-sw {
+  bottom: 0;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nesw-resize;
+  z-index: 9999;
+}
+
+.window-resize-handle.corner-se {
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 9999;
+}
+
 
 
 

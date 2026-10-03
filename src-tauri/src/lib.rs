@@ -91,11 +91,11 @@ fn setup_macos_panel(app: &tauri::App) {
             let behavior: usize = (1 << 0) | (1 << 6) | (1 << 8);
             let _: () = msg_send![ns_panel, setCollectionBehavior: behavior];
 
-            // NSWindowStyleMaskNonactivatingPanel (1 << 7 = 128)
-            // Crucial: prevents clicks on NoteFast from deactivating the fullscreen space or switching away
+            // NSWindowStyleMaskResizable (1 << 3 = 8) & NSWindowStyleMaskNonactivatingPanel (1 << 7 = 128)
+            // Crucial: ensures native Cocoa window border resize handles are permanently active and functional
             let current_mask: usize = msg_send![ns_panel, styleMask];
-            let non_activating_mask: usize = current_mask | (1 << 7);
-            let _: () = msg_send![ns_panel, setStyleMask: non_activating_mask];
+            let resizable_panel_mask: usize = current_mask | (1 << 3) | (1 << 7);
+            let _: () = msg_send![ns_panel, setStyleMask: resizable_panel_mask];
 
             // Do not hide when user interacts with fullscreen apps or deactivates NoteFast
             let _: () = msg_send![ns_panel, setHidesOnDeactivate: false];

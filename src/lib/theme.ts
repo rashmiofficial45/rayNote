@@ -54,7 +54,7 @@ export function getStoredThemeMode(): ThemeMode {
 
 import { broadcastSync } from "./settingsSync";
 
-export function applyThemeMode(mode: ThemeMode): void {
+export function applyThemeMode(mode: ThemeMode, useTransition = false): void {
   if (typeof window === "undefined") return;
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
   const isDark = mode === "dark" || (mode === "system" && prefersDark);
@@ -67,7 +67,7 @@ export function applyThemeMode(mode: ThemeMode): void {
     document.documentElement.style.colorScheme = isDark ? "dark" : "light";
   };
 
-  if (typeof (document as any).startViewTransition === "function") {
+  if (useTransition && typeof (document as any).startViewTransition === "function") {
     try {
       (document as any).startViewTransition(updateDOM);
       return;
@@ -81,7 +81,7 @@ export function applyThemeMode(mode: ThemeMode): void {
 export function setStoredThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
   localStorage.setItem("notefast_theme_mode", mode);
-  applyThemeMode(mode);
+  applyThemeMode(mode, true);
   broadcastSync({ type: "theme_mode", value: mode });
   window.dispatchEvent(new CustomEvent("notefast_theme_changed", { detail: { mode } }));
 }

@@ -1,5 +1,5 @@
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getExtensions } from "./extensions";
 import { SlashCommand } from "./SlashCommand";
@@ -84,9 +84,11 @@ export function Editor({
     [saveNow]
   );
 
+  const extensions = useMemo(() => getExtensions(SlashCommand), []);
+
   const editor = useEditor(
     {
-      extensions: getExtensions(SlashCommand),
+      extensions,
       content: content
         ? (() => {
             try {

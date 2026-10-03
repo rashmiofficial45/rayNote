@@ -5,6 +5,7 @@ import { NoteEditor } from "./components/NoteEditor";
 import { Toast, ToastData } from "./components/Toast";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { MarkdownViewerModal, PreviewFileData } from "./components/MarkdownViewerModal";
+import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import {
   getNoteTitle,
   getPreviewText,
@@ -47,17 +48,68 @@ import {
 } from "lucide-react";
 
 function App() {
-  const [notes, setNotes] = useState<NoteSummary[]>([]);
-  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const [activeNoteContent, setActiveNoteContent] = useState<string | null>(null);
-  const contentCacheRef = useRef<Map<string, string>>(new Map());
+  const [notes, setNotes] = useState<NoteSummary[]>(() => {
+    try {
+      const cached = localStorage.getItem("notefast_cached_notes");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
+    const saved = localStorage.getItem("notefast_active_note_id");
+    if (saved) return saved;
+    try {
+      const cached = localStorage.getItem("notefast_cached_notes");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
+      }
+    } catch {}
+    return null;
+  });
+
+  const [activeNoteContent, setActiveNoteContent] = useState<string | null>(() => {
+    const savedId = localStorage.getItem("notefast_active_note_id");
+    if (savedId) {
+      try {
+        const cached = localStorage.getItem("notefast_cached_note_" + savedId);
+        if (cached) return cached;
+      } catch {}
+    }
+    return null;
+  });
+
+  const contentCacheRef = useRef<Map<string, string>>(
+    (() => {
+      const map = new Map<string, string>();
+      const savedId = localStorage.getItem("notefast_active_note_id");
+      if (savedId) {
+        const cached = localStorage.getItem("notefast_cached_note_" + savedId);
+        if (cached) map.set(savedId, cached);
+      }
+      return map;
+    })()
+  );
   const activeFetchIdRef = useRef<string | null>(null);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "browse">("actions");
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem("notefast_cached_notes");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return false;
+      }
+    } catch {}
+    return true;
+  });
   const [deleteConfirm, setDeleteConfirm] = useState<{ noteId: string; agreed: boolean } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(() => {
     const saved = localStorage.getItem("notefast_zoom_level");
@@ -167,12 +219,22 @@ function App() {
     if (contentCacheRef.current.has(id)) {
       setActiveNoteContent(contentCacheRef.current.get(id)!);
     } else {
-      setActiveNoteContent(null);
+      const localCached = localStorage.getItem("notefast_cached_note_" + id);
+      if (localCached) {
+        contentCacheRef.current.set(id, localCached);
+        setActiveNoteContent(localCached);
+      } else {
+        setActiveNoteContent(null);
+      }
+
       activeFetchIdRef.current = id;
       getNote(id)
         .then((fullNote) => {
           if (activeFetchIdRef.current === id && fullNote) {
             contentCacheRef.current.set(id, fullNote.content);
+            try {
+              localStorage.setItem("notefast_cached_note_" + id, fullNote.content);
+            } catch {}
             // Cap memory cache to 25 items
             if (contentCacheRef.current.size > 25) {
               const oldestKey = contentCacheRef.current.keys().next().value;
@@ -308,12 +370,15 @@ function App() {
     try {
       const allNotes = await getAllNotes();
       setNotes(allNotes);
-      if (allNotes.length > 0 && !activeNoteId) {
+      try {
+        localStorage.setItem("notefast_cached_notes", JSON.stringify(allNotes));
+      } catch {}
+
+      if (allNotes.length > 0) {
         const savedId = localStorage.getItem("notefast_active_note_id");
-        if (savedId && allNotes.some((n) => n.id === savedId)) {
-          handleSelectNote(savedId);
-        } else {
-          handleSelectNote(allNotes[0].id);
+        const targetId = savedId && allNotes.some((n) => n.id === savedId) ? savedId : allNotes[0].id;
+        if (!activeNoteId || activeNoteId !== targetId) {
+          handleSelectNote(targetId);
         }
       }
     } catch (err) {
@@ -380,7 +445,13 @@ function App() {
         updated_at: note.updated_at,
         is_pinned: note.is_pinned,
       };
-      setNotes((prev) => [summary, ...prev]);
+      setNotes((prev) => {
+        const next = [summary, ...prev];
+        try {
+          localStorage.setItem("notefast_cached_notes", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       handleSelectNote(note.id);
       showToast("New note created", <Plus size={14} />);
     } catch (err) {
@@ -402,6 +473,9 @@ function App() {
       await updateNote(note.id, title, content);
 
       contentCacheRef.current.set(note.id, content);
+      try {
+        localStorage.setItem("notefast_cached_note_" + note.id, content);
+      } catch {}
       const preview = getPreviewText(content);
       const newSummary: NoteSummary = {
         id: note.id,
@@ -412,7 +486,13 @@ function App() {
         is_pinned: false,
       };
 
-      setNotes((prev) => [newSummary, ...prev]);
+      setNotes((prev) => {
+        const next = [newSummary, ...prev];
+        try {
+          localStorage.setItem("notefast_cached_notes", JSON.stringify(next));
+        } catch {}
+        return next;
+      });
       handleSelectNote(note.id);
       showToast("Note duplicated", <Copy size={14} />);
     } catch (err) {
@@ -438,14 +518,17 @@ function App() {
         }
 
         contentCacheRef.current.set(activeNoteId, content);
+        try {
+          localStorage.setItem("notefast_cached_note_" + activeNoteId, content);
+        } catch {}
         setActiveNoteContent(content);
 
         await updateNote(activeNoteId, title, content);
 
         const preview = getPreviewText(content);
 
-        setNotes((prev) =>
-          prev.map((n) =>
+        setNotes((prev) => {
+          const updated = prev.map((n) =>
             n.id === activeNoteId
               ? {
                 ...n,
@@ -454,8 +537,12 @@ function App() {
                 updated_at: new Date().toISOString(),
               }
               : n
-          )
-        );
+          );
+          try {
+            localStorage.setItem("notefast_cached_notes", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
       } catch (err) {
         console.error("Failed to update note:", err);
       }
@@ -468,7 +555,14 @@ function App() {
       try {
         await deleteNote(id);
         contentCacheRef.current.delete(id);
-        setNotes((prev) => prev.filter((n) => n.id !== id));
+        setNotes((prev) => {
+          const next = prev.filter((n) => n.id !== id);
+          try {
+            localStorage.setItem("notefast_cached_notes", JSON.stringify(next));
+            localStorage.removeItem("notefast_cached_note_" + id);
+          } catch {}
+          return next;
+        });
         if (activeNoteId === id) {
           const remaining = notes.filter((n) => n.id !== id);
           if (remaining.length > 0) {
@@ -476,6 +570,9 @@ function App() {
           } else {
             setActiveNoteId(null);
             setActiveNoteContent(null);
+            try {
+              localStorage.removeItem("notefast_active_note_id");
+            } catch {}
           }
         }
         showToast("Note deleted", <Trash2 size={14} />);
@@ -509,10 +606,14 @@ function App() {
           const updated = prev.map((n) =>
             n.id === id ? { ...n, is_pinned: isPinned } : n
           );
-          return updated.sort((a, b) => {
+          const sorted = updated.sort((a, b) => {
             if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
             return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
           });
+          try {
+            localStorage.setItem("notefast_cached_notes", JSON.stringify(sorted));
+          } catch {}
+          return sorted;
         });
         showToast(
           isPinned ? "Note pinned to top" : "Note unpinned",
@@ -894,6 +995,8 @@ function App() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <WindowResizeHandles />
+
       {/* Drag & drop visual overlay */}
       {isDragOver && (
         <div className="drag-drop-overlay">
