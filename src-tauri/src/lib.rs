@@ -92,10 +92,13 @@ fn setup_macos_panel(app: &tauri::App) {
             let _: () = msg_send![ns_panel, setCollectionBehavior: behavior];
 
             // NSWindowStyleMaskResizable (1 << 3 = 8) & NSWindowStyleMaskNonactivatingPanel (1 << 7 = 128)
-            // Crucial: ensures native Cocoa window border resize handles are permanently active and functional
+            // Crucial: ensures native Cocoa window border resize handles work and WindowServer allows panel in fullscreen spaces
             let current_mask: usize = msg_send![ns_panel, styleMask];
             let resizable_panel_mask: usize = current_mask | (1 << 3) | (1 << 7);
             let _: () = msg_send![ns_panel, setStyleMask: resizable_panel_mask];
+
+            // Crucial for keyboard & click focus: make panel become key on ANY interaction, not only when clicking text
+            let _: () = msg_send![ns_panel, setBecomesKeyOnlyIfNeeded: false];
 
             // Do not hide when user interacts with fullscreen apps or deactivates NoteFast
             let _: () = msg_send![ns_panel, setHidesOnDeactivate: false];
@@ -115,6 +118,29 @@ fn setup_macos_panel(app: &tauri::App) {
     panel.set_collection_behavior(behavior);
     panel.set_level(1000);
     panel.show_and_make_key();
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        let app_class = objc2::class!(NSApplication);
+        let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+        let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
+
+        if let Some(ns_panel) = ns_window_ptr.as_ref() {
+            let _: () = msg_send![ns_panel, orderFrontRegardless];
+            let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
+            let content_view: *mut AnyObject = msg_send![ns_panel, contentView];
+            if !content_view.is_null() {
+                let subviews: *mut AnyObject = msg_send![content_view, subviews];
+                let count: usize = msg_send![subviews, count];
+                if count > 0 {
+                    let first_sub: *mut AnyObject = msg_send![subviews, objectAtIndex: 0usize];
+                    let _: () = msg_send![ns_panel, makeFirstResponder: first_sub];
+                } else {
+                    let _: () = msg_send![ns_panel, makeFirstResponder: content_view];
+                }
+            }
+        }
+    }
 
     #[cfg(debug_assertions)]
     unsafe {
@@ -137,6 +163,10 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
 
+        let app_class = objc2::class!(NSApplication);
+        let shared_app: *mut AnyObject = unsafe { msg_send![app_class, sharedApplication] };
+        let _: () = unsafe { msg_send![shared_app, activateIgnoringOtherApps: true] };
+
         if let Ok(panel) = manager.get_webview_panel("main") {
             panel.show_and_make_key();
         }
@@ -144,15 +174,30 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
         if let Some(win) = manager.get_webview_window("main") {
             if let Ok(ptr) = win.ns_window() {
                 unsafe {
-                    let app_class = objc2::class!(NSApplication);
-                    let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
-                    let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
-
                     if let Some(ns_panel) = (ptr as *mut AnyObject).as_ref() {
+                        let behavior: usize = (1 << 0) | (1 << 6) | (1 << 8);
+                        let _: () = msg_send![ns_panel, setCollectionBehavior: behavior];
+                        let level: isize = 1000;
+                        let _: () = msg_send![ns_panel, setLevel: level];
                         let _: () = msg_send![ns_panel, orderFrontRegardless];
+                        let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
+                        let content_view: *mut AnyObject = msg_send![ns_panel, contentView];
+                        if !content_view.is_null() {
+                            let subviews: *mut AnyObject = msg_send![content_view, subviews];
+                            let count: usize = msg_send![subviews, count];
+                            if count > 0 {
+                                let first_sub: *mut AnyObject = msg_send![subviews, objectAtIndex: 0usize];
+                                let _: () = msg_send![ns_panel, makeFirstResponder: first_sub];
+                            } else {
+                                let _: () = msg_send![ns_panel, makeFirstResponder: content_view];
+                            }
+                        }
                     }
                 }
             }
+            let _ = win.set_focus();
+            use tauri::Emitter;
+            let _ = win.emit("app-focused", ());
         }
     }
 
@@ -161,6 +206,8 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
         if let Some(window) = manager.get_webview_window("main") {
             let _ = window.show();
             let _ = window.set_focus();
+            use tauri::Emitter;
+            let _ = window.emit("app-focused", ());
         }
     }
 }

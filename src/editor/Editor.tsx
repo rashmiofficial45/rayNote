@@ -1,6 +1,7 @@
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getExtensions } from "./extensions";
 import { SlashCommand } from "./SlashCommand";
 import { BottomToolbar } from "../components/BottomToolbar";
@@ -162,6 +163,51 @@ export function Editor({
       setCharCount(editor.state.doc.textContent.length);
     }
   }, [editor]);
+
+  // Guarantee focus on the current note whenever app opens, switches notes, or window gains focus
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+
+    const focusNote = () => {
+      if (editor && !editor.isDestroyed && !editor.isFocused) {
+        editor.commands.focus("end");
+      }
+    };
+
+    focusNote();
+    const t1 = setTimeout(focusNote, 40);
+    const t2 = setTimeout(focusNote, 150);
+
+    const handleWindowFocus = () => {
+      focusNote();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [editor, noteId]);
+
+  // Also listen for native backend focus activation
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen("app-focused", () => {
+        if (editorRef.current && !editorRef.current.isDestroyed) {
+          editorRef.current.commands.focus("end");
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {});
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // Intercept external links and open via native system browser
   useEffect(() => {

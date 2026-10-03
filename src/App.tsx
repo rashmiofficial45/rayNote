@@ -6,6 +6,7 @@ import { Toast, ToastData } from "./components/Toast";
 import { ShortcutsModal } from "./components/ShortcutsModal";
 import { MarkdownViewerModal, PreviewFileData } from "./components/MarkdownViewerModal";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   getNoteTitle,
   getPreviewText,
@@ -158,6 +159,22 @@ function App() {
         contentCacheRef.current.clear();
       },
     });
+  }, []);
+
+  // Ensure the app and window always gain focus on user click, interaction, or scrolling
+  useEffect(() => {
+    const handleInteraction = () => {
+      if (!document.hasFocus()) {
+        window.focus();
+        getCurrentWindow().setFocus().catch(() => {});
+      }
+    };
+    window.addEventListener("pointerdown", handleInteraction, { passive: true });
+    window.addEventListener("wheel", handleInteraction, { passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", handleInteraction);
+      window.removeEventListener("wheel", handleInteraction);
+    };
   }, []);
 
   // Persist window dimensions across restarts
@@ -747,19 +764,29 @@ function App() {
         return;
       }
 
-      // Search Notes / Toggle Command Palette (Cmd+K only)
-      if (isTriggered("search", "⌘K")) {
+      // Search Notes / Toggle Command Palette (Cmd+K)
+      const isSearchShortcut =
+        isTriggered("search", "⌘K") ||
+        (isCmd && !e.shiftKey && !e.altKey && (e.key === "k" || e.key === "K" || e.code === "KeyK"));
+
+      if (isSearchShortcut) {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteInitialView("actions");
-        setIsCommandPaletteOpen((prev) => !prev);
+        setIsCommandPaletteOpen((prev) => (paletteInitialView === "actions" && prev ? false : true));
         return;
       }
 
-      // Quick Open / Browse Notes
-      if (isTriggered("browse", "⌘P")) {
+      // Quick Open / Browse Notes (Cmd+P) - works during scroll or active typing
+      const isBrowseShortcut =
+        isTriggered("browse", "⌘P") ||
+        (isCmd && !e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P" || e.code === "KeyP"));
+
+      if (isBrowseShortcut) {
         e.preventDefault();
+        e.stopPropagation();
         setPaletteInitialView("browse");
-        setIsCommandPaletteOpen(true);
+        setIsCommandPaletteOpen((prev) => (paletteInitialView === "browse" && prev ? false : true));
         return;
       }
 

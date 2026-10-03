@@ -341,14 +341,17 @@ pub fn set_always_on_top(app: tauri::AppHandle, always_on_top: bool) -> Result<(
 
         // 2. Update NSWindow / NSPanel pointer and window manager flags
         if let Some(win) = app.get_webview_window("main") {
-            let _ = win.set_always_on_top(always_on_top);
             if let Ok(ptr) = win.ns_window() {
                 unsafe {
                     if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                        let behavior: usize = (1 << 0) | (1 << 6) | (1 << 8);
+                        let _: () = msg_send![ns_win, setCollectionBehavior: behavior];
                         let _: () = msg_send![ns_win, setLevel: level_isize];
                         let _: () = msg_send![ns_win, setFloatingPanel: always_on_top];
                         if !always_on_top {
                             let _: () = msg_send![ns_win, orderBack: std::ptr::null_mut::<AnyObject>()];
+                        } else {
+                            let _: () = msg_send![ns_win, orderFrontRegardless];
                         }
                     }
                 }
