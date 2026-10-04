@@ -755,7 +755,15 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
 
 #[tauri::command]
 pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), String> {
-    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    use tauri::tray::TrayIconBuilder;
+    use tauri::menu::{MenuBuilder, MenuItemBuilder};
+    use tauri::Manager;
+
+    // Persist preference to app_data_dir/menubar_preference.json
+    if let Ok(app_dir) = app.path().app_data_dir() {
+        let pref_file = app_dir.join("menubar_preference.json");
+        let _ = std::fs::write(pref_file, if visible { "true" } else { "false" });
+    }
 
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_visible(visible);
@@ -763,34 +771,79 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
     }
 
     if visible {
-        let mut builder = TrayIconBuilder::with_id("main-tray").tooltip("rayNote");
-        if let Some(icon) = app.default_window_icon().cloned() {
+        let toggle_i = MenuItemBuilder::with_id("toggle", "Toggle Notes")
+            .accelerator("CmdOrCtrl+Shift+Space")
+            .build(&app)
+            .map_err(|e| e.to_string())?;
+        let new_i = MenuItemBuilder::with_id("new", "New Note")
+            .accelerator("CmdOrCtrl+Shift+N")
+            .build(&app)
+            .map_err(|e| e.to_string())?;
+        let settings_i = MenuItemBuilder::with_id("settings", "Settings...")
+            .accelerator("CmdOrCtrl+,")
+            .build(&app)
+            .map_err(|e| e.to_string())?;
+        let quit_i = MenuItemBuilder::with_id("quit", "Quit rayNote")
+            .accelerator("CmdOrCtrl+Q")
+            .build(&app)
+            .map_err(|e| e.to_string())?;
+
+        let menu = MenuBuilder::new(&app)
+            .item(&toggle_i)
+            .item(&new_i)
+            .separator()
+            .item(&settings_i)
+            .separator()
+            .item(&quit_i)
+            .build()
+            .map_err(|e| e.to_string())?;
+
+        let mut builder = TrayIconBuilder::with_id("main-tray")
+            .tooltip("rayNote")
+            .icon_as_template(true)
+            .menu(&menu)
+            .show_menu_on_left_click(true);
+
+        if let Ok(icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/tray-template.png")) {
+            builder = builder.icon(icon);
+        } else if let Some(icon) = app.default_window_icon().cloned() {
             builder = builder.icon(icon);
         }
+
         let _ = builder
-            .on_tray_icon_event(|tray, event| {
-                if let TrayIconEvent::Click {
-                    button: MouseButton::Left,
-                    button_state: MouseButtonState::Up,
-                    ..
-                } = event
-                {
-                    let app = tray.app_handle();
-                    #[cfg(target_os = "macos")]
-                    {
-                        use tauri_nspanel::ManagerExt;
-                        if let Ok(panel) = app.get_webview_panel("main") {
-                            if panel.is_visible() {
-                                panel.hide();
-                            } else {
-                                crate::show_and_focus_main_panel(app);
+            .on_menu_event(|app, event| {
+                match event.id().as_ref() {
+                    "toggle" => {
+                        #[cfg(target_os = "macos")]
+                        {
+                            use tauri_nspanel::ManagerExt;
+                            if let Ok(panel) = app.get_webview_panel("main") {
+                                if panel.is_visible() {
+                                    panel.hide();
+                                } else {
+                                    crate::show_and_focus_main_panel(app);
+                                }
                             }
                         }
+                        #[cfg(not(target_os = "macos"))]
+                        {
+                            crate::show_and_focus_main_panel(app);
+                        }
                     }
-                    #[cfg(not(target_os = "macos"))]
-                    {
+                    "new" => {
                         crate::show_and_focus_main_panel(app);
+                        use tauri::Emitter;
+                        if let Some(win) = app.get_webview_window("main") {
+                            let _ = win.emit("new-note", ());
+                        }
                     }
+                    "settings" => {
+                        let _ = crate::commands::open_settings_window(app.clone());
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
                 }
             })
             .build(&app)

@@ -731,12 +731,12 @@ export default function SettingsApp() {
 
             {/* Window & Zoom Card (Raycast Style) */}
             <div className="settings-card">
-              {/* Show Notes Toggle Button in Menu Bar */}
+              {/* Show Menu Bar Icon */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Show Notes Toggle Button in Menu Bar</div>
+                  <div className="settings-row-title">Show Menu Bar Icon</div>
                   <div className="settings-row-desc">
-                    Display a button in the menu bar to quickly toggle the Notes window.
+                    Display the rayNote icon in the macOS menu bar for quick notes, settings, and options.
                   </div>
                 </div>
                 <div className="settings-row-action">

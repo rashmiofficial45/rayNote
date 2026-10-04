@@ -328,8 +328,19 @@ pub fn run() {
                 setup_macos_panel(app);
             }
 
-            // Initialize Menu Bar status item
-            let _ = set_menu_bar_visible(app.handle().clone(), true);
+            // Initialize Menu Bar status item if preference is enabled (default true)
+            let mut show_menu_bar = true;
+            if let Ok(app_dir) = app.path().app_data_dir() {
+                let pref_file = app_dir.join("menubar_preference.json");
+                if let Ok(content) = std::fs::read_to_string(&pref_file) {
+                    if content.trim() == "false" {
+                        show_menu_bar = false;
+                    }
+                }
+            }
+            if show_menu_bar {
+                let _ = set_menu_bar_visible(app.handle().clone(), true);
+            }
 
             Ok(())
         })
