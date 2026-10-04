@@ -1,3 +1,20 @@
+/**
+ * TipTap Note Editor Engine (Editor.tsx)
+ *
+ * Core architecture:
+ * - Rich Text & ProseMirror Schema: Powered by TipTap core with GitHub Flavored Markdown (GFM)
+ *   extensions, nested task lists, syntax-highlighted codeblocks (lowlight), smart horizontal rules,
+ *   and responsive iframe video embeds.
+ * - Bidirectional Markdown Interop: Seamlessly converts pasted Markdown files and clipboard
+ *   syntax into TipTap DOM nodes, and serializes selected ProseMirror slices back into clean Markdown.
+ * - Non-Blocking Debounced Persistence: Keeps typing latency at 0ms by separating fast O(1) UI
+ *   updates (character count) from a 300ms debounced JSON serialization that flushes to SQLite.
+ * - Zero Data-Loss Guarantees: Automatically flushes pending edits on window blur, note switching,
+ *   or component unmount.
+ * - Professional Caret Focus: Multi-stage focus recovery and native Cocoa activation listeners
+ *   ensure the cursor is always positioned and ready to type.
+ */
+
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -23,6 +40,10 @@ interface EditorProps {
   onCloseFind?: () => void;
 }
 
+/**
+ * Extracts note title from the first document node (paragraph or heading)
+ * to keep note drawer titles continuously up to date as the user types.
+ */
 const extractTitle = (json: any): string => {
   if (json && Array.isArray(json.content) && json.content.length > 0) {
     const firstNode = json.content[0];
@@ -50,7 +71,10 @@ export function Editor({
 
   const [charCount, setCharCount] = useState(0);
 
-  // Synchronously serializes and flushes pending changes to SQLite
+  /**
+   * Synchronously flushes any uncommitted editor changes to the parent state & SQLite.
+   * Clears the `isDirtyRef` flag so redundant writes are avoided.
+   */
   const saveNow = useCallback(() => {
     if (!isDirtyRef.current || !editorRef.current) return;
     try {
@@ -65,6 +89,12 @@ export function Editor({
     }
   }, []);
 
+  /**
+   * Handles document change events:
+   * 1. Sets dirty flag so exit/blur handlers know changes exist.
+   * 2. Computes character count in O(1) time without expensive JSON serialization.
+   * 3. Schedules a debounced 300ms save to disk.
+   */
   const handleEditorUpdate = useCallback(
     (editorInstance: any) => {
       // 1. Mark dirty
@@ -87,6 +117,15 @@ export function Editor({
 
   const extensions = useMemo(() => getExtensions(SlashCommand), []);
 
+  /**
+   * TipTap Editor Instance Setup:
+   * - `extensions`: Configures full typography, syntax highlighting, task lists, and custom commands.
+   * - `content`: Hydrates either from parsed TipTap JSON or converts markdown strings into schema-valid HTML.
+   * - `clipboardTextSerializer`: Preserves rich Markdown structure when copying text selections from the note.
+   * - `handlePaste`: Intercepts clipboard events:
+   *     1. Detects dropped/pasted Markdown files (.md/.txt) and parses them into rich TipTap nodes.
+   *     2. Detects raw Markdown text strings and converts them to formatted HTML before insertion.
+   */
   const editor = useEditor(
     {
       extensions,
@@ -164,7 +203,11 @@ export function Editor({
     }
   }, [editor]);
 
-  // Guarantee focus on the current note whenever app opens, switches notes, or window gains focus
+  /**
+   * Multi-stage cursor focus restoration:
+   * Guarantees that when switching notes or when the macOS window gains focus,
+   * the text caret is restored to the end of the note without requiring a mouse click.
+   */
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
@@ -190,7 +233,10 @@ export function Editor({
     };
   }, [editor, noteId]);
 
-  // Also listen for native backend focus activation
+  /**
+   * Listens for Tauri backend `app-focused` IPC event to refocus the editor
+   * when the app is brought forward from a background state.
+   */
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
@@ -209,7 +255,10 @@ export function Editor({
     };
   }, []);
 
-  // Intercept external links and open via native system browser
+  /**
+   * Intercepts `<a>` link clicks inside the note document to open external URLs
+   * in the user's default system browser via the `@tauri-apps/plugin-opener` plugin.
+   */
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -235,7 +284,9 @@ export function Editor({
     };
   }, []);
 
-  // Flush pending update on unmount or note switch to guarantee zero data loss
+  /**
+   * Flush uncommitted edits on unmount or note switch to prevent data loss.
+   */
   useEffect(() => {
     return () => {
       if (debounceTimer.current) {

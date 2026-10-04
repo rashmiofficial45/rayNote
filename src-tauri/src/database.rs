@@ -1,8 +1,22 @@
+//! NoteFast SQLite Persistence Layer (database.rs)
+//!
+//! Architectural highlights:
+//! - Embedded SQLite Connection: Manages local file-based database (`raynote.db`) with WAL
+//!   (Write-Ahead Logging) and MEMORY temp_store for zero-latency concurrent read/write operations.
+//! - Automatic Schema Migrations: Automatically upgrades schema across versions (e.g. adding
+//!   preview columns, copying data from legacy `notefast.db` installations).
+//! - SQLite FTS5 Full-Text Search: Automatically indexes titles, previews, and contents via
+//!   SQL triggers (`notes_fts_ai`, `notes_fts_ad`, `notes_fts_au`) for rapid keyword matching.
+//! - Lightweight Summaries vs On-Demand Full Notes: Prevents unnecessary memory overhead by
+//!   retrieving only lightweight metadata (`NoteSummary`) during listing, loading full document
+//!   JSON/Markdown payloads strictly on demand when a note is opened.
+
 use rusqlite::{Connection, Result, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use std::path::PathBuf;
 
+/// Lightweight note summary row structure returned for lists and searches.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct NoteSummary {
     pub id: String,
@@ -13,6 +27,7 @@ pub struct NoteSummary {
     pub is_pinned: bool,
 }
 
+/// Full note document containing the complete TipTap JSON/HTML or Markdown content payload.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Note {
     pub id: String,
@@ -24,10 +39,14 @@ pub struct Note {
     pub is_pinned: bool,
 }
 
+/// Thread-safe database wrapper wrapping an SQLite connection in a Mutex.
 pub struct Database {
     pub conn: Mutex<Connection>,
 }
 
+/// Extracts a plain-text preview snippet from note content.
+/// Handles both raw TipTap JSON schemas (recursively walking text nodes)
+/// and raw Markdown/HTML documents, stripping formatting characters and capping length.
 pub fn extract_preview(content: &str, max_chars: usize) -> String {
     let trimmed = content.trim();
     if trimmed.is_empty() {
@@ -100,6 +119,8 @@ fn truncate_preview(s: &str, max_chars: usize) -> String {
     }
 }
 
+/// Sanitizes a search string into an SQLite FTS5 prefix match expression.
+/// Strips punctuation and turns each token into `"token"*`.
 pub fn sanitize_fts5_query(query: &str) -> String {
     let mut tokens = Vec::new();
     for word in query.split_whitespace() {
@@ -115,6 +136,9 @@ pub fn sanitize_fts5_query(query: &str) -> String {
 }
 
 impl Database {
+    /// Opens connection to `raynote.db`, applies PRAGMA optimizations (WAL, cache, memory store),
+    /// executes schema migrations, sets up FTS5 tables with automated sync triggers,
+    /// and backfills previews and search indices.
     pub fn new(app_dir: PathBuf) -> Result<Self> {
         std::fs::create_dir_all(&app_dir).ok();
         let db_path = app_dir.join("raynote.db");
@@ -314,6 +338,7 @@ impl Database {
         }
     }
 
+    /// Inserts a newly generated note row into SQLite and extracts an initial preview.
     pub fn create_note(&self, note: &Note) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let preview = if note.preview.is_empty() {
@@ -337,6 +362,7 @@ impl Database {
         Ok(())
     }
 
+    /// Updates title, content, computed preview, and updated_at timestamp for a note in SQLite.
     pub fn update_note(&self, id: &str, title: &str, content: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let now = chrono::Utc::now().to_rfc3339();
@@ -348,12 +374,14 @@ impl Database {
         Ok(())
     }
 
+    /// Permanently deletes a note from SQLite (trigger automatically removes FTS index).
     pub fn delete_note(&self, id: &str) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
         Ok(())
     }
 
+    /// Toggles the is_pinned boolean flag for a note and returns the new pinned state.
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
         conn.execute(

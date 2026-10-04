@@ -1,3 +1,20 @@
+/**
+ * NoteFast Main Application Controller (App.tsx)
+ *
+ * Core architectural responsibilities:
+ * - State Management & Note Caching: Delivers 0ms note switching via two-tier caching:
+ *   synchronous localStorage hydration on boot and in-memory cache (`contentCacheRef`),
+ *   coupled with asynchronous reconciliation against SQLite via Tauri IPC.
+ * - File Ingestion & Drag-and-Drop: Handles drag-over overlays, local Markdown import,
+ *   and zero-write non-destructive file previews via `MarkdownViewerModal`.
+ * - Window Lifecycle & Sizing: Controls native borderless window resizing, focus restoration,
+ *   window dimension persistence across restarts, and always-on-top toggling.
+ * - Global Shortcuts & Palette Dispatch: Listens to Cmd/Ctrl shortcuts (search, new note,
+ *   delete, zoom, formatting) and coordinates the Raycast-style Command Palette.
+ * - Multi-Window Sync: Subscribes to settings events to propagate theme, font, zoom,
+ *   and alias modifications immediately across Tauri windows.
+ */
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { CommandPalette } from "./components/CommandPalette";
@@ -49,6 +66,11 @@ import {
 } from "lucide-react";
 
 function App() {
+  /**
+   * Note summaries list state.
+   * Hydrates immediately from localStorage on startup to prevent white/empty-screen flashes,
+   * then updates once SQLite asynchronous data is returned.
+   */
   const [notes, setNotes] = useState<NoteSummary[]>(() => {
     try {
       const cached = localStorage.getItem("notefast_cached_notes");
@@ -60,6 +82,10 @@ function App() {
     return [];
   });
 
+  /**
+   * Tracks the currently selected note ID.
+   * Priority: 1. Previously active note from localStorage, 2. First note in cache, 3. null.
+   */
   const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
     const saved = localStorage.getItem("notefast_active_note_id");
     if (saved) return saved;
@@ -73,6 +99,11 @@ function App() {
     return null;
   });
 
+  /**
+   * Raw text/JSON content of the active note.
+   * Hydrates from synchronous localStorage cache (`notefast_cached_note_<id>`)
+   * so editor mounts with full text without delay.
+   */
   const [activeNoteContent, setActiveNoteContent] = useState<string | null>(() => {
     const savedId = localStorage.getItem("notefast_active_note_id");
     if (savedId) {
@@ -84,6 +115,10 @@ function App() {
     return null;
   });
 
+  /**
+   * Fast in-memory cache map (id -> noteContent) providing 0ms latency note switching.
+   * Prevents UI re-renders and eliminates network/IPC roundtrips for recently edited notes.
+   */
   const contentCacheRef = useRef<Map<string, string>>(
     (() => {
       const map = new Map<string, string>();
@@ -95,6 +130,12 @@ function App() {
       return map;
     })()
   );
+
+  /**
+   * Concurrency guard: Stores the note ID of the latest fetch request.
+   * Prevents race conditions where an older, slow database query overwrites
+   * the content of a newly selected note.
+   */
   const activeFetchIdRef = useRef<string | null>(null);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -217,6 +258,16 @@ function App() {
     }, 1900);
   }, []);
 
+  /**
+   * Switches the active note with instantaneous UI response.
+   * Execution pipeline:
+   * 1. Updates `activeNoteId` state & persists active note ID to localStorage.
+   * 2. Appends ID to history stack (capped at 50 items) for back/forward navigation.
+   * 3. Checks in-memory `contentCacheRef` first (0ms latency, zero layout flicker).
+   * 4. If cache miss, checks `notefast_cached_note_<id>` in localStorage.
+   * 5. Dispatches asynchronous `getNote(id)` to SQLite with concurrency check
+   *    (`activeFetchIdRef`) to prevent out-of-order race conditions.
+   */
   const handleSelectNote = useCallback((id: string, recordHistory = true) => {
     setActiveNoteId(id);
     localStorage.setItem("notefast_active_note_id", id);
@@ -281,6 +332,11 @@ function App() {
     viewFileInputRef.current?.click();
   }, []);
 
+  /**
+   * Reads an imported file from disk, parses its title from YAML frontmatter / headings,
+   * generates a new note in SQLite, stores it in memory cache, prepends it to the note list,
+   * and navigates directly to the new note.
+   */
   const processImportFile = useCallback(
     async (file: File) => {
       try {
@@ -309,6 +365,11 @@ function App() {
     [handleSelectNote, showToast]
   );
 
+  /**
+   * Opens a file in the standalone MarkdownViewerModal for non-destructive reading.
+   * Does NOT write to SQLite or mutate the user's note library unless they explicitly
+   * choose "Import to Notes" inside the viewer.
+   */
   const processViewFile = useCallback(
     async (file: File) => {
       try {
@@ -326,6 +387,10 @@ function App() {
     [showToast]
   );
 
+  /**
+   * Triggers file import from the hidden `<input type="file">` element.
+   * Resets input value after execution to allow selecting the same file sequentially.
+   */
   const handleImportFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -334,6 +399,10 @@ function App() {
     e.target.value = "";
   };
 
+  /**
+   * Triggers non-destructive file preview from the hidden preview input element.
+   * Resets input value after execution.
+   */
   const handleViewFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -342,7 +411,10 @@ function App() {
     e.target.value = "";
   };
 
-  // Drag & drop file handler
+  /**
+   * Drag & drop file handler:
+   * Displays the glassmorphism drop overlay when files are dragged into the window.
+   */
   const handleDragOver = (e: React.DragEvent) => {
     if (e.dataTransfer.types.includes("Files")) {
       e.preventDefault();
@@ -356,6 +428,11 @@ function App() {
     }
   };
 
+  /**
+   * Handles dropping markdown/text files onto the NoteFast window.
+   * Validates file extensions (.md, .markdown, .txt) and prompts the user
+   * with options to either "View without saving" or "Import to Notes".
+   */
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -383,6 +460,12 @@ function App() {
     setAlwaysOnTop(savedAlwaysOnTop).catch(console.error);
   }, []);
 
+  /**
+   * Initial notes loader:
+   * 1. Fetches all note summaries from the SQLite database via Tauri IPC.
+   * 2. Synchronously caches summaries in localStorage for instant cold start on next launch.
+   * 3. Selects the previously active note (or falls back to the first available note).
+   */
   const loadNotes = async () => {
     try {
       const allNotes = await getAllNotes();
@@ -405,6 +488,9 @@ function App() {
     }
   };
 
+  /**
+   * Navigates backward in the note navigation history stack.
+   */
   const handleGoBack = useCallback(() => {
     setHistoryIndex((prevIndex) => {
       if (prevIndex > 0) {
@@ -417,6 +503,9 @@ function App() {
     });
   }, [history, handleSelectNote, showToast]);
 
+  /**
+   * Navigates forward in the note navigation history stack.
+   */
   const handleGoForward = useCallback(() => {
     setHistoryIndex((prevIndex) => {
       if (prevIndex < history.length - 1) {
@@ -429,6 +518,9 @@ function App() {
     });
   }, [history, handleSelectNote, showToast]);
 
+  /**
+   * Cycles to the next note in the active note list (wrapping around).
+   */
   const handleNextNote = useCallback(() => {
     if (notes.length === 0) return;
     const currentIndex = notes.findIndex((n) => n.id === activeNoteId);
@@ -438,6 +530,9 @@ function App() {
     showToast(getNoteTitle(nextNote.title, nextNote.preview));
   }, [notes, activeNoteId, handleSelectNote, showToast]);
 
+  /**
+   * Cycles to the previous note in the active note list (wrapping around).
+   */
   const handlePreviousNote = useCallback(() => {
     if (notes.length === 0) return;
     const currentIndex = notes.findIndex((n) => n.id === activeNoteId);
@@ -450,6 +545,12 @@ function App() {
     showToast(getNoteTitle(prevNote.title, prevNote.preview));
   }, [notes, activeNoteId, handleSelectNote, showToast]);
 
+  /**
+   * Creates a brand new note:
+   * 1. Inserts an empty note document into SQLite via `createNote()`.
+   * 2. Sets the initial content in memory cache.
+   * 3. Prepends the summary to the note list and selects it immediately.
+   */
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote();
@@ -476,6 +577,9 @@ function App() {
     }
   }, [handleSelectNote, showToast]);
 
+  /**
+   * Duplicates the active note, preserving all rich-text content while appending '(Copy)' to the title.
+   */
   const handleDuplicateNote = useCallback(async () => {
     if (!activeNoteId) return;
     try {
@@ -517,6 +621,13 @@ function App() {
     }
   }, [activeNoteId, activeNoteContent, notes, handleSelectNote, showToast]);
 
+  /**
+   * Updates note content and metadata:
+   * - Extracts title from the first document node (or uses `titleHint` if provided).
+   * - Updates synchronous memory cache and localStorage immediately for zero UI lag.
+   * - Persists changes asynchronously into SQLite via `updateNote()`.
+   * - Computes plain-text preview snippet and updates the note list summary.
+   */
   const handleUpdateNote = useCallback(
     async (content: string, titleHint?: string) => {
       if (!activeNoteId) return;
@@ -567,6 +678,12 @@ function App() {
     [activeNoteId]
   );
 
+  /**
+   * Deletes a note by ID:
+   * 1. Permanently removes row from SQLite.
+   * 2. Evicts note content from in-memory cache and localStorage.
+   * 3. Selects the next available note if the deleted note was currently active.
+   */
   const handleDeleteNote = useCallback(
     async (id: string) => {
       try {
@@ -615,6 +732,10 @@ function App() {
     }
   }, [deleteConfirm, handleDeleteNote]);
 
+  /**
+   * Toggles the pin status of a note.
+   * Re-sorts the notes list so pinned notes float to the top ordered by recency.
+   */
   const handleTogglePin = useCallback(
     async (id: string) => {
       try {
@@ -643,6 +764,9 @@ function App() {
     [showToast]
   );
 
+  /**
+   * Converts the active note's TipTap JSON/HTML to clean Markdown and writes to the system clipboard.
+   */
   const handleCopyNoteAsMarkdown = useCallback(async () => {
     if (!activeNoteId) return;
     let content = activeNoteContent;
@@ -656,6 +780,9 @@ function App() {
     });
   }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
+  /**
+   * Strips all formatting and copies the active note as plain text.
+   */
   const handleCopyNoteAsText = useCallback(async () => {
     if (!activeNoteId) return;
     let content = activeNoteContent;
@@ -669,6 +796,9 @@ function App() {
     });
   }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
+  /**
+   * Copies the custom URI scheme (`notefast://note/<id>`) to the clipboard for linking notes.
+   */
   const handleCopyDeeplink = useCallback(() => {
     if (!activeNoteId) return;
     const deeplink = `notefast://note/${activeNoteId}`;
@@ -677,6 +807,9 @@ function App() {
     });
   }, [activeNoteId, showToast]);
 
+  /**
+   * Exports the active note to a local `.md` file using browser download primitives.
+   */
   const handleExportNote = useCallback(async () => {
     if (!activeNoteId) return;
     let content = activeNoteContent;
@@ -691,6 +824,9 @@ function App() {
     showToast(`Exported "${filename}"`, <FileDown size={14} />);
   }, [activeNoteId, activeNoteContent, activeNote, showToast]);
 
+  /**
+   * Batch exports all notes from SQLite into individual Markdown files via Tauri native dialog.
+   */
   const handleExportAllNotes = useCallback(async () => {
     if (notes.length === 0) {
       showToast("No notes to export");
@@ -705,6 +841,9 @@ function App() {
     }
   }, [notes.length, showToast]);
 
+  /**
+   * Increases editor typography scale by 10% (max 200%) and broadcasts change across windows.
+   */
   const handleZoomIn = useCallback(() => {
     setZoomLevel((prev) => {
       const next = Math.min(Math.round((prev + 0.1) * 10) / 10, 2.0);
@@ -714,6 +853,9 @@ function App() {
     });
   }, [showToast]);
 
+  /**
+   * Decreases editor typography scale by 10% (min 60%) and broadcasts change across windows.
+   */
   const handleZoomOut = useCallback(() => {
     setZoomLevel((prev) => {
       const next = Math.max(Math.round((prev - 0.1) * 10) / 10, 0.6);
@@ -723,13 +865,21 @@ function App() {
     });
   }, [showToast]);
 
+  /**
+   * Resets typography zoom to the 120% default setting.
+   */
   const handleResetZoom = useCallback(() => {
     setZoomLevel(1.2);
     showToast("Zoom: 120% (Default)", <RotateCcw size={14} />);
     broadcastSync({ type: "zoom", value: 1.2 });
   }, [showToast]);
 
-  // Master Keyboard Shortcuts listener
+  /**
+   * Master Global Keyboard Shortcuts Router:
+   * Listens on window 'keydown' to handle hotkeys (Cmd+W hide, Cmd+N new note,
+   * Cmd+K command palette, Cmd+F find, Cmd+D duplicate, Cmd+P pin, zoom shortcuts, etc.),
+   * respecting customizable user-configured hotkey overrides.
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isCmd = e.metaKey || e.ctrlKey;
