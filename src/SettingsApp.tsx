@@ -617,9 +617,7 @@ export default function SettingsApp() {
         {/* App Hero Branding (Raycast Style) */}
         <div className="settings-hero" data-tauri-drag-region>
           <div className="settings-hero-icon-wrapper">
-            <div className="settings-hero-icon">
-              <span className="settings-hero-icon-letter">T</span>
-            </div>
+            <img src="/app-icon.png" alt="rayNote" className="settings-hero-icon-img" />
           </div>
           <h1 className="settings-hero-title">rayNote</h1>
           <p className="settings-hero-subtitle">Raycast-inspired notes accessory for macOS.</p>
