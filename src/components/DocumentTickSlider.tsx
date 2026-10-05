@@ -12,7 +12,7 @@ export function DocumentTickSlider({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
   const [isCompact, setIsCompact] = useState(() => {
-    return typeof window !== "undefined" ? window.innerWidth < 520 : false;
+    return typeof window !== "undefined" ? window.innerWidth < 260 || window.innerHeight < 200 : false;
   });
   const [isDragging, setIsDragging] = useState(false);
   const [trackHeight, setTrackHeight] = useState(300);
@@ -21,10 +21,10 @@ export function DocumentTickSlider({
   const rafId = useRef<number | null>(null);
   const dragRafId = useRef<number | null>(null);
 
-  // Responsive: hide on compact / narrow window size (< 520px)
+  // Responsive: only hide on extremely cramped window size (< 260px or < 200px height)
   useEffect(() => {
     const handleResize = () => {
-      setIsCompact(window.innerWidth < 520 || window.innerHeight < 320);
+      setIsCompact(window.innerWidth < 260 || window.innerHeight < 200);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);

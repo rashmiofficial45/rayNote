@@ -21,24 +21,13 @@ tauri_panel! {
 }
 
 #[cfg(target_os = "macos")]
-#[link(name = "CoreGraphics", kind = "framework")]
-extern "C" {
-    fn CGSMainConnectionID() -> i32;
-    fn CGSGetActiveSpace(cid: i32) -> u64;
-}
-
-#[cfg(target_os = "macos")]
 thread_local! {
     static LAST_GRAB: std::cell::Cell<Option<std::time::Instant>> = std::cell::Cell::new(None);
-    static LAST_CTX: std::cell::Cell<(i32, u64)> = std::cell::Cell::new((0, 0));
-    static SETTLE_UNTIL: std::cell::Cell<Option<std::time::Instant>> = std::cell::Cell::new(None);
-    static HEARTBEAT: std::cell::Cell<Option<std::time::Instant>> = std::cell::Cell::new(None);
 }
 
-/// Main thread, every 100ms. Panel visible + not key => take keyboard focus.
-/// Also re-asserts focus whenever the frontmost app or active Space changes,
-/// because AppKit's `isKeyWindow` can be stale after a Space switch.
-/// Hide the panel (⌘W / ⌘⇧Space) to use other apps.
+/// Main thread, every 100ms. Panel visible + mouse is over the panel + not key => take keyboard focus.
+/// This ensures clicking on the rayNote panel gives it keyboard focus, while clicking on
+/// other apps (even fullscreen ones) correctly lets those apps keep focus.
 #[cfg(target_os = "macos")]
 fn hover_focus_tick(app: &tauri::AppHandle) {
     use objc2::msg_send;
@@ -55,41 +44,6 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
         let visible: bool = msg_send![ns_win, isVisible];
         let level: isize = msg_send![ns_win, level];
 
-        // --- context: who is frontmost + which Space is active ---
-        let ws: *mut AnyObject = msg_send![objc2::class!(NSWorkspace), sharedWorkspace];
-        let front: *mut AnyObject = msg_send![ws, frontmostApplication];
-        let pid: i32 = if front.is_null() { 0 } else { msg_send![front, processIdentifier] };
-        let space = CGSGetActiveSpace(CGSMainConnectionID());
-        let ctx = (pid, space);
-        let ctx_changed = LAST_CTX.with(|c| {
-            let old = c.get();
-            c.set(ctx);
-            old != (0, 0) && old != ctx
-        });
-        if ctx_changed {
-            SETTLE_UNTIL.with(|s| s.set(Some(Instant::now() + Duration::from_millis(3000))));
-        }
-        let settling = SETTLE_UNTIL.with(|s| s.get().map_or(false, |t| Instant::now() < t));
-
-        let is_key: bool = msg_send![ns_win, isKeyWindow];
-        let shared_app: *mut AnyObject = msg_send![objc2::class!(NSApplication), sharedApplication];
-        let app_active: bool = msg_send![shared_app, isActive];
-
-        // Heartbeat (temporary diagnostics): proves the watcher runs and shows state once a second
-        let hb = HEARTBEAT.with(|h| {
-            let due = h.get().map_or(true, |t| t.elapsed() >= Duration::from_millis(1000));
-            if due {
-                h.set(Some(Instant::now()));
-            }
-            due
-        });
-        if hb {
-            eprintln!(
-                "[rayNote focus] heartbeat: visible={} level={} front_pid={} space={} is_key={} app_active={}",
-                visible, level, pid, space, is_key, app_active
-            );
-        }
-
         // "Always on top" is on when the panel sits at a floating level or higher.
         // NOTE: set_always_on_top ends with setFloatingPanel:, which resets the level to 3
         // (NSFloatingWindowLevel), so checking for 1000 here would never pass. Off = level 0.
@@ -97,22 +51,10 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
             return;
         }
 
-        if ctx_changed {
-            eprintln!(
-                "[rayNote focus] context changed: front_pid={} space={} is_key={} app_active={}",
-                pid, space, is_key, app_active
-            );
-        }
+        let is_key: bool = msg_send![ns_win, isKeyWindow];
 
-        if settling {
-            eprintln!(
-                "[rayNote focus] tick: front_pid={} is_key={} app_active={}",
-                pid, is_key, app_active
-            );
-        }
-
-        // Steady state and AppKit says we're key -> nothing to do
-        if is_key && !settling {
+        // Already has focus — nothing to do
+        if is_key {
             return;
         }
 
@@ -122,27 +64,38 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
             return;
         }
 
-        let cooldown = if settling { 200 } else { 250 };
+        // --- Core fix: only grab focus if the mouse cursor is inside the panel's frame ---
+        // This means clicking on another app's input field won't be interrupted.
+        let mouse_loc: tauri_nspanel::objc2_foundation::NSPoint =
+            msg_send![objc2::class!(NSEvent), mouseLocation];
+        let frame: tauri_nspanel::objc2_foundation::NSRect = msg_send![ns_win, frame];
+        let mouse_inside = mouse_loc.x >= frame.origin.x
+            && mouse_loc.x <= frame.origin.x + frame.size.width
+            && mouse_loc.y >= frame.origin.y
+            && mouse_loc.y <= frame.origin.y + frame.size.height;
+
+        if !mouse_inside {
+            return;
+        }
+
+        // Cooldown to avoid spamming focus grabs
         let cooling = LAST_GRAB.with(|c| {
-            c.get().map_or(false, |t| t.elapsed() < Duration::from_millis(cooldown))
+            c.get().map_or(false, |t| t.elapsed() < Duration::from_millis(250))
         });
         if cooling {
             return;
         }
         LAST_GRAB.with(|c| c.set(Some(Instant::now())));
 
-        // makeKeyAndOrderFront: is the call that honors the non-activating tag.
-        // (The crate's show_and_make_key only calls makeKeyWindow, which logs showed does nothing here.)
-        let _: () = msg_send![ns_win, orderFrontRegardless];
+        // Grab focus: makeKeyAndOrderFront: honors the non-activating panel tag
         let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
         let mut key_now: bool = msg_send![ns_win, isKeyWindow];
-        let mut used_fallback = false;
         if !key_now {
             // Last resort: activate the app, then try again
+            let shared_app: *mut AnyObject = msg_send![objc2::class!(NSApplication), sharedApplication];
             let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
             let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
             key_now = msg_send![ns_win, isKeyWindow];
-            used_fallback = true;
         }
 
         // Make the web view the first responder so typing reaches the editor
@@ -158,14 +111,6 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
                 };
                 let _: bool = msg_send![ns_win, makeFirstResponder: target];
             }
-        }
-
-        eprintln!(
-            "[rayNote focus] grab (was_key={} settling={} fallback={}) -> key={}",
-            is_key, settling, used_fallback, key_now
-        );
-        if !key_now {
-            return;
         }
     }
 
