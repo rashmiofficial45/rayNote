@@ -256,6 +256,43 @@ export function Editor({
   }, []);
 
   /**
+   * Typing safety net: for ~1.5s after the panel gains focus, if a printable key
+   * arrives while nothing is focused, focus the editor first so the character lands.
+   * Time-limited on purpose so "Esc loses focus" still works.
+   */
+  useEffect(() => {
+    if (!editor) return;
+    let armedUntil = 0;
+    const arm = () => {
+      armedUntil = Date.now() + 1500;
+    };
+
+    window.addEventListener("focus", arm);
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .listen("app-focused", arm)
+      .then((fn) => {
+        unlisten = fn;
+      })
+      .catch(() => {});
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (Date.now() > armedUntil) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return; // printable only, keep shortcuts intact
+      const a = document.activeElement;
+      if (a && a !== document.body) return; // don't hijack FindBar/palette inputs
+      if (!editor.isDestroyed && !editor.isFocused) editor.commands.focus("end");
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+
+    return () => {
+      window.removeEventListener("focus", arm);
+      window.removeEventListener("keydown", onKeyDown, true);
+      unlisten?.();
+    };
+  }, [editor]);
+
+  /**
    * Intercepts `<a>` link clicks inside the note document to open external URLs
    * in the user's default system browser via the `@tauri-apps/plugin-opener` plugin.
    */
