@@ -560,6 +560,7 @@ body,
 }
 
 .tiptap {
+  isolation: isolate;
   outline: none;
   min-height: calc(100vh - 44px);
   padding-top: 20px;
@@ -1637,7 +1638,37 @@ html[data-smooth-caret="false"] .tiptap {
 /* ── Selection ────────────────────────────────────────── */
 ::selection {
   background: var(--color-accent-muted);
-  color: inherit;
+}
+::-moz-selection {
+  background: var(--color-accent-muted);
+}
+
+/* ── Block Selection ──────────────────────────────────── */
+.notefast-block-selected {
+  background-color: var(--color-accent-muted) !important;
+  box-shadow: 0 0 0 2px var(--color-accent-muted) !important;
+  border-radius: 8px !important;
+  outline: none !important;
+}
+
+/* Disable ProseMirror's default square NodeSelection outline */
+.ProseMirror-selectednode {
+  outline: none !important;
+}
+.ProseMirror-selectednode:not(.notefast-block-selected) {
+  /* Just in case they select something natively, don't break it entirely, but we handle blocks */
+}
+
+.notefast-block-selected::selection,
+.notefast-block-selected *::selection {
+  /* Hide native text selection when the block is selected */
+  background-color: rgba(0, 0, 0, 0.001) !important;
+  color: inherit !important;
+}
+.notefast-block-selected::-moz-selection,
+.notefast-block-selected *::-moz-selection {
+  background-color: rgba(0, 0, 0, 0.001) !important;
+  color: inherit !important;
 }
 
 /* ── Syntax Highlighting (Dark & Light High Contrast) ─── */

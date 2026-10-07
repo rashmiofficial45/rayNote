@@ -18,7 +18,8 @@ export function NoteEditor({
   isFindOpen,
   onCloseFind,
 }: NoteEditorProps) {
-  if (!noteId || content === null) {
+  // Only render placeholder when no note is selected at all (e.g. 0 notes in library)
+  if (!noteId) {
     return (
       <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] flex items-center justify-center">
@@ -26,7 +27,7 @@ export function NoteEditor({
         </div>
         <div className="text-center">
           <p className="text-[var(--text-secondary)] text-[13px] font-medium">
-            {noteId ? "Loading note…" : "No note selected"}
+            No note selected
           </p>
           <p className="text-[var(--text-muted)] text-[11px] mt-1">
             Press <kbd className="px-1.5 py-0.5 rounded-full bg-[var(--btn-liquid-bg)] border border-[var(--btn-liquid-border)] text-[var(--text-primary)] text-[10px]">⌘N</kbd> to create a new note
@@ -36,12 +37,13 @@ export function NoteEditor({
     );
   }
 
+  // Notice: No key={noteId}! The Editor component stays permanently mounted.
+  // Note switching happens in place via document replacement, eliminating unmount/remount flicker.
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <Editor
-        key={noteId}
         noteId={noteId}
-        content={content}
+        initialContent={content || ""}
         onUpdate={onUpdate}
         zoomLevel={zoomLevel}
         isFindOpen={isFindOpen}

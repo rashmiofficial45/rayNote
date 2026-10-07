@@ -136,6 +136,7 @@ export function getExtensions(slashCommandExtension?: any) {
     }),
     Table.configure({
       resizable: true,
+      allowTableNodeSelection: true,
       HTMLAttributes: {
         class: 'notefast-table',
       },

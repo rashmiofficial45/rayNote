@@ -3,7 +3,7 @@
  *
  * Core architectural responsibilities:
  * - State Management & Note Caching: Delivers 0ms note switching via two-tier caching:
- *   synchronous localStorage hydration on boot and in-memory cache (`contentCacheRef`),
+ *   synchronous in-memory LRU cache (`noteCache`),
  *   coupled with asynchronous reconciliation against SQLite via Tauri IPC.
  * - File Ingestion & Drag-and-Drop: Handles drag-over overlays, local Markdown import,
  *   and zero-write non-destructive file previews via `MarkdownViewerModal`.
@@ -48,6 +48,7 @@ import {
   NoteSummary,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
+import { noteCache } from "./lib/noteCache";
 import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
 import {
   Check,
@@ -107,29 +108,11 @@ function App() {
   const [activeNoteContent, setActiveNoteContent] = useState<string | null>(() => {
     const savedId = localStorage.getItem("notefast_active_note_id");
     if (savedId) {
-      try {
-        const cached = localStorage.getItem("notefast_cached_note_" + savedId);
-        if (cached) return cached;
-      } catch {}
+      const cached = noteCache.get(savedId);
+      if (cached) return cached.content;
     }
     return null;
   });
-
-  /**
-   * Fast in-memory cache map (id -> noteContent) providing 0ms latency note switching.
-   * Prevents UI re-renders and eliminates network/IPC roundtrips for recently edited notes.
-   */
-  const contentCacheRef = useRef<Map<string, string>>(
-    (() => {
-      const map = new Map<string, string>();
-      const savedId = localStorage.getItem("notefast_active_note_id");
-      if (savedId) {
-        const cached = localStorage.getItem("notefast_cached_note_" + savedId);
-        if (cached) map.set(savedId, cached);
-      }
-      return map;
-    })()
-  );
 
   /**
    * Concurrency guard: Stores the note ID of the latest fetch request.
@@ -197,7 +180,7 @@ function App() {
         setNotes([]);
         setActiveNoteId(null);
         setActiveNoteContent(null);
-        contentCacheRef.current.clear();
+        noteCache.clear();
       },
     });
   }, []);
@@ -263,8 +246,8 @@ function App() {
    * Execution pipeline:
    * 1. Updates `activeNoteId` state & persists active note ID to localStorage.
    * 2. Appends ID to history stack (capped at 50 items) for back/forward navigation.
-   * 3. Checks in-memory `contentCacheRef` first (0ms latency, zero layout flicker).
-   * 4. If cache miss, checks `notefast_cached_note_<id>` in localStorage.
+   * 3. Checks in-memory `noteCache` first (0ms latency, zero layout flicker).
+   * 4. If cache miss, falls back to SQLite.
    * 5. Dispatches asynchronous `getNote(id)` to SQLite with concurrency check
    *    (`activeFetchIdRef`) to prevent out-of-order race conditions.
    */
@@ -283,31 +266,16 @@ function App() {
       });
     }
 
-    // Fast cache check (0ms instantaneous switch)
-    if (contentCacheRef.current.has(id)) {
-      setActiveNoteContent(contentCacheRef.current.get(id)!);
+    // Fast in-memory LRU cache check (0ms instantaneous switch)
+    const cached = noteCache.get(id);
+    if (cached) {
+      setActiveNoteContent(cached.content);
     } else {
-      const localCached = localStorage.getItem("notefast_cached_note_" + id);
-      if (localCached) {
-        contentCacheRef.current.set(id, localCached);
-        setActiveNoteContent(localCached);
-      } else {
-        setActiveNoteContent(null);
-      }
-
       activeFetchIdRef.current = id;
       getNote(id)
         .then((fullNote) => {
           if (activeFetchIdRef.current === id && fullNote) {
-            contentCacheRef.current.set(id, fullNote.content);
-            try {
-              localStorage.setItem("notefast_cached_note_" + id, fullNote.content);
-            } catch {}
-            // Cap memory cache to 25 items
-            if (contentCacheRef.current.size > 25) {
-              const oldestKey = contentCacheRef.current.keys().next().value;
-              if (oldestKey) contentCacheRef.current.delete(oldestKey);
-            }
+            noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
             setActiveNoteContent(fullNote.content);
           }
         })
@@ -316,6 +284,34 @@ function App() {
         });
     }
   }, []);
+
+  // Idle prefetching: quietly loads adjacent notes into LRU cache when user is idle
+  useEffect(() => {
+    if (!activeNoteId || notes.length === 0) return;
+
+    const timer = setTimeout(() => {
+      const currentIndex = notes.findIndex((n) => n.id === activeNoteId);
+      if (currentIndex === -1) return;
+
+      const candidates: string[] = [];
+      if (currentIndex > 0) candidates.push(notes[currentIndex - 1].id);
+      if (currentIndex < notes.length - 1) candidates.push(notes[currentIndex + 1].id);
+
+      candidates.forEach((candId) => {
+        if (!noteCache.has(candId)) {
+          getNote(candId)
+            .then((fullNote) => {
+              if (fullNote && !noteCache.has(fullNote.id)) {
+                noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
+              }
+            })
+            .catch(() => {});
+        }
+      });
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [activeNoteId, notes]);
 
   // Local Markdown File Import & Preview States
   const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
@@ -344,7 +340,7 @@ function App() {
         const title = extractTitleFromMarkdown(text, file.name);
         const newNote = await createNote();
         await updateNote(newNote.id, title, text);
-        contentCacheRef.current.set(newNote.id, text);
+        noteCache.set(newNote.id, text, new Date().toISOString(), title, 0);
         const preview = getPreviewText(text);
         const summary: NoteSummary = {
           id: newNote.id,
@@ -554,7 +550,7 @@ function App() {
   const handleNewNote = useCallback(async () => {
     try {
       const note = await createNote();
-      contentCacheRef.current.set(note.id, note.content);
+      noteCache.set(note.id, note.content, note.updated_at, note.title, 0);
       const summary: NoteSummary = {
         id: note.id,
         title: note.title,
@@ -593,10 +589,7 @@ function App() {
       const title = currentSummary?.title ? `${currentSummary.title} (Copy)` : "Untitled (Copy)";
       await updateNote(note.id, title, content);
 
-      contentCacheRef.current.set(note.id, content);
-      try {
-        localStorage.setItem("notefast_cached_note_" + note.id, content);
-      } catch {}
+      noteCache.set(note.id, content, new Date().toISOString(), title, 0);
       const preview = getPreviewText(content);
       const newSummary: NoteSummary = {
         id: note.id,
@@ -645,10 +638,7 @@ function App() {
           } catch { }
         }
 
-        contentCacheRef.current.set(activeNoteId, content);
-        try {
-          localStorage.setItem("notefast_cached_note_" + activeNoteId, content);
-        } catch {}
+        noteCache.updateContent(activeNoteId, content, title);
         setActiveNoteContent(content);
 
         await updateNote(activeNoteId, title, content);
@@ -681,19 +671,18 @@ function App() {
   /**
    * Deletes a note by ID:
    * 1. Permanently removes row from SQLite.
-   * 2. Evicts note content from in-memory cache and localStorage.
+   * 2. Evicts note content from in-memory cache.
    * 3. Selects the next available note if the deleted note was currently active.
    */
   const handleDeleteNote = useCallback(
     async (id: string) => {
       try {
         await deleteNote(id);
-        contentCacheRef.current.delete(id);
+        noteCache.delete(id);
         setNotes((prev) => {
           const next = prev.filter((n) => n.id !== id);
           try {
             localStorage.setItem("notefast_cached_notes", JSON.stringify(next));
-            localStorage.removeItem("notefast_cached_note_" + id);
           } catch {}
           return next;
         });
@@ -1363,7 +1352,7 @@ function App() {
                 setNotes([]);
                 setActiveNoteId(null);
                 setActiveNoteContent(null);
-                contentCacheRef.current.clear();
+                noteCache.clear();
                 showToast("All notes cleared", <Trash2 size={14} />);
               }).catch(console.error);
             }
@@ -1385,8 +1374,8 @@ function App() {
           try {
             const newNote = await createNote();
             await updateNote(newNote.id, title, markdown);
-            contentCacheRef.current.set(newNote.id, markdown);
             const preview = getPreviewText(markdown);
+            noteCache.set(newNote.id, markdown, new Date().toISOString(), preview);
             const summary: NoteSummary = {
               id: newNote.id,
               title,

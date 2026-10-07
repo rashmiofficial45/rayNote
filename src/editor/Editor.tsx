@@ -2,17 +2,15 @@
  * TipTap Note Editor Engine (Editor.tsx)
  *
  * Core architecture:
- * - Rich Text & ProseMirror Schema: Powered by TipTap core with GitHub Flavored Markdown (GFM)
- *   extensions, nested task lists, syntax-highlighted codeblocks (lowlight), smart horizontal rules,
- *   and responsive iframe video embeds.
- * - Bidirectional Markdown Interop: Seamlessly converts pasted Markdown files and clipboard
- *   syntax into TipTap DOM nodes, and serializes selected ProseMirror slices back into clean Markdown.
- * - Non-Blocking Debounced Persistence: Keeps typing latency at 0ms by separating fast O(1) UI
- *   updates (character count) from a 300ms debounced JSON serialization that flushes to SQLite.
- * - Zero Data-Loss Guarantees: Automatically flushes pending edits on window blur, note switching,
- *   or component unmount.
- * - Professional Caret Focus: Multi-stage focus recovery and native Cocoa activation listeners
- *   ensure the cursor is always positioned and ready to type.
+ * - Single Persistent Editor Instance: Maintains ONE mounted Tiptap editor across all note switches,
+ *   completely eliminating component unmount/remount churn and layout flashes.
+ * - In-Memory LRU Cache Integration: Queries `noteCache` for instantaneous 0ms document loading.
+ * - Non-Blocking Debounced Persistence: Keeps typing latency at 0ms with a 300ms debounced save
+ *   that synchronizes both the memory cache and SQLite.
+ * - Zero Data-Loss Guarantees: Automatically flushes pending edits to cache and SQLite on note switch,
+ *   window blur, or app exit.
+ * - Scroll Memory: Restores per-note scroll positions seamlessly using requestAnimationFrame.
+ * - Stale-While-Revalidate: Renders cached content immediately and verifies against SQLite in background.
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -25,14 +23,19 @@ import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
+import { useEditorScroll } from "./useEditorScroll";
+import { useBlockSelection } from "./useBlockSelection";
 import {
   isMarkdownContent,
   markdownToTipTapHtml,
   sliceToMarkdown,
 } from "./markdownUtils";
+import { noteCache } from "../lib/noteCache";
+import { getNote } from "../lib/db";
 
 interface EditorProps {
-  content: string;
+  initialContent?: string;
+  content?: string;
   noteId: string;
   onUpdate: (content: string, titleHint?: string) => void;
   zoomLevel?: number;
@@ -55,6 +58,7 @@ const extractTitle = (json: any): string => {
 };
 
 export function Editor({
+  initialContent,
   content,
   noteId,
   onUpdate,
@@ -69,20 +73,27 @@ export function Editor({
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
+  // Track the active note ID internally to identify transitions
+  const currentNoteIdRef = useRef(noteId);
+
   const [charCount, setCharCount] = useState(0);
 
   /**
-   * Synchronously flushes any uncommitted editor changes to the parent state & SQLite.
+   * Synchronously flushes any uncommitted editor changes to the memory cache, parent state, & SQLite.
    * Clears the `isDirtyRef` flag so redundant writes are avoided.
    */
   const saveNow = useCallback(() => {
     if (!isDirtyRef.current || !editorRef.current) return;
     try {
       const currentEditor = editorRef.current;
+      const currentId = currentNoteIdRef.current;
       const json = currentEditor.getJSON();
       const title = extractTitle(json);
       const strContent = JSON.stringify(json);
       isDirtyRef.current = false;
+
+      // Update in-memory LRU cache immediately
+      noteCache.updateContent(currentId, strContent, title);
       onUpdateRef.current(strContent, title);
     } catch (err) {
       console.error("Failed to save editor content:", err);
@@ -91,20 +102,19 @@ export function Editor({
 
   /**
    * Handles document change events:
-   * 1. Sets dirty flag so exit/blur handlers know changes exist.
+   * 1. Sets dirty flag so exit/switch handlers know changes exist.
    * 2. Computes character count in O(1) time without expensive JSON serialization.
-   * 3. Schedules a debounced 300ms save to disk.
+   * 3. Schedules a debounced 300ms save to disk & cache.
    */
   const handleEditorUpdate = useCallback(
     (editorInstance: any) => {
-      // 1. Mark dirty
       isDirtyRef.current = true;
 
-      // 2. Update cheap metadata (O(1) / direct text length, no JSON serialization)
+      // O(1) cheap metadata update
       const count = editorInstance?.state?.doc?.textContent?.length ?? 0;
       setCharCount(count);
 
-      // 3. Reset 300ms debounce timer
+      // Reset 300ms debounce timer
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
@@ -118,26 +128,28 @@ export function Editor({
   const extensions = useMemo(() => getExtensions(SlashCommand), []);
 
   /**
-   * TipTap Editor Instance Setup:
-   * - `extensions`: Configures full typography, syntax highlighting, task lists, and custom commands.
-   * - `content`: Hydrates either from parsed TipTap JSON or converts markdown strings into schema-valid HTML.
-   * - `clipboardTextSerializer`: Preserves rich Markdown structure when copying text selections from the note.
-   * - `handlePaste`: Intercepts clipboard events:
-   *     1. Detects dropped/pasted Markdown files (.md/.txt) and parses them into rich TipTap nodes.
-   *     2. Detects raw Markdown text strings and converts them to formatted HTML before insertion.
+   * Hydrates initial document payload on mount from LRU cache or initialContent.
+   */
+  const seedContent = useMemo(() => {
+    const cached = noteCache.get(noteId);
+    const raw = cached?.content ?? (initialContent || content || "");
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return markdownToTipTapHtml(raw);
+    }
+  }, []); // Only runs once on mount
+
+  /**
+   * Single Persistent TipTap Editor Instance:
+   * Notice: Dependency array is empty `[]`! The editor is created ONCE and stays mounted.
+   * Switching notes happens in place via `editor.commands.setContent()`, eliminating remount flicker.
    */
   const editor = useEditor(
     {
       extensions,
-      content: content
-        ? (() => {
-            try {
-              return JSON.parse(content);
-            } catch {
-              return markdownToTipTapHtml(content);
-            }
-          })()
-        : undefined,
+      content: seedContent,
       onUpdate: ({ editor }) => {
         handleEditorUpdate(editor);
       },
@@ -191,29 +203,149 @@ export function Editor({
       },
       autofocus: "end",
     },
-    [noteId]
+    [] // Permanent editor lifetime
   );
 
   editorRef.current = editor;
 
-  // Initialize character count once on mount or content load
+  /**
+   * Note Switching Transition Handler (Zero-Flicker in-place replacement):
+   * Runs whenever `noteId` prop changes while maintaining the same mounted editor shell.
+   */
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const prevId = currentNoteIdRef.current;
+    if (prevId === noteId) return; // Same note, no-op
+
+    // 1. Synchronously flush uncommitted edits from the departing note
+    if (isDirtyRef.current) {
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
+      }
+      try {
+        const json = editor.getJSON();
+        const title = extractTitle(json);
+        const strContent = JSON.stringify(json);
+        isDirtyRef.current = false;
+        noteCache.updateContent(prevId, strContent, title);
+        onUpdateRef.current(strContent, title);
+      } catch (err) {
+        console.error("Failed to flush edits before note switch:", err);
+      }
+    }
+
+    // 2. Save scroll position of the departing note
+    if (scrollContainerRef.current) {
+      noteCache.updateScrollTop(prevId, scrollContainerRef.current.scrollTop);
+    }
+
+    // 3. Update active note reference
+    currentNoteIdRef.current = noteId;
+
+    // 4. Retrieve incoming note from in-memory LRU cache
+    const cached = noteCache.get(noteId);
+    if (cached) {
+      // CACHE HIT: 0ms Instantaneous in-place document swap
+      let docData: any;
+      try {
+        docData = JSON.parse(cached.content);
+      } catch {
+        docData = markdownToTipTapHtml(cached.content);
+      }
+      editor.commands.setContent(docData, { emitUpdate: false }); // emitUpdate: false avoids redundant dirty flags
+      setCharCount(editor.state.doc.textContent.length);
+
+      // Restore cached scroll position smoothly
+      const targetScroll = cached.scrollTop;
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current && currentNoteIdRef.current === noteId) {
+          scrollContainerRef.current.scrollTop = targetScroll;
+        }
+      });
+
+      // Background Stale-While-Revalidate: verify with SQLite without blocking UI
+      getNote(noteId)
+        .then((fullNote) => {
+          if (fullNote && currentNoteIdRef.current === noteId) {
+            const dbTime = new Date(fullNote.updated_at).getTime();
+            if (dbTime > cached.updatedAt && fullNote.content !== cached.content) {
+              noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, targetScroll);
+              let freshDoc: any;
+              try {
+                freshDoc = JSON.parse(fullNote.content);
+              } catch {
+                freshDoc = markdownToTipTapHtml(fullNote.content);
+              }
+              editor.commands.setContent(freshDoc, { emitUpdate: false });
+              setCharCount(editor.state.doc.textContent.length);
+            }
+          }
+        })
+        .catch(() => {});
+    } else {
+      // CACHE MISS: Keep editor mounted and fetch from SQLite asynchronously
+      getNote(noteId)
+        .then((fullNote) => {
+          if (fullNote && currentNoteIdRef.current === noteId) {
+            noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0);
+            let freshDoc: any;
+            try {
+              freshDoc = JSON.parse(fullNote.content);
+            } catch {
+              freshDoc = markdownToTipTapHtml(fullNote.content);
+            }
+            editor.commands.setContent(freshDoc, { emitUpdate: false });
+            setCharCount(editor.state.doc.textContent.length);
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTop = 0;
+            }
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to load note from SQLite:", err);
+        });
+    }
+  }, [noteId, editor]);
+
+  // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (currentNoteIdRef.current) {
+        noteCache.updateScrollTop(currentNoteIdRef.current, container.scrollTop);
+      }
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Initialize character count once on mount
   useEffect(() => {
     if (editor) {
       setCharCount(editor.state.doc.textContent.length);
     }
   }, [editor]);
 
+  const selectionBoxRef = useRef<HTMLDivElement>(null);
+
+  // Hook for Edge Auto-Scroll and Block Selection
+  useEditorScroll(editor, scrollContainerRef);
+  useBlockSelection({ editor, scrollContainerRef, selectionBoxRef });
+
   /**
-   * Multi-stage cursor focus restoration:
-   * Guarantees that when switching notes or when the macOS window gains focus,
-   * the text caret is restored to the end of the note without requiring a mouse click.
+   * Focus restoration without resetting restored scroll position:
    */
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
     const focusNote = () => {
       if (editor && !editor.isDestroyed && !editor.isFocused) {
-        editor.commands.focus("end");
+        // focus with scrollIntoView: false prevents jumping away from restored scrollTop
+        editor.commands.focus("end", { scrollIntoView: false });
       }
     };
 
@@ -234,15 +366,14 @@ export function Editor({
   }, [editor, noteId]);
 
   /**
-   * Listens for Tauri backend `app-focused` IPC event to refocus the editor
-   * when the app is brought forward from a background state.
+   * Refocus editor on Tauri app-focused event
    */
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen("app-focused", () => {
         if (editorRef.current && !editorRef.current.isDestroyed) {
-          editorRef.current.commands.focus("end");
+          editorRef.current.commands.focus("end", { scrollIntoView: false });
         }
       })
       .then((fn) => {
@@ -251,14 +382,12 @@ export function Editor({
       .catch(() => {});
 
     return () => {
-      if (unlisten) unlisten();
+      unlisten?.();
     };
   }, []);
 
   /**
-   * Typing safety net: for ~1.5s after the panel gains focus, if a printable key
-   * arrives while nothing is focused, focus the editor first so the character lands.
-   * Time-limited on purpose so "Esc loses focus" still works.
+   * Keystroke auto-focus restoration
    */
   useEffect(() => {
     if (!editor) return;
@@ -278,10 +407,12 @@ export function Editor({
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (Date.now() > armedUntil) return;
-      if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return; // printable only, keep shortcuts intact
+      if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
       const a = document.activeElement;
-      if (a && a !== document.body) return; // don't hijack FindBar/palette inputs
-      if (!editor.isDestroyed && !editor.isFocused) editor.commands.focus("end");
+      if (a && a !== document.body) return;
+      if (!editor.isDestroyed && !editor.isFocused) {
+        editor.commands.focus("end", { scrollIntoView: false });
+      }
     };
     window.addEventListener("keydown", onKeyDown, true);
 
@@ -293,8 +424,7 @@ export function Editor({
   }, [editor]);
 
   /**
-   * Intercepts `<a>` link clicks inside the note document to open external URLs
-   * in the user's default system browser via the `@tauri-apps/plugin-opener` plugin.
+   * External Link click interceptor
    */
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -322,7 +452,7 @@ export function Editor({
   }, []);
 
   /**
-   * Flush uncommitted edits on unmount or note switch to prevent data loss.
+   * Flush uncommitted edits on component unmount to prevent data loss.
    */
   useEffect(() => {
     return () => {
@@ -332,14 +462,19 @@ export function Editor({
       if (isDirtyRef.current && editorRef.current) {
         try {
           const currentEditor = editorRef.current;
+          const currentId = currentNoteIdRef.current;
           const json = currentEditor.getJSON();
           const title = extractTitle(json);
           const strContent = JSON.stringify(json);
           isDirtyRef.current = false;
+          noteCache.updateContent(currentId, strContent, title);
           onUpdateRef.current(strContent, title);
         } catch (err) {
           console.error("Failed to flush editor update on unmount:", err);
         }
+      }
+      if (scrollContainerRef.current && currentNoteIdRef.current) {
+        noteCache.updateScrollTop(currentNoteIdRef.current, scrollContainerRef.current.scrollTop);
       }
     };
   }, []);
@@ -369,6 +504,7 @@ export function Editor({
       />
       <div
         ref={scrollContainerRef}
+        data-scroll-container
         className="flex-1 min-h-0 overflow-y-auto pt-3 relative"
       >
         <div style={{ zoom: zoomLevel } as React.CSSProperties} className="relative">
@@ -379,10 +515,24 @@ export function Editor({
           />
           <EditorContent editor={editor} />
         </div>
+        {/* Marquee Selection Box */}
+        <div
+          ref={selectionBoxRef}
+          style={{
+            position: "fixed",
+            display: "none",
+            backgroundColor: "rgba(46, 170, 220, 0.2)",
+            border: "1px solid rgba(46, 170, 220, 0.5)",
+            pointerEvents: "none",
+            zIndex: 9999,
+            borderRadius: "4px",
+            willChange: "top, left, width, height",
+          }}
+        />
       </div>
       <DocumentTickSlider scrollContainerRef={scrollContainerRef} />
       <div className="editor-char-count">
-        {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
+        {charCount} {charCount === 1 ? "char" : "chars"}
       </div>
       <BottomToolbar editor={editor} />
     </div>
