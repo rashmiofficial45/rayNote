@@ -1,0 +1,18 @@
+{
+  "smallResults": {
+    "label": "100 Switches of 20 KB Notes",
+    "baseWebKit": 75,
+    "peakWebKit": 291,
+    "settledWebKit": 207,
+    "settledTotal": 238,
+    "settledTauri": 31
+  },
+  "giantResults": {
+    "label": "100 Switches of Large/Giant Notes (up to 1 MB)",
+    "baseWebKit": 76,
+    "peakWebKit": 852,
+    "settledWebKit": 518,
+    "settledTotal": 548,
+    "settledTauri": 30
+  }
+}

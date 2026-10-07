@@ -14,6 +14,8 @@
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
+import { createDocument } from "@tiptap/core";
+import { EditorState } from "@tiptap/pm/state";
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -243,6 +245,28 @@ export function Editor({
     // 3. Update active note reference
     currentNoteIdRef.current = noteId;
 
+    // High-performance document swap:
+    // Uses EditorState.create to clear prosemirror-history undo stack and detach old document nodes,
+    // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
+    const applyDocumentInPlace = (docData: any) => {
+      try {
+        const newDoc = createDocument(docData, editor.schema, {}, {
+          errorOnInvalidContent: editor.options.enableContentCheck,
+        });
+        const newState = EditorState.create({
+          schema: editor.schema,
+          doc: newDoc,
+          plugins: editor.state.plugins,
+        });
+        editor.view.updateState(newState);
+        setCharCount(newDoc.textContent.length);
+      } catch (err) {
+        console.warn("createDocument fallback to setContent:", err);
+        editor.commands.setContent(docData, { emitUpdate: false });
+        setCharCount(editor.state.doc.textContent.length);
+      }
+    };
+
     // 4. Retrieve incoming note from in-memory LRU cache
     const cached = noteCache.get(noteId);
     if (cached) {
@@ -253,8 +277,7 @@ export function Editor({
       } catch {
         docData = markdownToTipTapHtml(cached.content);
       }
-      editor.commands.setContent(docData, { emitUpdate: false }); // emitUpdate: false avoids redundant dirty flags
-      setCharCount(editor.state.doc.textContent.length);
+      applyDocumentInPlace(docData);
 
       // Restore cached scroll position smoothly
       const targetScroll = cached.scrollTop;
@@ -277,8 +300,7 @@ export function Editor({
               } catch {
                 freshDoc = markdownToTipTapHtml(fullNote.content);
               }
-              editor.commands.setContent(freshDoc, { emitUpdate: false });
-              setCharCount(editor.state.doc.textContent.length);
+              applyDocumentInPlace(freshDoc);
             }
           }
         })
@@ -295,8 +317,7 @@ export function Editor({
             } catch {
               freshDoc = markdownToTipTapHtml(fullNote.content);
             }
-            editor.commands.setContent(freshDoc, { emitUpdate: false });
-            setCharCount(editor.state.doc.textContent.length);
+            applyDocumentInPlace(freshDoc);
             if (scrollContainerRef.current) {
               scrollContainerRef.current.scrollTop = 0;
             }
@@ -329,6 +350,20 @@ export function Editor({
       setCharCount(editor.state.doc.textContent.length);
     }
   }, [editor]);
+
+  // Register lightweight zero-overhead diagnostic metrics for memory profiling
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__RAYNOTE_DIAGNOSTICS__ = {
+        getCachedNotesCount: () => noteCache.size,
+        getCachedBytes: () => noteCache.totalBytes,
+        getEditorInstanceCount: () => (editorRef.current && !editorRef.current.isDestroyed ? 1 : 0),
+        getMountedEditorDomCount: () => document.querySelectorAll(".tiptap").length,
+        getMountedEditorChildrenCount: () => document.querySelector(".tiptap")?.childElementCount || 0,
+        getMountedCodeBlocksCount: () => document.querySelectorAll(".code-block-wrapper").length,
+      };
+    }
+  }, []);
 
   const selectionBoxRef = useRef<HTMLDivElement>(null);
 

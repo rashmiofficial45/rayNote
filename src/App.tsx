@@ -100,25 +100,7 @@ function App() {
     return null;
   });
 
-  /**
-   * Raw text/JSON content of the active note.
-   * Hydrates from synchronous localStorage cache (`notefast_cached_note_<id>`)
-   * so editor mounts with full text without delay.
-   */
-  const [activeNoteContent, setActiveNoteContent] = useState<string | null>(() => {
-    const savedId = localStorage.getItem("notefast_active_note_id");
-    if (savedId) {
-      const cached = noteCache.get(savedId);
-      if (cached) return cached.content;
-    }
-    return null;
-  });
-
-  /**
-   * Concurrency guard: Stores the note ID of the latest fetch request.
-   * Prevents race conditions where an older, slow database query overwrites
-   * the content of a newly selected note.
-   */
+  // Active fetch tracker to guard against out-of-order SQLite responses
   const activeFetchIdRef = useRef<string | null>(null);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -179,7 +161,6 @@ function App() {
       onNotesCleared: () => {
         setNotes([]);
         setActiveNoteId(null);
-        setActiveNoteContent(null);
         noteCache.clear();
       },
     });
@@ -268,15 +249,12 @@ function App() {
 
     // Fast in-memory LRU cache check (0ms instantaneous switch)
     const cached = noteCache.get(id);
-    if (cached) {
-      setActiveNoteContent(cached.content);
-    } else {
+    if (!cached) {
       activeFetchIdRef.current = id;
       getNote(id)
         .then((fullNote) => {
           if (activeFetchIdRef.current === id && fullNote) {
             noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
-            setActiveNoteContent(fullNote.content);
           }
         })
         .catch((err) => {
@@ -551,8 +529,8 @@ function App() {
   const handleDuplicateNote = useCallback(async () => {
     if (!activeNoteId) return;
     try {
-      let content = activeNoteContent;
-      if (content === null) {
+      let content = noteCache.get(activeNoteId)?.content;
+      if (!content) {
         const full = await getNote(activeNoteId);
         content = full?.content || "";
       }
@@ -584,7 +562,7 @@ function App() {
     } catch (err) {
       console.error("Failed to duplicate note:", err);
     }
-  }, [activeNoteId, activeNoteContent, notes, handleSelectNote, showToast]);
+  }, [activeNoteId, notes, handleSelectNote, showToast]);
 
   /**
    * Updates note content and metadata:
@@ -611,7 +589,6 @@ function App() {
         }
 
         noteCache.updateContent(activeNoteId, content, title);
-        setActiveNoteContent(content);
 
         await updateNote(activeNoteId, title, content);
 
@@ -664,7 +641,6 @@ function App() {
             handleSelectNote(remaining[0].id);
           } else {
             setActiveNoteId(null);
-            setActiveNoteContent(null);
             try {
               localStorage.removeItem("notefast_active_note_id");
             } catch {}
@@ -730,8 +706,8 @@ function App() {
    */
   const handleCopyNoteAsMarkdown = useCallback(async () => {
     if (!activeNoteId) return;
-    let content = activeNoteContent;
-    if (content === null) {
+    let content = noteCache.get(activeNoteId)?.content;
+    if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
@@ -739,15 +715,15 @@ function App() {
     navigator.clipboard.writeText(md).then(() => {
       showToast("Copied note as Markdown", <Check size={14} />);
     });
-  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
+  }, [activeNoteId, activeNote, showToast]);
 
   /**
    * Strips all formatting and copies the active note as plain text.
    */
   const handleCopyNoteAsText = useCallback(async () => {
     if (!activeNoteId) return;
-    let content = activeNoteContent;
-    if (content === null) {
+    let content = noteCache.get(activeNoteId)?.content;
+    if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
@@ -755,7 +731,7 @@ function App() {
     navigator.clipboard.writeText(text).then(() => {
       showToast("Copied note as Plain Text", <Check size={14} />);
     });
-  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
+  }, [activeNoteId, activeNote, showToast]);
 
   /**
    * Copies the custom URI scheme (`notefast://note/<id>`) to the clipboard for linking notes.
@@ -773,8 +749,8 @@ function App() {
    */
   const handleExportNote = useCallback(async () => {
     if (!activeNoteId) return;
-    let content = activeNoteContent;
-    if (content === null) {
+    let content = noteCache.get(activeNoteId)?.content;
+    if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
@@ -783,7 +759,7 @@ function App() {
     const md = noteContentToMarkdown(content, activeNote?.title);
     downloadFile(filename, md, "text/markdown");
     showToast(`Exported "${filename}"`, <FileDown size={14} />);
-  }, [activeNoteId, activeNoteContent, activeNote, showToast]);
+  }, [activeNoteId, activeNote, showToast]);
 
   /**
    * Batch exports all notes from SQLite into individual Markdown files via Tauri native dialog.
@@ -1272,7 +1248,6 @@ function App() {
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <NoteEditor
           noteId={activeNoteId}
-          content={activeNoteContent}
           onUpdate={handleUpdateNote}
           zoomLevel={zoomLevel}
           isFindOpen={isFindOpen}
@@ -1323,7 +1298,6 @@ function App() {
               Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
                 setNotes([]);
                 setActiveNoteId(null);
-                setActiveNoteContent(null);
                 noteCache.clear();
                 showToast("All notes cleared", <Trash2 size={14} />);
               }).catch(console.error);

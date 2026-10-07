@@ -1,0 +1,10 @@
+{
+  "test": "Configuration B: Native ProseMirror <pre><code>",
+  "baseWebKit": 341,
+  "peakWebKit": 465,
+  "settled15sWebKit": 978,
+  "finalWebKit": 480,
+  "finalTotal": 512,
+  "finalTauri": 32,
+  "idleCpu": 80.9
+}

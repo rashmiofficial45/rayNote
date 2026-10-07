@@ -1,0 +1,127 @@
+{
+  "tauriPid": 41980,
+  "webKitPid": 41991,
+  "results": [
+    {
+      "scenario": "1. Fresh Launch Baseline",
+      "tauriFp": 29,
+      "webKitFp": 96,
+      "totalFp": 125,
+      "totalPeak": 125,
+      "tauriCpu": 0.8,
+      "webKitCpu": 0.4,
+      "threads": 37,
+      "expected": "Expected baseline ~150-200 MB"
+    },
+    {
+      "scenario": "2. Initial Idle (Settled)",
+      "tauriFp": 27,
+      "webKitFp": 72,
+      "totalFp": 99,
+      "totalPeak": 125,
+      "tauriCpu": 0.5,
+      "webKitCpu": 0.3,
+      "threads": 23,
+      "expected": "CPU ~0.2%, memory stable"
+    },
+    {
+      "scenario": "3. 100 Note Switches",
+      "tauriFp": 32,
+      "webKitFp": 949,
+      "totalFp": 981,
+      "totalPeak": 984,
+      "tauriCpu": 0.1,
+      "webKitCpu": 80.1,
+      "threads": 35,
+      "expected": "Stable, plateau beginning"
+    },
+    {
+      "scenario": "4. 500 Note Switches",
+      "tauriFp": 29,
+      "webKitFp": 906,
+      "totalFp": 935,
+      "totalPeak": 1121,
+      "tauriCpu": 0.7,
+      "webKitCpu": 76.9,
+      "threads": 34,
+      "expected": "Memory strictly bounded by LRU"
+    },
+    {
+      "scenario": "5. 1,000 Note Switches",
+      "tauriFp": 31,
+      "webKitFp": 681,
+      "totalFp": 712,
+      "totalPeak": 1138,
+      "tauriCpu": 0.1,
+      "webKitCpu": 98.3,
+      "threads": 32,
+      "expected": "Memory plateaued (< 20 MB drift)"
+    },
+    {
+      "scenario": "6. Post-1,000 Switch Idle",
+      "tauriFp": 33,
+      "webKitFp": 647,
+      "totalFp": 680,
+      "totalPeak": 1138,
+      "tauriCpu": 0.8,
+      "webKitCpu": 82.8,
+      "threads": 34,
+      "expected": "CPU drops to ~0.2%, GC completes"
+    },
+    {
+      "scenario": "7. Giant 1 MB Note Loaded",
+      "tauriFp": 31,
+      "webKitFp": 755,
+      "totalFp": 786,
+      "totalPeak": 1138,
+      "tauriCpu": 0.5,
+      "webKitCpu": 87.9,
+      "threads": 33,
+      "expected": "Render single large document"
+    },
+    {
+      "scenario": "8. Giant Note Edited & Autosaved",
+      "tauriFp": 32,
+      "webKitFp": 879,
+      "totalFp": 911,
+      "totalPeak": 1138,
+      "tauriCpu": 1,
+      "webKitCpu": 86.9,
+      "threads": 35,
+      "expected": "Cache updated in-place + DB flush"
+    },
+    {
+      "scenario": "9. 100 Switches Away",
+      "tauriFp": 35,
+      "webKitFp": 821,
+      "totalFp": 856,
+      "totalPeak": 1138,
+      "tauriCpu": 0.8,
+      "webKitCpu": 84.5,
+      "threads": 35,
+      "expected": "Document evicted to DB if needed"
+    },
+    {
+      "scenario": "10. Returned to Giant Note",
+      "tauriFp": 48,
+      "webKitFp": 721,
+      "totalFp": 769,
+      "totalPeak": 1148,
+      "tauriCpu": 3.2,
+      "webKitCpu": 85.7,
+      "threads": 36,
+      "expected": "Restored from cache/DB with edits intact"
+    },
+    {
+      "scenario": "11. Final Idle Stabilization",
+      "tauriFp": 49,
+      "webKitFp": 920,
+      "totalFp": 969,
+      "totalPeak": 1151,
+      "tauriCpu": 1.2,
+      "webKitCpu": 84.8,
+      "threads": 34,
+      "expected": "Final resting footprint & ~0% CPU"
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "test": "Test 1: Plain 1 MB (0 Code, 0 Tables)",
+    "description": "Pure markdown prose & headings only. Zero code blocks, zero tables.",
+    "baseWebKit": 324,
+    "peakWebKit": 1040,
+    "settledWebKit": 1421,
+    "settledTotal": 1452,
+    "settledTauri": 31,
+    "idleCpu": 79.9
+  },
+  {
+    "test": "Test 2: Code-Heavy 1 MB (968 Code, 0 Tables)",
+    "description": "968 React CodeBlock NodeViews. Zero tables.",
+    "baseWebKit": 458,
+    "peakWebKit": 873,
+    "settledWebKit": 694,
+    "settledTotal": 723,
+    "settledTauri": 29,
+    "idleCpu": 91.9
+  },
+  {
+    "test": "Test 3: Table-Heavy 1 MB (0 Code, 581 Tables)",
+    "description": "581 Table DOM nodes and plugins. Zero code blocks.",
+    "baseWebKit": 310,
+    "peakWebKit": 964,
+    "settledWebKit": 1377,
+    "settledTotal": 1404,
+    "settledTauri": 27,
+    "idleCpu": 78.8
+  },
+  {
+    "test": "Test 4: Realistic 1 MB (10 Code, 5 Tables)",
+    "description": "Realistic knowledge base document: 10 code blocks, 5 tables, headings & markdown prose.",
+    "baseWebKit": 189,
+    "peakWebKit": 1547,
+    "settledWebKit": 655,
+    "settledTotal": 684,
+    "settledTauri": 29,
+    "idleCpu": 91.5
+  }
+]

@@ -3,7 +3,7 @@ import { FileText } from "lucide-react";
 
 interface NoteEditorProps {
   noteId: string | null;
-  content: string | null;
+  content?: string | null;
   onUpdate: (content: string, titleHint?: string) => void;
   zoomLevel: number;
   isFindOpen?: boolean;
