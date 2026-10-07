@@ -1,18 +1,18 @@
 {
   "smallResults": {
     "label": "100 Switches of 20 KB Notes",
-    "baseWebKit": 75,
-    "peakWebKit": 291,
-    "settledWebKit": 207,
-    "settledTotal": 238,
-    "settledTauri": 31
+    "baseWebKit": 76,
+    "peakWebKit": 261,
+    "settledWebKit": 191,
+    "settledTotal": 219,
+    "settledTauri": 28
   },
   "giantResults": {
     "label": "100 Switches of Large/Giant Notes (up to 1 MB)",
-    "baseWebKit": 76,
-    "peakWebKit": 852,
-    "settledWebKit": 518,
-    "settledTotal": 548,
-    "settledTauri": 30
+    "baseWebKit": 75,
+    "peakWebKit": 502,
+    "settledWebKit": 1043,
+    "settledTotal": 1070,
+    "settledTauri": 27
   }
 }

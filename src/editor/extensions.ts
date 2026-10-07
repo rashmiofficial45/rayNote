@@ -20,8 +20,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Youtube } from "@tiptap/extension-youtube";
 import { IframeExtension } from "./iframeExtension";
-import { ReactNodeViewRenderer } from "@tiptap/react";
-import { CodeBlockComponent } from "./CodeBlockComponent";
+
 
 function enhancedBash(hljs: any) {
   const base = common.bash(hljs);
@@ -110,13 +109,12 @@ export function getExtensions(slashCommandExtension?: any) {
       multicolor: false,
     }),
     Typography,
-    CodeBlockLowlight.extend({
-      addNodeView() {
-        return ReactNodeViewRenderer(CodeBlockComponent);
-      },
-    }).configure({
+    CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "bash",
+      HTMLAttributes: {
+        class: "code-block-wrapper notefast-code-block",
+      },
     }),
     Link.configure({
       openOnClick: false,

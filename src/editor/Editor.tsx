@@ -24,6 +24,7 @@ import { SlashCommand } from "./SlashCommand";
 import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
+import { FloatingCodeBlockToolbar } from "./FloatingCodeBlockToolbar";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import { useEditorScroll } from "./useEditorScroll";
 import { useBlockSelection } from "./useBlockSelection";
@@ -549,6 +550,10 @@ export function Editor({
             scrollContainerRef={scrollContainerRef}
           />
           <EditorContent editor={editor} />
+          <FloatingCodeBlockToolbar
+            editor={editor}
+            scrollContainerRef={scrollContainerRef}
+          />
         </div>
         {/* Marquee Selection Box */}
         <div
