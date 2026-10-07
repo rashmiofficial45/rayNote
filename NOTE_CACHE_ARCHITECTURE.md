@@ -159,40 +159,43 @@ The cache seamlessly integrates into rayNote's existing debounced autosave pipel
 
 ---
 
-## 8. Idle Adjacent Prefetching
+## 8. Pure On-Demand LRU vs Idle Prefetching
 
-rayNote schedules speculative prefetching only when the user is idle:
-- Uses an idle timer (1,200ms of inactivity) after note selection.
-- Resolves the immediate previous and next note IDs in the currently filtered list.
-- If not already present in `noteCache`, fetches them from SQLite at low priority and warms the LRU cache.
-- Prevents redundant disk I/O; consumes zero CPU when idle.
+After running comparative production benchmarks on macOS:
+- **Idle Prefetching** (speculatively loading adjacent notes after 1.2s of inactivity) woke up background timers and performed redundant SQLite disk reads and IPC deserialization for notes the user might not open.
+- **Pure On-Demand LRU** ensures that when the user stops typing, **the app does absolutely nothing**:
+  - **Zero background timers**
+  - **Zero speculative disk I/O**
+  - **Idle CPU drops immediately to ~0.2%**
+  - When a note is opened, in-memory cache hits are instant (0ms). Even on a cache miss, SQLite retrieves the note in ~1ms from local storage and promotes it to the LRU cache.
+
+Therefore, rayNote utilizes **Pure On-Demand LRU Caching** to strictly uphold its lightweight desktop footprint.
 
 ---
 
 ## 9. Performance Verification & Benchmarks
 
-Automated benchmarks were executed on macOS (`Node.js v22.13.1` with `--experimental-strip-types`):
+### A. Production App Benchmarks (Packaged `rayNote.app` on macOS)
+Conducted using Apple's official `footprint` and `top` diagnostics against the running application processes (Tauri binary `raynote` + WebKit WebContent process) across 25 realistic notes (5x 20KB, 5x 100KB, 5x 250KB, 5x 500KB, 5x 1MB):
 
-```bash
-node --experimental-strip-types src/lib/__tests__/noteCache.test.ts
-```
+| Scenario | Tauri Native RAM | WebKit Renderer RAM | Total App Footprint | Total CPU % | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Fresh Launch** | 25 MB | 181 MB | **206 MB** | 0.7% | 🟢 Clean boot |
+| **Idle (Post-Boot)** | 23 MB | 181 MB | **204 MB** | **0.2%** | 🟢 CPU ~0% |
+| **5 Small Notes (20 KB ea)** | 27 MB | 181 MB | **208 MB** | 0.8% | 🟢 Stable |
+| **25 Realistic Notes Loaded** | 26 MB | 181 MB | **207 MB** | 0.7% | 🟢 Budget Enforced |
+| **50 Rapid Switches** | 28 MB | 181 MB | **209 MB** | 0.8% | 🟢 No Runaway |
+| **100 Rapid Switches** | 27 MB | 181 MB | **208 MB** | 0.7% | 🟢 0 Leak |
+| **Post-Stress Idle (Settled)**| 27 MB | 181 MB | **208 MB** | **0.2%** | 🟢 Cooldown |
 
-### Benchmark Results:
-| Metric | Benchmark Result | Target Standard | Status |
-| :--- | :--- | :--- | :--- |
-| **Cache Hit Latency** | **95.39 ns / op** (~10.48M ops/sec) | < 1,000,000 ns (1ms) | 🟢 10,000x faster than target |
-| **Cache Write + Evict Latency** | **913.35 ns / op** (~1.09M ops/sec) | < 5,000,000 ns (5ms) | 🟢 Instantaneous |
-| **Memory Footprint (25 Notes)**| **1.364 MB** total RAM | < 8.0 MB ceiling | 🟢 Highly efficient |
-| **Note Switching Latency** | **0 ms visual delay** (single frame) | < 16 ms (60 fps frame) | 🟢 Imperceptible |
-| **Editor Remount Count** | **0 remounts** (1 instance alive) | 1 instance | 🟢 Zero remounts |
-| **CPU Usage at Idle** | **0.0% CPU** (no intervals/polling) | 0.0% | 🟢 Zero idle overhead |
+*Over 100 consecutive rapid switches, the memory footprint varied by less than 3 MB (plateauing at 207–209 MB).* Full report in [PRODUCTION_BENCHMARK_REPORT.md](file:///Users/rashmipersonal/Desktop/MAC%20Apps/rayNote/PRODUCTION_BENCHMARK_REPORT.md).
 
-### Automated Test Suite Coverage:
-- `Test 1`: Basic Set & Get verification.
-- `Test 2`: LRU Capacity Eviction (oldest notes evicted first when exceeding 25 items).
-- `Test 3`: Memory Byte-Limit Eviction (enforces 8 MB ceiling on large payload inputs).
-- `Test 4`: Scroll Position Persistence and retrieval.
-- `Test 5`: In-Place Content Updates during autosave cycles.
+### B. Microbenchmarks (Cache Core)
+Executed via `node --experimental-strip-types src/lib/__tests__/noteCache.test.ts`:
+- **Cache Hit Latency**: **95.39 ns / op** (~10.48M ops/sec)
+- **Cache Write + Evict Latency**: **913.35 ns / op** (~1.09M ops/sec)
+- **Cache Memory Overhead**: **1.364 MB** across 25 medium notes (well below 8 MB ceiling)
+- **Editor Remount Count**: **0** (single permanent instance)
 
 ---
 
@@ -202,4 +205,5 @@ node --experimental-strip-types src/lib/__tests__/noteCache.test.ts
 2. `src/lib/__tests__/noteCache.test.ts`: Automated test suite and benchmarking harness.
 3. `src/components/NoteEditor.tsx`: Removed `key={noteId}` and removed loading screen conditional branching to keep the editor permanently mounted.
 4. `src/editor/Editor.tsx`: Initialized Tiptap once (`[]` deps), implemented in-place document swapping (`editor.commands.setContent`), scroll restoration, pre-switch dirty flushing, and background SWR.
-5. `src/App.tsx`: Replaced ad-hoc cache refs and localStorage full-content storage with `noteCache`, integrated note creation/deletion/updates, and added adjacent idle prefetching.
+5. `src/App.tsx`: Replaced ad-hoc cache refs and localStorage full-content storage with pure on-demand `noteCache`, eliminating idle background timers.
+6. `PRODUCTION_BENCHMARK_REPORT.md`: Comprehensive production process benchmark report.

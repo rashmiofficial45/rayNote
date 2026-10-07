@@ -1,0 +1,76 @@
+{
+  "tauriPid": 1808,
+  "webKitPid": 71806,
+  "results": [
+    {
+      "scenario": "Fresh Launch",
+      "tauriFp": 25,
+      "webKitFp": 181,
+      "totalFp": 206,
+      "tauriCpu": 0.5,
+      "webKitCpu": 0.2,
+      "threads": 29,
+      "expected": "Clean Baseline (~150-170 MB)"
+    },
+    {
+      "scenario": "Idle (Post-Boot)",
+      "tauriFp": 23,
+      "webKitFp": 181,
+      "totalFp": 204,
+      "tauriCpu": 0.5,
+      "webKitCpu": 0.2,
+      "threads": 20,
+      "expected": "Stable Footprint, CPU ~0.0%"
+    },
+    {
+      "scenario": "5 Small Notes (20 KB ea)",
+      "tauriFp": 27,
+      "webKitFp": 181,
+      "totalFp": 208,
+      "tauriCpu": 0.6,
+      "webKitCpu": 0.2,
+      "threads": 23,
+      "expected": "Minimal RAM change (< 5 MB delta)"
+    },
+    {
+      "scenario": "25 Realistic Notes Loaded",
+      "tauriFp": 26,
+      "webKitFp": 181,
+      "totalFp": 207,
+      "tauriCpu": 0.5,
+      "webKitCpu": 0.2,
+      "threads": 25,
+      "expected": "Memory strictly bounded by 8MB budget"
+    },
+    {
+      "scenario": "50 Rapid Switches",
+      "tauriFp": 28,
+      "webKitFp": 181,
+      "totalFp": 209,
+      "tauriCpu": 0.6,
+      "webKitCpu": 0.2,
+      "threads": 22,
+      "expected": "No memory runaway"
+    },
+    {
+      "scenario": "100 Rapid Switches",
+      "tauriFp": 27,
+      "webKitFp": 181,
+      "totalFp": 208,
+      "tauriCpu": 0.5,
+      "webKitCpu": 0.2,
+      "threads": 26,
+      "expected": "Bounded Memory, 0 leak"
+    },
+    {
+      "scenario": "Post-Stress Idle (Settled)",
+      "tauriFp": 27,
+      "webKitFp": 181,
+      "totalFp": 208,
+      "tauriCpu": 0.4,
+      "webKitCpu": 0.2,
+      "threads": 24,
+      "expected": "CPU drops to ~0%, RAM remains plateaued"
+    }
+  ]
+}

@@ -285,34 +285,6 @@ function App() {
     }
   }, []);
 
-  // Idle prefetching: quietly loads adjacent notes into LRU cache when user is idle
-  useEffect(() => {
-    if (!activeNoteId || notes.length === 0) return;
-
-    const timer = setTimeout(() => {
-      const currentIndex = notes.findIndex((n) => n.id === activeNoteId);
-      if (currentIndex === -1) return;
-
-      const candidates: string[] = [];
-      if (currentIndex > 0) candidates.push(notes[currentIndex - 1].id);
-      if (currentIndex < notes.length - 1) candidates.push(notes[currentIndex + 1].id);
-
-      candidates.forEach((candId) => {
-        if (!noteCache.has(candId)) {
-          getNote(candId)
-            .then((fullNote) => {
-              if (fullNote && !noteCache.has(fullNote.id)) {
-                noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
-              }
-            })
-            .catch(() => {});
-        }
-      });
-    }, 1200);
-
-    return () => clearTimeout(timer);
-  }, [activeNoteId, notes]);
-
   // Local Markdown File Import & Preview States
   const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
   const [droppedFilePrompt, setDroppedFilePrompt] = useState<{ file: File; text: string } | null>(null);
