@@ -1,4 +1,5 @@
 mod database;
+mod search;
 mod commands;
 
 use database::Database;
@@ -463,6 +464,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_all_notes,
             search_notes,
+            search_documents,
             get_note,
             create_note,
             update_note,

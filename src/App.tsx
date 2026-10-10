@@ -21,6 +21,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { NoteEditor } from "./components/NoteEditor";
 import { Toast, ToastData } from "./components/Toast";
 import { ShortcutsModal } from "./components/ShortcutsModal";
+import { SmartSearch } from "./components/SmartSearch";
 import { MarkdownViewerModal, PreviewFileData } from "./components/MarkdownViewerModal";
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -104,6 +105,7 @@ function App() {
   const activeFetchIdRef = useRef<string | null>(null);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "browse">("actions");
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isFindOpen, setIsFindOpen] = useState(false);
@@ -897,16 +899,16 @@ function App() {
         return;
       }
 
-      // Quick Open / Browse Notes (Cmd+P) - works during scroll or active typing
-      const isBrowseShortcut =
+      // Dedicated Smart Document Search & Quick Switcher (Cmd+P)
+      const isSmartSearchShortcut =
+        isTriggered("smart_search", "⌘P") ||
         isTriggered("browse", "⌘P") ||
         (isCmd && !e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P" || e.code === "KeyP"));
 
-      if (isBrowseShortcut) {
+      if (isSmartSearchShortcut) {
         e.preventDefault();
         e.stopPropagation();
-        setPaletteInitialView("browse");
-        setIsCommandPaletteOpen((prev) => (paletteInitialView === "browse" && prev ? false : true));
+        setIsSmartSearchOpen((prev) => !prev);
         return;
       }
 
@@ -1069,6 +1071,10 @@ function App() {
           setIsShortcutsModalOpen(false);
           return;
         }
+        if (isSmartSearchOpen) {
+          setIsSmartSearchOpen(false);
+          return;
+        }
         if (isCommandPaletteOpen) {
           setIsCommandPaletteOpen(false);
           return;
@@ -1121,6 +1127,7 @@ function App() {
     handleZoomOut,
     handleResetZoom,
     isShortcutsModalOpen,
+    isSmartSearchOpen,
     isCommandPaletteOpen,
     isFindOpen,
   ]);
@@ -1164,6 +1171,7 @@ function App() {
           setPaletteInitialView("actions");
           setIsCommandPaletteOpen(true);
         }}
+        onOpenSmartSearch={() => setIsSmartSearchOpen(true)}
         onDuplicateNote={handleDuplicateNote}
         onDeleteNote={() => activeNoteId && promptDeleteNote(activeNoteId)}
         onCopyMarkdown={handleCopyNoteAsMarkdown}
@@ -1342,6 +1350,13 @@ function App() {
       <ShortcutsModal
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
+      />
+
+      <SmartSearch
+        isOpen={isSmartSearchOpen}
+        onClose={() => setIsSmartSearchOpen(false)}
+        onSelectNote={handleSelectNote}
+        activeNoteId={activeNoteId}
       />
 
       {/* Markdown Quick Viewer Modal (No Upload) */}

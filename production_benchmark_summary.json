@@ -1,28 +1,28 @@
 {
-  "timestamp": "2026-10-10T17:58:36.673Z",
+  "timestamp": "2026-10-10T20:46:03.098Z",
   "coldBoot": {
-    "launchLatencyMs": 3253,
-    "tauriFootprintMb": 34,
-    "webKitFootprintMb": 182,
-    "totalFootprintMb": 216
+    "launchLatencyMs": 1487,
+    "tauriFootprintMb": 35,
+    "webKitFootprintMb": 114,
+    "totalFootprintMb": 149
   },
   "cacheBenchmark": {
-    "setLatencyPerOpUs": 6.35075,
-    "getLatencyPerOpUs": 0.131958,
+    "setLatencyPerOpUs": 2.098668,
+    "getLatencyPerOpUs": 0.151916,
     "cacheHitRatePct": 83.5,
     "evictionUnderMaxEntries": true,
     "evictionUnderMaxBytes": true,
-    "sqliteReadLatencyMs": 73,
-    "sqliteVsCacheSpeedup": "553206x"
+    "sqliteReadLatencyMs": 63,
+    "sqliteVsCacheSpeedup": "414703x"
   },
   "stressEndurance": {
-    "initialTotalMb": 214,
-    "after50SwitchesMb": 613,
-    "after100SwitchesMb": 872,
-    "settledPostCooldownMb": 723,
-    "memoryDeltaMb": 509,
-    "leakDetected": true,
-    "idleCpuPct": 8.7
+    "initialTotalMb": 150,
+    "after50SwitchesMb": 558,
+    "after100SwitchesMb": 881,
+    "settledPostCooldownMb": 371,
+    "memoryDeltaMb": 221,
+    "leakDetected": false,
+    "idleCpuPct": 2.9
   },
   "featureVerification": {
     "blockSelectionGapHit": true,
@@ -38,6 +38,7 @@
     "copyMarkdown": true,
     "keyboardArrowNavigation": true,
     "commandPaletteOpen": true,
+    "smartSearchOpen": true,
     "findBarOpen": true,
     "recentNotePersistence": true
   }

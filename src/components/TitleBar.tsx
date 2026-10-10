@@ -1,4 +1,4 @@
-import { Command, Copy, Plus, Trash2, Settings, FileText, Upload, Eye } from "lucide-react";
+import { Command, Copy, Plus, Trash2, Settings, FileText, Upload, Eye, Search } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { openSettingsWindow } from "../lib/db";
@@ -7,6 +7,7 @@ interface TitleBarProps {
   title: string;
   onNewNote: () => void;
   onOpenCommandPalette: () => void;
+  onOpenSmartSearch?: () => void;
   onDuplicateNote: () => void;
   onDeleteNote: () => void;
   onCopyMarkdown: () => void;
@@ -18,6 +19,7 @@ export function TitleBar({
   title,
   onNewNote,
   onOpenCommandPalette,
+  onOpenSmartSearch,
   onDuplicateNote,
   onDeleteNote,
   onCopyMarkdown,
@@ -232,6 +234,17 @@ export function TitleBar({
                 <kbd className="popover-kbd">⌘N</kbd>
               </button>
               <div className="command-popover-divider" />
+              <button
+                className="command-popover-item"
+                onClick={() => {
+                  onOpenSmartSearch?.();
+                  setCommandMenuOpen(false);
+                }}
+              >
+                <Search size={13} />
+                <span>Search Notes</span>
+                <kbd className="popover-kbd">⌘P</kbd>
+              </button>
               <button
                 className="command-popover-item"
                 onClick={() => {

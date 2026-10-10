@@ -39,6 +39,26 @@ export async function getAllNotes(): Promise<NoteSummary[]> {
 }
 
 /**
+ * Relevance-ranked search result item returned by ⌘P Smart Search.
+ */
+export interface SearchResult {
+  id: string;
+  title: string;
+  snippet: string;
+  score: number;
+  match_type: "exact_title" | "title_prefix" | "title_substring" | "title_words" | "fuzzy_title" | "content" | "recent" | string;
+  updated_at: string;
+  is_pinned: boolean;
+}
+
+/**
+ * Executes high-performance relevance-ranked search across titles and extracted document content.
+ */
+export async function searchDocuments(query: string): Promise<SearchResult[]> {
+  return invoke<SearchResult[]>("search_documents", { query });
+}
+
+/**
  * Queries the SQLite FTS5 (Full-Text Search) index to find matching notes by keyword.
  */
 export async function searchNotes(query: string): Promise<NoteSummary[]> {

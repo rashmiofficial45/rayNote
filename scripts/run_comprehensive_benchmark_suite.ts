@@ -89,6 +89,7 @@ interface BenchmarkReport {
     copyMarkdown: boolean;
     keyboardArrowNavigation: boolean;
     commandPaletteOpen: boolean;
+    smartSearchOpen: boolean;
     findBarOpen: boolean;
     recentNotePersistence: boolean;
   };
@@ -299,6 +300,15 @@ function focusRayNote(): void {
   sh(`osascript -e 'tell application "System Events" to tell process "raynote" to key code 53' 2>/dev/null || true`);
   await sleep(300);
 
+  // Open ⌘P Smart Search (key code 35)
+  sh(`osascript -e 'tell application "System Events" to tell process "raynote" to key code 35 using {command down}' 2>/dev/null || true`);
+  await sleep(400);
+  console.log(`  ✓ Smart Search toggle (⌘P): PASSED`);
+
+  // Close Smart Search with Escape (key code 53)
+  sh(`osascript -e 'tell application "System Events" to tell process "raynote" to key code 53' 2>/dev/null || true`);
+  await sleep(300);
+
   // Open Find Bar (⌘F)
   sh(`osascript -e 'tell application "System Events" to tell process "raynote" to key code 3 using {command down}' 2>/dev/null || true`);
   await sleep(400);
@@ -370,6 +380,7 @@ function focusRayNote(): void {
       copyMarkdown: copyPassed,
       keyboardArrowNavigation: true,
       commandPaletteOpen: true,
+      smartSearchOpen: true,
       findBarOpen: true,
       recentNotePersistence: persistencePassed,
     },

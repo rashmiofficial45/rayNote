@@ -1,4 +1,5 @@
 use crate::database::{Database, Note, NoteSummary};
+use crate::search::SearchResult;
 use tauri::State;
 use uuid::Uuid;
 use chrono::Utc;
@@ -11,6 +12,11 @@ pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<NoteSummary>, String
 #[tauri::command]
 pub fn search_notes(db: State<'_, Database>, query: String) -> Result<Vec<NoteSummary>, String> {
     db.search_notes(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn search_documents(db: State<'_, Database>, query: String) -> Result<Vec<SearchResult>, String> {
+    db.search_documents(&query).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

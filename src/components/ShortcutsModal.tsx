@@ -15,7 +15,7 @@ interface ShortcutItem {
 const SHORTCUTS: ShortcutItem[] = [
   // Navigation & App
   { keys: ["⌘", "N"], description: "New Note", category: "Navigation & App" },
-  { keys: ["⌘", "P"], description: "Quick Open / Browse Notes", category: "Navigation & App" },
+  { keys: ["⌘", "P"], description: "Smart Search & Quick Switcher", category: "Navigation & App" },
   { keys: ["⌘", "K"], description: "Actions / Command Palette", category: "Navigation & App" },
   { keys: ["⌘", "D"], description: "Duplicate Note", category: "Navigation & App" },
   { keys: ["⇧", "⌘", "P"], description: "Pin / Unpin Note", category: "Navigation & App" },
