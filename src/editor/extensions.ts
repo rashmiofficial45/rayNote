@@ -20,6 +20,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { Youtube } from "@tiptap/extension-youtube";
 import { IframeExtension } from "./iframeExtension";
+import { BlockSelection } from "../extensions/BlockSelection";
 
 
 function enhancedBash(hljs: any) {
@@ -153,6 +154,7 @@ export function getExtensions(slashCommandExtension?: any) {
       },
     }),
     IframeExtension,
+    BlockSelection,
   ];
 
   if (slashCommandExtension) {

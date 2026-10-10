@@ -255,11 +255,18 @@ function App() {
         .then((fullNote) => {
           if (activeFetchIdRef.current === id && fullNote) {
             noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
+            try {
+              localStorage.setItem("notefast_active_note_content", fullNote.content);
+            } catch {}
           }
         })
         .catch((err) => {
           console.error("Failed to load note content:", err);
         });
+    } else {
+      try {
+        localStorage.setItem("notefast_active_note_content", cached.content);
+      } catch {}
     }
   }, []);
 
@@ -425,6 +432,9 @@ function App() {
         const targetId = savedId && allNotes.some((n) => n.id === savedId) ? savedId : allNotes[0].id;
         if (!activeNoteId || activeNoteId !== targetId) {
           handleSelectNote(targetId);
+        } else {
+          // Even if activeNoteId was already initialized by useState, ensure content is loaded into noteCache
+          handleSelectNote(targetId, false);
         }
       }
     } catch (err) {
@@ -579,10 +589,28 @@ function App() {
         if (titleHint === undefined) {
           try {
             const doc = JSON.parse(content);
-            if (doc.content && doc.content.length > 0) {
-              const firstNode = doc.content[0];
-              if (firstNode.content) {
-                title = firstNode.content.map((n: any) => n.text || "").join("");
+            if (doc.content && Array.isArray(doc.content)) {
+              for (const node of doc.content) {
+                if (Array.isArray(node.content)) {
+                  const text = node.content.map((n: any) => n.text || "").join("").trim();
+                  if (text) {
+                    title = text;
+                    break;
+                  }
+                }
+                if (node.type === "table" && Array.isArray(node.content)) {
+                  const texts: string[] = [];
+                  function extractNodeText(sub: any) {
+                    if (sub.text) texts.push(sub.text);
+                    if (sub.content) sub.content.forEach(extractNodeText);
+                  }
+                  extractNodeText(node);
+                  const joined = texts.join(" ").trim();
+                  if (joined) {
+                    title = joined.slice(0, 50);
+                    break;
+                  }
+                }
               }
             }
           } catch { }
@@ -591,6 +619,11 @@ function App() {
         noteCache.updateContent(activeNoteId, content, title);
 
         await updateNote(activeNoteId, title, content);
+
+        try {
+          localStorage.setItem("notefast_active_note_id", activeNoteId);
+          localStorage.setItem("notefast_active_note_content", content);
+        } catch {}
 
         const preview = getPreviewText(content);
 

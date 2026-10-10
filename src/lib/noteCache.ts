@@ -40,6 +40,36 @@ export class NoteLRUCache {
   constructor(maxEntries = MAX_ENTRIES, maxBytes = MAX_CACHE_BYTES) {
     this.maxEntries = maxEntries;
     this.maxBytes = maxBytes;
+    this.hydrateFromLocalStorage();
+  }
+
+  /**
+   * Hydrates the most recently active note from localStorage on app boot (0ms cold start).
+   */
+  hydrateFromLocalStorage(): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      const activeId = localStorage.getItem("notefast_active_note_id");
+      const activeContent = localStorage.getItem("notefast_active_note_content");
+      if (activeId && activeContent) {
+        this.set(activeId, activeContent, Date.now(), undefined, 0);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  /**
+   * Persists active note ID and content to localStorage for instant hydration on next launch.
+   */
+  persistActiveToLocalStorage(id: string, content: string): void {
+    if (typeof localStorage === "undefined") return;
+    try {
+      localStorage.setItem("notefast_active_note_id", id);
+      localStorage.setItem("notefast_active_note_content", content);
+    } catch {
+      // Ignore quota errors
+    }
   }
 
   get size(): number {
@@ -124,6 +154,14 @@ export class NoteLRUCache {
     this.cache.set(id, entry);
     this.currentTotalBytes += byteSize;
 
+    // Persist active note to localStorage if this is the active note
+    if (typeof localStorage !== "undefined") {
+      const activeId = localStorage.getItem("notefast_active_note_id");
+      if (!activeId || activeId === id) {
+        this.persistActiveToLocalStorage(id, content);
+      }
+    }
+
     // Evict oldest entries until both limits are satisfied
     this.evictToBudget(id);
   }
@@ -162,6 +200,7 @@ export class NoteLRUCache {
       byteSize: newByteSize,
     });
 
+    this.persistActiveToLocalStorage(id, content);
     this.evictToBudget(id);
   }
 
@@ -172,6 +211,14 @@ export class NoteLRUCache {
     const entry = this.cache.get(id);
     if (entry) {
       this.currentTotalBytes -= entry.byteSize;
+      if (typeof localStorage !== "undefined") {
+        const activeId = localStorage.getItem("notefast_active_note_id");
+        if (activeId === id) {
+          try {
+            localStorage.removeItem("notefast_active_note_content");
+          } catch {}
+        }
+      }
       return this.cache.delete(id);
     }
     return false;

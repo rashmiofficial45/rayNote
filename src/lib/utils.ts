@@ -5,6 +5,32 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export type VariantConfig<V> = {
+  variants?: V;
+  defaultVariants?: { [K in keyof V]?: keyof V[K] };
+};
+
+export function cva<V extends Record<string, Record<string, ClassValue>>>(
+  base?: ClassValue,
+  config?: VariantConfig<V>
+) {
+  return (props?: { [K in keyof V]?: keyof V[K] } & { className?: ClassValue }) => {
+    const classes: ClassValue[] = [base];
+    if (config?.variants) {
+      for (const [key, variantMap] of Object.entries(config.variants)) {
+        const val = props?.[key] ?? config.defaultVariants?.[key];
+        if (val !== undefined && variantMap[val as string]) {
+          classes.push(variantMap[val as string]);
+        }
+      }
+    }
+    if (props?.className) {
+      classes.push(props.className);
+    }
+    return cn(...classes);
+  };
+}
+
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();

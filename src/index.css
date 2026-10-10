@@ -1687,32 +1687,96 @@ pre.notefast-code-block:hover {
   background: var(--color-accent-muted);
 }
 
-/* ── Block Selection ──────────────────────────────────── */
+/* ── Notion-style Block Selection ──────────────────────── */
+.raynote-block-selected,
 .notefast-block-selected {
-  background-color: var(--color-accent-muted) !important;
-  box-shadow: 0 0 0 2px var(--color-accent-muted) !important;
+  background-color: rgba(14, 165, 233, 0.22) !important;
+  box-shadow: 0 0 0 1.5px rgba(14, 165, 233, 0.45) !important;
   border-radius: 8px !important;
+  transition: background-color 80ms ease, box-shadow 80ms ease, border-radius 80ms ease;
+  position: relative;
   outline: none !important;
 }
 
-/* Disable ProseMirror's default square NodeSelection outline */
-.ProseMirror-selectednode {
-  outline: none !important;
-}
-.ProseMirror-selectednode:not(.notefast-block-selected) {
-  /* Just in case they select something natively, don't break it entirely, but we handle blocks */
+.dark .raynote-block-selected,
+.dark .notefast-block-selected,
+[data-theme="dark"] .raynote-block-selected,
+[data-theme="dark"] .notefast-block-selected {
+  background-color: rgba(35, 131, 226, 0.28) !important;
+  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.5) !important;
 }
 
+/* Ensure ALL selected blocks are rounded consistently on all corners */
+.raynote-block-selected,
+[data-selection-edge],
+[data-selection-edge="single"],
+[data-selection-edge="first"],
+[data-selection-edge="middle"],
+[data-selection-edge="last"] {
+  border-radius: 8px !important;
+}
+
+/* Table block selection rounding */
+.tiptap table.raynote-block-selected {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.tiptap table.raynote-block-selected tr:first-child th:first-child,
+.tiptap table.raynote-block-selected tr:first-child td:first-child {
+  border-top-left-radius: 8px !important;
+}
+.tiptap table.raynote-block-selected tr:first-child th:last-child,
+.tiptap table.raynote-block-selected tr:first-child td:last-child {
+  border-top-right-radius: 8px !important;
+}
+.tiptap table.raynote-block-selected tr:last-child td:first-child {
+  border-bottom-left-radius: 8px !important;
+}
+.tiptap table.raynote-block-selected tr:last-child td:last-child {
+  border-bottom-right-radius: 8px !important;
+}
+
+/* Code block selection rounding */
+.tiptap pre.notefast-code-block.raynote-block-selected {
+  border-radius: 12px !important;
+}
+
+/* In block selection drag mode: suppress text selection and WKWebView overscroll jank */
+.is-block-dragging,
+.is-block-dragging * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+[data-scroll-container].is-block-dragging {
+  overscroll-behavior-y: none;
+}
+
+[data-scroll-container] {
+  overscroll-behavior-y: none;
+}
+
+/* Hide native text selection when blocks are selected */
+.raynote-block-selected::selection,
+.raynote-block-selected *::selection,
 .notefast-block-selected::selection,
 .notefast-block-selected *::selection {
-  /* Hide native text selection when the block is selected */
-  background-color: rgba(0, 0, 0, 0.001) !important;
+  background-color: transparent !important;
   color: inherit !important;
 }
+
+.raynote-block-selected::-moz-selection,
+.raynote-block-selected *::-moz-selection,
 .notefast-block-selected::-moz-selection,
 .notefast-block-selected *::-moz-selection {
-  background-color: rgba(0, 0, 0, 0.001) !important;
+  background-color: transparent !important;
   color: inherit !important;
+}
+
+/* Disable ProseMirror default square outline on selected nodes */
+.ProseMirror-selectednode {
+  outline: none !important;
 }
 
 /* ── Syntax Highlighting (Dark & Light High Contrast) ─── */

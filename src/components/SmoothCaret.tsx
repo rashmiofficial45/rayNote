@@ -73,8 +73,9 @@ export function SmoothCaret({
       const caret = caretRef.current;
       const { state, view } = editor;
 
-      // Hide if disabled, editor not focused, or text selection is a range
-      if (!isEnabled || !view.hasFocus() || !state.selection.empty) {
+      // Hide if disabled, editor not focused, text selection is a range, or block selection is active
+      const hasBlockSelection = Boolean(view.dom.querySelector(".raynote-block-selected"));
+      if (!isEnabled || !view.hasFocus() || !state.selection.empty || hasBlockSelection) {
         caret.style.opacity = "0";
         caret.classList.remove("is-blinking");
         caret.classList.remove("is-smooth");

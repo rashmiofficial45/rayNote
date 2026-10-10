@@ -26,8 +26,7 @@ import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
 import { FloatingCodeBlockToolbar } from "./FloatingCodeBlockToolbar";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
-import { useEditorScroll } from "./useEditorScroll";
-import { useBlockSelection } from "./useBlockSelection";
+import { useBlockDrag } from "../extensions/useBlockDrag";
 import {
   isMarkdownContent,
   markdownToTipTapHtml,
@@ -47,14 +46,26 @@ interface EditorProps {
 }
 
 /**
- * Extracts note title from the first document node (paragraph or heading)
+ * Extracts note title from the first document node with text (heading, paragraph, or table)
  * to keep note drawer titles continuously up to date as the user types.
  */
 const extractTitle = (json: any): string => {
   if (json && Array.isArray(json.content) && json.content.length > 0) {
-    const firstNode = json.content[0];
-    if (Array.isArray(firstNode.content)) {
-      return firstNode.content.map((n: any) => n.text || "").join("");
+    for (const node of json.content) {
+      if (Array.isArray(node.content)) {
+        const text = node.content.map((n: any) => n.text || "").join("").trim();
+        if (text) return text;
+      }
+      if (node.type === "table" && Array.isArray(node.content)) {
+        const texts: string[] = [];
+        function extractText(sub: any) {
+          if (sub.text) texts.push(sub.text);
+          if (sub.content) sub.content.forEach(extractText);
+        }
+        extractText(node);
+        const joined = texts.join(" ").trim();
+        if (joined) return joined.slice(0, 50);
+      }
     }
   }
   return "";
@@ -76,8 +87,8 @@ export function Editor({
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
-  // Track the active note ID internally to identify transitions
-  const currentNoteIdRef = useRef(noteId);
+  // Track the active note ID internally to identify transitions (starts null so initial note mounts cleanly)
+  const currentNoteIdRef = useRef<string | null>(null);
 
   const [charCount, setCharCount] = useState(0);
 
@@ -90,6 +101,7 @@ export function Editor({
     try {
       const currentEditor = editorRef.current;
       const currentId = currentNoteIdRef.current;
+      if (!currentId) return;
       const json = currentEditor.getJSON();
       const title = extractTitle(json);
       const strContent = JSON.stringify(json);
@@ -220,30 +232,31 @@ export function Editor({
     const prevId = currentNoteIdRef.current;
     if (prevId === noteId) return; // Same note, no-op
 
-    // 1. Synchronously flush uncommitted edits from the departing note
-    if (isDirtyRef.current) {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-        debounceTimer.current = null;
+    // 1. Synchronously flush uncommitted edits from the departing note (if prevId exists)
+    if (prevId && editor && !editor.isDestroyed) {
+      editor.commands.clearBlockSelection?.();
+      if (isDirtyRef.current) {
+        if (debounceTimer.current) {
+          clearTimeout(debounceTimer.current);
+          debounceTimer.current = null;
+        }
+        try {
+          const json = editor.getJSON();
+          const title = extractTitle(json);
+          const strContent = JSON.stringify(json);
+          isDirtyRef.current = false;
+          noteCache.updateContent(prevId, strContent, title);
+          onUpdateRef.current(strContent, title);
+        } catch (err) {
+          console.error("Failed to flush edits before note switch:", err);
+        }
       }
-      try {
-        const json = editor.getJSON();
-        const title = extractTitle(json);
-        const strContent = JSON.stringify(json);
-        isDirtyRef.current = false;
-        noteCache.updateContent(prevId, strContent, title);
-        onUpdateRef.current(strContent, title);
-      } catch (err) {
-        console.error("Failed to flush edits before note switch:", err);
+      if (scrollContainerRef.current) {
+        noteCache.updateScrollTop(prevId, scrollContainerRef.current.scrollTop);
       }
     }
 
-    // 2. Save scroll position of the departing note
-    if (scrollContainerRef.current) {
-      noteCache.updateScrollTop(prevId, scrollContainerRef.current.scrollTop);
-    }
-
-    // 3. Update active note reference
+    // 2. Update active note reference
     currentNoteIdRef.current = noteId;
 
     // High-performance document swap:
@@ -268,17 +281,21 @@ export function Editor({
       }
     };
 
-    // 4. Retrieve incoming note from in-memory LRU cache
+    // 3. Retrieve incoming note from in-memory LRU cache
     const cached = noteCache.get(noteId);
     if (cached) {
       // CACHE HIT: 0ms Instantaneous in-place document swap
-      let docData: any;
-      try {
-        docData = JSON.parse(cached.content);
-      } catch {
-        docData = markdownToTipTapHtml(cached.content);
+      // If editor was already seeded on mount with this note's content, avoid redundant re-application
+      const alreadySeeded = prevId === null && editor.state.doc.textContent.length > 0;
+      if (!alreadySeeded) {
+        let docData: any;
+        try {
+          docData = JSON.parse(cached.content);
+        } catch {
+          docData = markdownToTipTapHtml(cached.content);
+        }
+        applyDocumentInPlace(docData);
       }
-      applyDocumentInPlace(docData);
 
       // Restore cached scroll position smoothly
       const targetScroll = cached.scrollTop;
@@ -368,9 +385,8 @@ export function Editor({
 
   const selectionBoxRef = useRef<HTMLDivElement>(null);
 
-  // Hook for Edge Auto-Scroll and Block Selection
-  useEditorScroll(editor, scrollContainerRef);
-  useBlockSelection({ editor, scrollContainerRef, selectionBoxRef });
+  // Notion-style Block Drag & Auto-Scroll
+  useBlockDrag({ editor, scrollContainerRef, rubberBandRef: selectionBoxRef });
 
   /**
    * Focus restoration without resetting restored scroll position:
@@ -499,12 +515,14 @@ export function Editor({
         try {
           const currentEditor = editorRef.current;
           const currentId = currentNoteIdRef.current;
-          const json = currentEditor.getJSON();
-          const title = extractTitle(json);
-          const strContent = JSON.stringify(json);
-          isDirtyRef.current = false;
-          noteCache.updateContent(currentId, strContent, title);
-          onUpdateRef.current(strContent, title);
+          if (currentId) {
+            const json = currentEditor.getJSON();
+            const title = extractTitle(json);
+            const strContent = JSON.stringify(json);
+            isDirtyRef.current = false;
+            noteCache.updateContent(currentId, strContent, title);
+            onUpdateRef.current(strContent, title);
+          }
         } catch (err) {
           console.error("Failed to flush editor update on unmount:", err);
         }
@@ -555,18 +573,17 @@ export function Editor({
             scrollContainerRef={scrollContainerRef}
           />
         </div>
-        {/* Marquee Selection Box */}
+        {/* Notion-style Rubber-band Selection Box */}
         <div
           ref={selectionBoxRef}
           style={{
-            position: "fixed",
+            position: "absolute",
             display: "none",
-            backgroundColor: "rgba(46, 170, 220, 0.2)",
-            border: "1px solid rgba(46, 170, 220, 0.5)",
+            backgroundColor: "rgba(14, 165, 233, 0.16)",
+            border: "1px solid rgba(14, 165, 233, 0.65)",
+            borderRadius: "8px",
             pointerEvents: "none",
-            zIndex: 9999,
-            borderRadius: "4px",
-            willChange: "top, left, width, height",
+            zIndex: 50,
           }}
         />
       </div>
