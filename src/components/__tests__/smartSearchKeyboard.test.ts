@@ -201,6 +201,32 @@ describe("Smart Search - Keyboard Navigation & Selection Behavior", () => {
     expect(ctrl.query).toBe("");
     expect(ctrl.selectedIndex).toBe(0);
   });
+
+  it("6. Single-selection invariant: exactly one item is selected at all times when typing new queries", () => {
+    const onSelect = vi.fn();
+    const onClose = vi.fn();
+    const ctrl = new SmartSearchTestController(onSelect, onClose);
+
+    ctrl.open();
+    ctrl.results = mockNotes;
+
+    // Move to item 2
+    ctrl.handleKeyDown("ArrowDown");
+    ctrl.handleKeyDown("ArrowDown");
+    expect(ctrl.selectedIndex).toBe(2);
+
+    // Typing new query replaces results and resets selection strictly to top item (index 0)
+    const req = ctrl.initiateSearch("sqlite");
+    ctrl.resolveSearch(req, [mockNotes[2]]);
+    expect(ctrl.selectedIndex).toBe(0);
+    expect(ctrl.results).toHaveLength(1);
+
+    // Verify index stays bounded and singular
+    ctrl.handleKeyDown("ArrowDown");
+    expect(ctrl.selectedIndex).toBe(0);
+    ctrl.handleKeyDown("ArrowUp");
+    expect(ctrl.selectedIndex).toBe(0);
+  });
 });
 
 describe("Smart Search - Request Cancellation & Stale Response Rejection", () => {

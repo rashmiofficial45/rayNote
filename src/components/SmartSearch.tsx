@@ -1,14 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SearchResult, searchDocuments } from "../lib/db";
-import { formatDate } from "../lib/utils";
 import { getHighlightedSegments } from "../lib/searchRanking";
-import {
-  Search,
-  FileText,
-  Pin,
-  X,
-  FileSearch,
-} from "lucide-react";
+import { Search, FileText, Pin, X } from "lucide-react";
 
 export interface SmartSearchProps {
   isOpen: boolean;
@@ -24,7 +17,6 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   isOpen,
   onClose,
   onSelectNote,
-  activeNoteId,
 }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>(cachedRecentNotes);
@@ -33,6 +25,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef<number>(0);
+  const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Focus input and reset query on modal open
   useEffect(() => {
@@ -87,6 +80,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
           console.error("Search error:", err);
           if (requestIdRef.current === reqId) {
             setResults([]);
+            setSelectedIndex(0);
           }
         });
     }, 15);
@@ -151,6 +145,19 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     }
   };
 
+  // Only update selection on deliberate mouse movement, never while stationary
+  const handleItemMouseMove = (index: number, e: React.MouseEvent) => {
+    if (
+      e.clientX !== mousePosRef.current.x ||
+      e.clientY !== mousePosRef.current.y
+    ) {
+      mousePosRef.current = { x: e.clientX, y: e.clientY };
+      if (selectedIndex !== index) {
+        setSelectedIndex(index);
+      }
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -166,9 +173,9 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        {/* Sleek Search Header */}
+        {/* Sleek Liquid Glass Search Header */}
         <div className="smart-search-header">
-          <Search className="smart-search-icon" size={16} />
+          <Search className="smart-search-icon" size={15} />
 
           <input
             ref={inputRef}
@@ -177,7 +184,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search notes by title or content…"
+            placeholder="Search notes…"
             autoFocus
             spellCheck={false}
           />
@@ -192,7 +199,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
               }}
               aria-label="Clear search"
             >
-              <X size={12} />
+              <X size={11} />
             </button>
           )}
 
@@ -201,12 +208,11 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
           </div>
         </div>
 
-        {/* Minimalist Results List */}
+        {/* Minimalist Results List (Strict single-item highlight) */}
         <div className="smart-search-list" ref={listRef} role="listbox">
           {results.length > 0 ? (
             results.map((item, index) => {
               const isSelected = index === selectedIndex;
-              const isActiveNote = item.id === activeNoteId;
 
               return (
                 <div
@@ -214,52 +220,35 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
                   data-index={index}
                   role="option"
                   aria-selected={isSelected}
-                  className={`smart-search-item ${
-                    isSelected ? "is-selected" : ""
-                  } ${isActiveNote ? "is-active-note" : ""}`}
+                  className={`smart-search-item ${isSelected ? "is-selected" : ""}`}
                   onClick={() => handleSelectCurrent(index)}
-                  onMouseEnter={() => setSelectedIndex(index)}
+                  onMouseMove={(e) => handleItemMouseMove(index, e)}
                 >
                   <div className="smart-search-item-icon">
                     {item.is_pinned ? (
-                      <Pin size={13} className="text-amber-400" />
+                      <Pin size={13} className="smart-search-pin-icon" />
                     ) : (
                       <FileText size={13} />
                     )}
                   </div>
 
                   <div className="smart-search-item-body">
-                    <div className="smart-search-item-top">
-                      <span className="smart-search-item-title">
-                        <HighlightText text={item.title} query={query} />
-                      </span>
-
-                      {/* Minimalist match badge */}
-                      <MatchBadge matchType={item.match_type} />
-                    </div>
-
-                    {/* Clean 1-line snippet */}
-                    {item.snippet && (
-                      <div className="smart-search-item-snippet">
-                        <HighlightText text={item.snippet} query={query} />
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="smart-search-item-meta">
-                    <span className="smart-search-item-date">
-                      {formatDate(item.updated_at)}
+                    <span className="smart-search-item-title">
+                      <HighlightText text={item.title || "Untitled"} query={query} />
                     </span>
+
+                    {item.snippet && (
+                      <span className="smart-search-item-snippet">
+                        <HighlightText text={item.snippet} query={query} />
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })
           ) : query.trim() !== "" ? (
             <div className="smart-search-empty">
-              <FileSearch size={28} className="smart-search-empty-icon" />
-              <div className="smart-search-empty-title">
-                No notes found
-              </div>
+              <div className="smart-search-empty-title">No notes found</div>
               <div className="smart-search-empty-desc">
                 No matching documents for &ldquo;{query}&rdquo;
               </div>
@@ -267,29 +256,9 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
           ) : null}
         </div>
 
-        {/* Minimal Footer */}
+        {/* Ultra-Minimal Status Footer */}
         <div className="smart-search-footer">
-          <div className="smart-search-footer-hints">
-            <span className="smart-search-kbd-hint">
-              <kbd>↑</kbd>
-              <kbd>↓</kbd>
-              Navigate
-            </span>
-            <span className="smart-search-kbd-hint">
-              <kbd>↵</kbd>
-              Open
-            </span>
-            <span className="smart-search-kbd-hint">
-              <kbd>esc</kbd>
-              Dismiss
-            </span>
-          </div>
-
-          <div className="smart-search-footer-count">
-            {results.length > 0 && (
-              <span>{results.length} {results.length === 1 ? "note" : "notes"}</span>
-            )}
-          </div>
+          <span>↑↓ to navigate · ↵ to open · esc to close</span>
         </div>
       </div>
     </div>
@@ -321,24 +290,3 @@ const HighlightText: React.FC<{ text: string; query: string }> = React.memo(
     );
   }
 );
-
-/**
- * Sleek, minimal match badge
- */
-function MatchBadge({ matchType }: { matchType: string }) {
-  switch (matchType) {
-    case "exact_title":
-      return <span className="smart-search-pill pill-exact">Exact</span>;
-    case "title_prefix":
-    case "title_substring":
-      return <span className="smart-search-pill pill-title">Title</span>;
-    case "title_words":
-      return <span className="smart-search-pill pill-words">Words</span>;
-    case "fuzzy_title":
-      return <span className="smart-search-pill pill-fuzzy">Typo</span>;
-    case "content":
-      return <span className="smart-search-pill pill-content">Content</span>;
-    default:
-      return null;
-  }
-}
