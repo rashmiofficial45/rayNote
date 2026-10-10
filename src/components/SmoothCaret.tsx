@@ -35,6 +35,43 @@ function getFormatCursorHeight(state: any): number {
   return 20;
 }
 
+export interface CaretCoords {
+  left: number;
+  top: number;
+  bottom: number;
+  right?: number;
+}
+
+export function isInvalidCoords(coords: CaretCoords | null | undefined): boolean {
+  if (!coords) return true;
+  return coords.left === 0 && coords.top === 0 && coords.bottom === 0;
+}
+
+export class SmoothCaretRetryController {
+  public retryCount = 0;
+  public readonly maxRetries = 3;
+
+  public handleCoords(
+    coords: CaretCoords | null | undefined,
+    scheduleRetry: () => void
+  ): boolean {
+    if (isInvalidCoords(coords)) {
+      if (this.retryCount < this.maxRetries) {
+        this.retryCount++;
+        scheduleRetry();
+        return true;
+      }
+      return false; // Limit reached: cap to prevent CPU runaway
+    }
+    this.retryCount = 0;
+    return true;
+  }
+
+  public reset(): void {
+    this.retryCount = 0;
+  }
+}
+
 export function SmoothCaret({
   editor,
   zoomLevel = 1.2,
@@ -44,6 +81,7 @@ export function SmoothCaret({
   const lastPosRef = useRef<{ x: number; y: number; height: number } | null>(null);
   const blinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseDownRef = useRef(false);
+  const retryControllerRef = useRef(new SmoothCaretRetryController());
   const [isEnabled, setIsEnabled] = useState(() => {
     const saved = localStorage.getItem("notefast_smooth_caret");
     return saved === null ? true : saved === "true";
@@ -88,11 +126,15 @@ export function SmoothCaret({
         const parent = caret.parentElement;
         if (!parent || !coords) return;
 
-        // In WebKit, if DOM isn't laid out yet upon mounting, coords may be all zeros
-        if (coords.left === 0 && coords.top === 0 && coords.bottom === 0) {
-          requestAnimationFrame(() => updatePosition(true));
+        // In WebKit, if DOM isn't laid out yet upon mounting, coords may be all zeros.
+        // Cap retries to 3 frames (~25ms) to prevent infinite 100% CPU spinning.
+        if (isInvalidCoords(coords)) {
+          retryControllerRef.current.handleCoords(coords, () => {
+            requestAnimationFrame(() => updatePosition(true));
+          });
           return;
         }
+        retryControllerRef.current.reset();
 
         const parentRect = parent.getBoundingClientRect();
         const zoom = zoomLevel || 1;
@@ -198,6 +240,7 @@ export function SmoothCaret({
     };
 
     const handleSnapUpdate = () => {
+      retryControllerRef.current.reset();
       scheduleUpdate(true);
     };
 

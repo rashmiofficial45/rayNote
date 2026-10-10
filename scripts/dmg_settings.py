@@ -32,8 +32,23 @@ show_pathbar = False
 show_sidebar = False
 
 # Files and symlinks
+app_path = os.environ.get('RAYNOTE_APP_PATH')
+if not app_path or not os.path.exists(app_path):
+    candidates = [
+        'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/rayNote.app',
+        'src-tauri/target/release/bundle/macos/rayNote.app',
+        '/Applications/rayNote.app',
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            app_path = c
+            break
+
+if not app_path or not os.path.exists(app_path):
+    raise FileNotFoundError("Could not find rayNote.app in candidates or RAYNOTE_APP_PATH")
+
 files = [
-    'src-tauri/target/release/bundle/macos/rayNote.app'
+    app_path
 ]
 
 symlinks = {

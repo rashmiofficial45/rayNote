@@ -76,6 +76,8 @@ export function getExtensions(slashCommandExtension?: any) {
       horizontalRule: false, // replaced by smart HorizontalRuleExtension below
       link: false, // configured separately below
       underline: false, // configured separately below
+      listKeymap: false, // custom robust keymap in ShortcutsExtension handles this
+      trailingNode: false, // avoid ghost empty paragraphs
       undoRedo: {
         depth: 50,
       },

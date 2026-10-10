@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-10-10T17:58:36.673Z",
+  "coldBoot": {
+    "launchLatencyMs": 3253,
+    "tauriFootprintMb": 34,
+    "webKitFootprintMb": 182,
+    "totalFootprintMb": 216
+  },
+  "cacheBenchmark": {
+    "setLatencyPerOpUs": 6.35075,
+    "getLatencyPerOpUs": 0.131958,
+    "cacheHitRatePct": 83.5,
+    "evictionUnderMaxEntries": true,
+    "evictionUnderMaxBytes": true,
+    "sqliteReadLatencyMs": 73,
+    "sqliteVsCacheSpeedup": "553206x"
+  },
+  "stressEndurance": {
+    "initialTotalMb": 214,
+    "after50SwitchesMb": 613,
+    "after100SwitchesMb": 872,
+    "settledPostCooldownMb": 723,
+    "memoryDeltaMb": 509,
+    "leakDetected": true,
+    "idleCpuPct": 8.7
+  },
+  "featureVerification": {
+    "blockSelectionGapHit": true,
+    "blockSelectionThreshold": true,
+    "marquee2DHitTest": true,
+    "gutterDragVertical": true,
+    "emptyClickDeselection": true,
+    "caretAboveLineSnappingFix": true,
+    "backspaceBlockDeletion": true,
+    "backspaceFormattingRemoval": true,
+    "progressiveSelectAll": true,
+    "duplicateBlock": true,
+    "copyMarkdown": true,
+    "keyboardArrowNavigation": true,
+    "commandPaletteOpen": true,
+    "findBarOpen": true,
+    "recentNotePersistence": true
+  }
+}

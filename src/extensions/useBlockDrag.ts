@@ -15,6 +15,8 @@ export interface CachedBlockRect {
   nodeSize: number;
   docTop: number;
   docBottom: number;
+  docLeft: number;
+  docRight: number;
 }
 
 /**
@@ -23,53 +25,81 @@ export interface CachedBlockRect {
  */
 export function findBlockIndexByDocY(
   cachedBlocks: CachedBlockRect[],
-  docY: number
+  docY: number,
+  snapToNearest: boolean = false
 ): number {
   if (cachedBlocks.length === 0) return -1;
-  let low = 0;
-  let high = cachedBlocks.length - 1;
 
-  if (docY <= cachedBlocks[0].docTop) return 0;
-  if (docY >= cachedBlocks[high].docBottom) return high;
-
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    const b = cachedBlocks[mid];
-
+  for (let i = 0; i < cachedBlocks.length; i++) {
+    const b = cachedBlocks[i];
     if (docY >= b.docTop && docY <= b.docBottom) {
-      return mid;
-    }
-
-    if (docY < b.docTop) {
-      high = mid - 1;
-    } else {
-      low = mid + 1;
+      return i;
     }
   }
 
+  if (!snapToNearest) return -1;
+
+  if (docY <= cachedBlocks[0].docTop) return 0;
+  if (docY >= cachedBlocks[cachedBlocks.length - 1].docBottom) return cachedBlocks.length - 1;
+
+  let low = 0;
+  let high = cachedBlocks.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const b = cachedBlocks[mid];
+    if (docY >= b.docTop && docY <= b.docBottom) return mid;
+    if (docY < b.docTop) high = mid - 1;
+    else low = mid + 1;
+  }
   return Math.max(0, Math.min(cachedBlocks.length - 1, low));
 }
 
 /**
- * Finds the range of blocks that intersect the vertical interval [minDocY, maxDocY].
- * Returns { minIdx, maxIdx } or null if no blocks intersect.
+ * Finds the range of blocks that intersect the selection rectangle.
+ * For a point click (minDocY === maxDocY), requires direct vertical containment.
+ * For a drag interval, requires penetrating into the block by an inset threshold (e.g. 8px or 25%)
+ * to avoid prematurely highlighting blocks when the cursor/box is still above or barely touching them.
  */
 export function getIntersectingBlockIndices(
   cachedBlocks: CachedBlockRect[],
   minDocY: number,
-  maxDocY: number
+  maxDocY: number,
+  minDocX?: number,
+  maxDocX?: number,
+  isGutterDrag: boolean = true
 ): { minIdx: number; maxIdx: number } | null {
   if (cachedBlocks.length === 0) return null;
 
   let minIdx = -1;
   let maxIdx = -1;
+  const isPointHit = Math.abs(maxDocY - minDocY) < 1;
 
   for (let i = 0; i < cachedBlocks.length; i++) {
     const b = cachedBlocks[i];
-    if (b.docBottom >= minDocY && b.docTop <= maxDocY) {
-      if (minIdx === -1) minIdx = i;
-      maxIdx = i;
+    const bHeight = b.docBottom - b.docTop;
+
+    let yHits = false;
+    if (isPointHit) {
+      // Direct point hit test on mousedown
+      yHits = minDocY >= b.docTop && minDocY <= b.docBottom;
+    } else {
+      // Drag interval: requires penetrating at least vThreshold into the block
+      // to avoid prematurely highlighting blocks when cursor/box is above or barely grazing them.
+      const vThreshold = Math.min(8, Math.max(2, bHeight * 0.25));
+      yHits = maxDocY >= b.docTop + vThreshold && minDocY <= b.docBottom - vThreshold;
     }
+
+    if (!yHits) continue;
+
+    // Horizontal check for non-gutter (marquee) drags
+    if (!isGutterDrag && minDocX !== undefined && maxDocX !== undefined) {
+      const hThreshold = 4;
+      const xHits = maxDocX >= b.docLeft + hThreshold && minDocX <= b.docRight - hThreshold;
+      if (!xHits) continue;
+    }
+
+    if (minIdx === -1) minIdx = i;
+    maxIdx = i;
   }
 
   if (minIdx === -1 || maxIdx === -1) return null;
@@ -100,6 +130,7 @@ export function useBlockDrag({
     selectedMinIdx: -1,
     selectedMaxIdx: -1,
     hasMoved: false,
+    isGutterDrag: false,
     rafId: null as number | null,
   });
 
@@ -200,7 +231,18 @@ export function useBlockDrag({
       const minDocY = Math.min(state.startDocY, currentDocY);
       const maxDocY = Math.max(state.startDocY, currentDocY);
 
-      const hit = getIntersectingBlockIndices(state.cachedBlocks, minDocY, maxDocY);
+      const curRelX = state.currentPointerX - containerRect.left;
+      const minDocX = Math.min(state.startRelX, curRelX);
+      const maxDocX = Math.max(state.startRelX, curRelX);
+
+      const hit = getIntersectingBlockIndices(
+        state.cachedBlocks,
+        minDocY,
+        maxDocY,
+        minDocX,
+        maxDocX,
+        state.isGutterDrag
+      );
       const newMinIdx = hit ? hit.minIdx : -1;
       const newMaxIdx = hit ? hit.maxIdx : -1;
 
@@ -217,8 +259,6 @@ export function useBlockDrag({
       // 4. Update rubber-band marquee box in container coordinates
       const box = rubberBandRef.current;
       if (box) {
-        const curRelX = state.currentPointerX - containerRect.left;
-
         const left = Math.min(state.startRelX, curRelX);
         const top = Math.min(state.startDocY, currentDocY);
         const width = Math.abs(curRelX - state.startRelX);
@@ -259,8 +299,9 @@ export function useBlockDrag({
         if (state.selectedMinIdx !== -1 && state.selectedMaxIdx !== -1) {
           updateSelectionRangeInView(state.selectedMinIdx, state.selectedMaxIdx);
           setLastDragEndTime(Date.now());
-        } else if (state.hasMoved) {
-          // Drag finished with no blocks touched -> clear selection
+          editor?.view?.focus();
+        } else {
+          // Drag or click ended with no blocks touched -> ensure selection cleared
           updateSelectionRangeInView(-1, -1);
           setLastDragEndTime(Date.now());
         }
@@ -313,11 +354,14 @@ export function useBlockDrag({
           const range = document.caretRangeFromPoint(e.clientX, e.clientY);
           if (range) {
             const rangeRect = range.getBoundingClientRect();
-            if (rangeRect && e.clientX > rangeRect.right + 14) {
+            if (
+              rangeRect &&
+              e.clientY >= rangeRect.top - 4 &&
+              e.clientY <= rangeRect.bottom + 4 &&
+              e.clientX > rangeRect.right + 14
+            ) {
               isRightOfText = true;
             }
-          } else {
-            isRightOfText = true;
           }
         }
       }
@@ -372,17 +416,24 @@ export function useBlockDrag({
             nodeSize: b.nodeSize,
             docTop: r.top - containerRect.top + scrollTop,
             docBottom: r.bottom - containerRect.top + scrollTop,
+            docLeft: r.left - containerRect.left,
+            docRight: r.right - containerRect.left,
           });
         }
       }
 
       if (cachedBlocks.length === 0) return;
 
+      const isGutterDrag = isLeftGutter || isRightGutter || isBelowText;
+
       // Find initial intersecting block at mouse down point
       const initialHit = getIntersectingBlockIndices(
         cachedBlocks,
         startDocY,
-        startDocY
+        startDocY,
+        startRelX,
+        startRelX,
+        isGutterDrag
       );
       const initialMin = initialHit ? initialHit.minIdx : -1;
       const initialMax = initialHit ? initialHit.maxIdx : -1;
@@ -412,6 +463,7 @@ export function useBlockDrag({
       state.selectedMinIdx = initialMin;
       state.selectedMaxIdx = initialMax;
       state.hasMoved = false;
+      state.isGutterDrag = isGutterDrag;
 
       // If clicked next to a block (left or right gutter), select that block immediately
       // If clicked below all blocks, initialMin is -1 (clears/waits until drag reaches a block)

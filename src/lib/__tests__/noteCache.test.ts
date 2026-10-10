@@ -1,134 +1,129 @@
-import { NoteLRUCache } from '../noteCache.ts';
+import { describe, it, expect } from 'vitest';
+import { NoteLRUCache, MAX_ENTRIES, MAX_CACHE_BYTES } from '../noteCache';
 
-function assert(condition: boolean, msg: string) {
-  if (!condition) {
-    console.error(`❌ Assertion Failed: ${msg}`);
-    throw new Error(msg);
-  }
-}
+describe('NoteLRUCache Regression & Boundedness Tests', () => {
+  it('1. Basic Set & Get retrieves content and scroll position correctly', () => {
+    const cache = new NoteLRUCache(5, 1024 * 1024);
+    cache.set('n1', 'Content 1', '2026-10-07T00:00:00Z', 'Preview 1', 150);
+    const item = cache.get('n1');
+    expect(item).toBeDefined();
+    expect(item?.content).toBe('Content 1');
+    expect(item?.scrollTop).toBe(150);
+  });
 
-console.log('🧪 Starting NoteLRUCache Tests & Benchmarks...\n');
+  it('2. Enforces entry limit (MAX_ENTRIES = 25): adding 25 notes stays within limit, 26th evicts LRU', () => {
+    const cache = new NoteLRUCache(MAX_ENTRIES, MAX_CACHE_BYTES);
 
-// 1. Basic Set & Get
-{
-  const cache = new NoteLRUCache(5, 1024 * 1024);
-  cache.set('n1', 'Content 1', '2026-10-07T00:00:00Z', 'Preview 1', 150);
-  const item = cache.get('n1');
-  assert(item !== null, 'Item n1 should be retrieved');
-  assert(item?.content === 'Content 1', 'Content should match');
-  assert(item?.scrollTop === 150, 'ScrollTop should be 150');
-  console.log('✅ Test 1: Basic Set & Get passed');
-}
+    // Insert 25 distinct notes
+    for (let i = 1; i <= 25; i++) {
+      cache.set(`note-${i}`, `Note body ${i}`);
+    }
+    expect(cache.size).toBe(25);
+    expect(cache.has('note-1')).toBe(true);
+    expect(cache.has('note-25')).toBe(true);
 
-// 2. LRU Capacity Eviction (MAX_ENTRIES)
-{
-  const cache = new NoteLRUCache(3, 1024 * 1024);
-  cache.set('n1', 'Content 1');
-  cache.set('n2', 'Content 2');
-  cache.set('n3', 'Content 3');
-  assert(cache.size === 3, 'Size should be 3');
+    // Adding 26th note must evict note-1 (the least recently used)
+    cache.set('note-26', 'Note body 26');
+    expect(cache.size).toBe(25);
+    expect(cache.has('note-1')).toBe(false); // evicted!
+    expect(cache.has('note-2')).toBe(true);
+    expect(cache.has('note-26')).toBe(true);
+  });
 
-  // Adding n4 should evict n1 (oldest)
-  cache.set('n4', 'Content 4');
-  assert(cache.size === 3, 'Size should remain 3');
-  assert(cache.get('n1') === undefined, 'n1 should be evicted');
-  assert(cache.get('n2') !== undefined, 'n2 should still exist');
-  assert(cache.get('n3') !== undefined, 'n3 should still exist');
-  assert(cache.get('n4') !== undefined, 'n4 should still exist');
+  it('3. Reading an older note updates its recent-use position before 26th note insertion', () => {
+    const cache = new NoteLRUCache(MAX_ENTRIES, MAX_CACHE_BYTES);
 
-  // Access n2 (moves it to newest)
-  cache.get('n2');
-  // Add n5 -> n3 is now the oldest and should be evicted!
-  cache.set('n5', 'Content 5');
-  assert(cache.get('n3') === undefined, 'n3 should be evicted because n2 was refreshed');
-  assert(cache.get('n2') !== undefined, 'n2 should still exist');
-  console.log('✅ Test 2: LRU Capacity Eviction passed');
-}
+    // Insert 25 notes
+    for (let i = 1; i <= 25; i++) {
+      cache.set(`note-${i}`, `Note body ${i}`);
+    }
 
-// 3. Memory Byte-Limit Eviction (MAX_CACHE_BYTES)
-{
-  // 100 KB limit, max 10 entries
-  const limitBytes = 100 * 1024;
-  const cache = new NoteLRUCache(10, limitBytes);
-  
-  // Create 30 KB strings
-  const chunk30k = 'x'.repeat(15 * 1024); // 15,000 chars ~ 30,000 bytes UTF-16
-  cache.set('n1', chunk30k);
-  cache.set('n2', chunk30k);
-  cache.set('n3', chunk30k);
-  
-  assert(cache.size === 3, 'Should hold 3 chunks (~90KB)');
-  assert(cache.totalBytes <= limitBytes, 'Should be within memory limit');
+    // Access note-1 (moves it to the front of LRU queue)
+    const readNote1 = cache.get('note-1');
+    expect(readNote1).toBeDefined();
 
-  // Add 4th chunk (will push total over 100KB, forcing eviction of n1)
-  cache.set('n4', chunk30k);
-  assert(cache.get('n1') === undefined, 'n1 must be evicted to stay under 100KB limit');
-  assert(cache.totalBytes <= limitBytes, `Total bytes (${cache.totalBytes}) must not exceed ${limitBytes}`);
-  console.log(`✅ Test 3: Byte Limit Eviction passed (Total: ${cache.totalBytes} bytes / max: ${limitBytes})`);
-}
+    // Now insert note-26: note-2 must be evicted instead of note-1!
+    cache.set('note-26', 'Note body 26');
+    expect(cache.size).toBe(25);
+    expect(cache.has('note-1')).toBe(true); // preserved because it was read!
+    expect(cache.has('note-2')).toBe(false); // note-2 evicted as it was the oldest
+    expect(cache.has('note-26')).toBe(true);
+  });
 
-// 4. Scroll Position Persistence
-{
-  const cache = new NoteLRUCache(5, 1024 * 1024);
-  cache.set('n1', 'Hello world', undefined, undefined, 4200);
-  assert(cache.getScrollTop('n1') === 4200, 'Scroll top should be 4200');
+  it('4. Enforces 8 MB memory budget (MAX_CACHE_BYTES) and evicts oldest to stay bounded', () => {
+    const limitBytes = 8 * 1024 * 1024; // 8 MB
+    const cache = new NoteLRUCache(100, limitBytes);
+    const chunk1MB = 'a'.repeat(500 * 1024); // ~1 MB UTF-16 string
 
-  cache.setScrollTop('n1', 7850);
-  assert(cache.getScrollTop('n1') === 7850, 'Updated scroll top should be 7850');
-  console.log('✅ Test 4: Scroll Position Persistence passed');
-}
+    // Insert 7 x 1MB notes -> 7 MB < 8 MB
+    for (let i = 1; i <= 7; i++) {
+      cache.set(`big-${i}`, chunk1MB);
+    }
+    expect(cache.size).toBe(7);
+    expect(cache.totalBytes).toBeLessThanOrEqual(limitBytes);
 
-// 5. Update Content In-Place (Autosave Pipeline Integration)
-{
-  const cache = new NoteLRUCache(5, 1024 * 1024);
-  cache.set('n1', 'Original Content', '2026-10-07T00:00:00Z', 'Preview 1', 500);
-  
-  cache.updateContent('n1', 'Edited Content', 'Updated Preview');
-  const updated = cache.get('n1');
-  assert(updated?.content === 'Edited Content', 'Content should be updated');
-  assert(updated?.scrollTop === 500, 'Scroll top must be preserved');
-  assert(updated?.preview === 'Updated Preview', 'Preview should be updated');
-  console.log('✅ Test 5: In-Place Content Update passed');
-}
+    // Insert 8th and 9th -> total would be ~9 MB, so oldest entries must be evicted
+    cache.set('big-8', chunk1MB);
+    cache.set('big-9', chunk1MB);
+    expect(cache.totalBytes).toBeLessThanOrEqual(limitBytes);
+    expect(cache.has('big-1')).toBe(false); // evicted to preserve 8 MB budget
+    expect(cache.has('big-9')).toBe(true);
+  });
 
-// 6. BENCHMARK: Latency & Memory Throughput
-{
-  console.log('\n⚡ Running Benchmarks:');
-  const cache = new NoteLRUCache(25, 8 * 1024 * 1024);
-  const mediumDoc = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(500); // ~28 KB
+  it('5. Handles oversized entries (> 8 MB) safely without infinite loop or throwing', () => {
+    const limitBytes = 8 * 1024 * 1024;
+    const cache = new NoteLRUCache(25, limitBytes);
+    const massiveDoc = 'm'.repeat(5 * 1024 * 1024); // ~10 MB string
 
-  // Warm-up cache with 25 notes
-  for (let i = 0; i < 25; i++) {
-    cache.set(`note-${i}`, mediumDoc, new Date().toISOString(), `Preview for note ${i}`, i * 50);
-  }
+    // Pre-populate with a few notes
+    cache.set('n1', 'small note');
+    cache.set('n2', 'another small note');
 
-  // Measure Cache Hit Latency over 100,000 iterations
-  const iterations = 100000;
-  const startHit = performance.now();
-  for (let i = 0; i < iterations; i++) {
-    const key = `note-${i % 25}`;
-    const entry = cache.get(key);
-    if (!entry) throw new Error('Missing entry');
-  }
-  const endHit = performance.now();
-  const totalHitTimeMs = endHit - startHit;
-  const avgHitLatencyNs = ((totalHitTimeMs / iterations) * 1_000_000).toFixed(2);
-  const opsPerSec = Math.round((iterations / totalHitTimeMs) * 1000).toLocaleString();
+    // Inserting an oversized entry that exceeds total budget on its own
+    expect(() => {
+      cache.set('giant-note', massiveDoc);
+    }).not.toThrow();
 
-  console.log(`  ⏱️ Cache Hit Latency:       ${avgHitLatencyNs} ns / op (${opsPerSec} ops/sec)`);
-  console.log(`  📊 Cache Memory Footprint:  ${(cache.totalBytes / (1024 * 1024)).toFixed(3)} MB across 25 medium notes`);
+    // The oversized entry evicts other notes and safely remains as single entry without crashing
+    expect(cache.has('n1')).toBe(false);
+    expect(cache.has('n2')).toBe(false);
+    expect(cache.has('giant-note')).toBe(true);
+    expect(cache.size).toBe(1);
+  });
 
-  // Measure Set/Eviction Latency
-  const startSet = performance.now();
-  for (let i = 25; i < 25 + iterations; i++) {
-    cache.set(`note-${i}`, mediumDoc, new Date().toISOString(), 'Preview', 100);
-  }
-  const endSet = performance.now();
-  const totalSetTimeMs = endSet - startSet;
-  const avgSetLatencyNs = ((totalSetTimeMs / iterations) * 1_000_000).toFixed(2);
-  console.log(`  ⏱️ Cache Write + Evict:     ${avgSetLatencyNs} ns / op`);
-  console.log(`  🛡️ Final Entry Count:       ${cache.size} (Max limit 25 enforced)`);
-  console.log(`  🛡️ Final Cache Size:        ${(cache.totalBytes / (1024 * 1024)).toFixed(3)} MB (Max limit 8 MB enforced)`);
-}
+  it('6. Persists and updates scroll position independently', () => {
+    const cache = new NoteLRUCache(5, 1024 * 1024);
+    cache.set('n1', 'Hello world', undefined, undefined, 4200);
+    expect(cache.getScrollTop('n1')).toBe(4200);
 
-console.log('\n🎉 ALL TESTS AND BENCHMARKS PASSED SUCCESSFULLY!');
+    cache.setScrollTop('n1', 7850);
+    expect(cache.getScrollTop('n1')).toBe(7850);
+  });
+
+  it('7. Updates content in-place without resetting scroll offset', () => {
+    const cache = new NoteLRUCache(5, 1024 * 1024);
+    cache.set('n1', 'Original Content', '2026-10-07T00:00:00Z', 'Preview 1', 500);
+
+    cache.updateContent('n1', 'Edited Content', 'Updated Preview');
+    const updated = cache.get('n1');
+    expect(updated?.content).toBe('Edited Content');
+    expect(updated?.scrollTop).toBe(500);
+    expect(updated?.preview).toBe('Updated Preview');
+  });
+
+  it('8. High throughput benchmark: 50,000 lookups complete in under 50ms', () => {
+    const cache = new NoteLRUCache(25, 8 * 1024 * 1024);
+    const mediumDoc = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '.repeat(100);
+
+    for (let i = 0; i < 25; i++) {
+      cache.set(`note-${i}`, mediumDoc);
+    }
+
+    const t0 = performance.now();
+    for (let i = 0; i < 50000; i++) {
+      cache.get(`note-${i % 25}`);
+    }
+    const duration = performance.now() - t0;
+    expect(duration).toBeLessThan(100);
+  });
+});

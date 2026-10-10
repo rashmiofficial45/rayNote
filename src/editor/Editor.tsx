@@ -171,7 +171,7 @@ export function Editor({
       editorProps: {
         attributes: {
           class: "tiptap",
-          spellcheck: "true",
+          spellcheck: "false",
         },
         clipboardTextSerializer: (slice) => {
           return sliceToMarkdown(slice, editorRef.current);

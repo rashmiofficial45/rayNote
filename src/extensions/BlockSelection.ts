@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/core";
-import { Plugin, PluginKey, TextSelection, Selection } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection, Selection, EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { DOMSerializer, Fragment, Slice } from "@tiptap/pm/model";
@@ -198,22 +198,91 @@ export function deleteSelectedBlocks(view: EditorView): boolean {
   const pluginState = blockSelectionPluginKey.getState(state);
   if (!pluginState || pluginState.selectedPositions.length === 0) return false;
 
-  const sortedPositions = [...pluginState.selectedPositions].sort((a, b) => b - a); // delete descending
-  const minPos = Math.min(...pluginState.selectedPositions);
-  let tr = state.tr;
+  const allBlocks = getAllBlocks(state.doc);
+  const isAllSelected =
+    allBlocks.length > 0 &&
+    allBlocks.every((b) => pluginState.selectedPositions.includes(b.pos));
 
-  for (const pos of sortedPositions) {
-    const node = tr.doc.nodeAt(pos);
-    if (node) {
-      tr = tr.delete(pos, pos + node.nodeSize);
-    }
+  if (isAllSelected) {
+    let tr = state.tr;
+    tr = tr.replaceWith(0, tr.doc.content.size, state.schema.nodes.paragraph.create());
+    tr = tr.setSelection(TextSelection.create(tr.doc, 1));
+    tr = tr.setMeta(blockSelectionPluginKey, {
+      anchor: null,
+      head: null,
+      selectedPositions: [],
+    });
+    view.dispatch(tr);
+    view.focus();
+    return true;
   }
 
+  const positionsSet = new Set(pluginState.selectedPositions);
+  const rangesToDelete: { from: number; to: number }[] = [];
+
+  // Traverse top-level nodes in state.doc to detect full list deletions
+  let offset = 0;
+  for (let i = 0; i < state.doc.childCount; i++) {
+    const child = state.doc.child(i);
+    const childPos = offset;
+    const typeName = child.type.name;
+
+    if (typeName === "bulletList" || typeName === "orderedList" || typeName === "taskList") {
+      if (positionsSet.has(childPos)) {
+        rangesToDelete.push({ from: childPos, to: childPos + child.nodeSize });
+      } else {
+        let allItemsSelected = true;
+        let hasAnySelected = false;
+        let itemOffset = childPos + 1;
+
+        for (let j = 0; j < child.childCount; j++) {
+          const item = child.child(j);
+          const isSelected = positionsSet.has(itemOffset) || positionsSet.has(itemOffset + 1);
+          if (isSelected) {
+            hasAnySelected = true;
+          } else {
+            allItemsSelected = false;
+          }
+          itemOffset += item.nodeSize;
+        }
+
+        if (allItemsSelected && hasAnySelected) {
+          // Delete the entire list container so no ghost empty list items remain
+          rangesToDelete.push({ from: childPos, to: childPos + child.nodeSize });
+        } else if (hasAnySelected) {
+          // Delete only the individual selected items
+          itemOffset = childPos + 1;
+          for (let j = 0; j < child.childCount; j++) {
+            const item = child.child(j);
+            if (positionsSet.has(itemOffset) || positionsSet.has(itemOffset + 1)) {
+              rangesToDelete.push({ from: itemOffset, to: itemOffset + item.nodeSize });
+            }
+            itemOffset += item.nodeSize;
+          }
+        }
+      }
+    } else {
+      if (positionsSet.has(childPos)) {
+        rangesToDelete.push({ from: childPos, to: childPos + child.nodeSize });
+      }
+    }
+    offset += child.nodeSize;
+  }
+
+  // Sort descending so deletions don't affect lower indices
+  rangesToDelete.sort((a, b) => b.from - a.from);
+
+  let tr = state.tr;
+  for (const range of rangesToDelete) {
+    tr = tr.delete(range.from, range.to);
+  }
+
+  // If document became completely empty, ensure a single paragraph exists
   if (tr.doc.childCount === 0 || tr.doc.content.size <= 2) {
-    const defaultBlock = state.schema.nodes.paragraph.create();
-    tr = tr.insert(0, defaultBlock);
+    tr = tr.replaceWith(0, tr.doc.content.size, state.schema.nodes.paragraph.create());
     tr = tr.setSelection(TextSelection.create(tr.doc, 1));
   } else {
+    const minPos = Math.min(...pluginState.selectedPositions);
     const targetPos = Math.min(minPos, tr.doc.content.size - 1);
     try {
       const $pos = tr.doc.resolve(Math.max(1, targetPos));
@@ -274,10 +343,9 @@ export function duplicateSelectedBlocks(view: EditorView): boolean {
   return true;
 }
 
-export async function copySelectedBlocks(view: EditorView, isCut = false): Promise<boolean> {
-  const state = view.state;
+export function serializeSelectedBlocks(state: EditorState): { markdownText: string; htmlText: string } | null {
   const pluginState = blockSelectionPluginKey.getState(state);
-  if (!pluginState || pluginState.selectedPositions.length === 0) return false;
+  if (!pluginState || pluginState.selectedPositions.length === 0) return null;
 
   const doc = state.doc;
   const sortedPositions = [...pluginState.selectedPositions].sort((a, b) => a - b);
@@ -290,7 +358,7 @@ export async function copySelectedBlocks(view: EditorView, isCut = false): Promi
     }
   }
 
-  if (nodes.length === 0) return false;
+  if (nodes.length === 0) return null;
 
   const fragment = Fragment.fromArray(nodes);
   const slice = new Slice(fragment, 0, 0);
@@ -309,20 +377,45 @@ export async function copySelectedBlocks(view: EditorView, isCut = false): Promi
     htmlText = markdownText;
   }
 
+  return { markdownText, htmlText };
+}
+
+export function copySelectedBlocks(view: EditorView, isCut = false): boolean {
+  const serialized = serializeSelectedBlocks(view.state);
+  if (!serialized) return false;
+
+  // 1. Synchronously copy via focused hidden textarea (100% reliable in all WebKit / Safari contexts)
   try {
-    if (navigator.clipboard && window.ClipboardItem) {
-      const items: Record<string, Blob> = {
-        "text/plain": new Blob([markdownText], { type: "text/plain" }),
-      };
-      if (htmlText) {
-        items["text/html"] = new Blob([htmlText], { type: "text/html" });
-      }
-      await navigator.clipboard.write([new ClipboardItem(items)]);
-    } else {
-      await navigator.clipboard.writeText(markdownText);
-    }
+    const el = document.createElement("textarea");
+    el.value = serialized.markdownText;
+    el.style.position = "fixed";
+    el.style.left = "-9999px";
+    el.style.top = "-9999px";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    document.execCommand("copy");
+    document.body.removeChild(el);
   } catch (err) {
-    console.warn("Failed to write to clipboard:", err);
+    console.warn("execCommand copy fallback failed:", err);
+  }
+
+  // 2. Also write via navigator.clipboard asynchronously for rich HTML if supported
+  if (navigator.clipboard) {
+    if (window.ClipboardItem && serialized.htmlText) {
+      try {
+        const items: Record<string, Blob> = {
+          "text/plain": new Blob([serialized.markdownText], { type: "text/plain" }),
+          "text/html": new Blob([serialized.htmlText], { type: "text/html" }),
+        };
+        navigator.clipboard.write([new ClipboardItem(items)]).catch(() => {});
+      } catch {
+        navigator.clipboard.writeText(serialized.markdownText).catch(() => {});
+      }
+    } else {
+      navigator.clipboard.writeText(serialized.markdownText).catch(() => {});
+    }
   }
 
   if (isCut) {
@@ -609,6 +702,33 @@ export const BlockSelection = Extension.create({
                 view.dispatch(tr);
               }
 
+              return false;
+            },
+
+            copy(view, event) {
+              const serialized = serializeSelectedBlocks(view.state);
+              if (serialized && event.clipboardData) {
+                event.preventDefault();
+                event.clipboardData.setData("text/plain", serialized.markdownText);
+                if (serialized.htmlText) {
+                  event.clipboardData.setData("text/html", serialized.htmlText);
+                }
+                return true;
+              }
+              return false;
+            },
+
+            cut(view, event) {
+              const serialized = serializeSelectedBlocks(view.state);
+              if (serialized && event.clipboardData) {
+                event.preventDefault();
+                event.clipboardData.setData("text/plain", serialized.markdownText);
+                if (serialized.htmlText) {
+                  event.clipboardData.setData("text/html", serialized.htmlText);
+                }
+                deleteSelectedBlocks(view);
+                return true;
+              }
               return false;
             },
 
