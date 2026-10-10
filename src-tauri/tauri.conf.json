@@ -44,7 +44,22 @@
     ],
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "dmg": {
+        "background": "icons/dmg-background.png",
+        "windowSize": {
+          "width": 820,
+          "height": 540
+        },
+        "appPosition": {
+          "x": 210,
+          "y": 365
+        },
+        "applicationFolderPosition": {
+          "x": 610,
+          "y": 365
+        }
+      }
     }
   }
 }
