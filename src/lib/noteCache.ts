@@ -66,7 +66,11 @@ export class NoteLRUCache {
     if (typeof localStorage === "undefined") return;
     try {
       localStorage.setItem("notefast_active_note_id", id);
-      localStorage.setItem("notefast_active_note_content", content);
+      if (content && content.length <= 65536) {
+        localStorage.setItem("notefast_active_note_content", content);
+      } else {
+        localStorage.removeItem("notefast_active_note_content");
+      }
     } catch {
       // Ignore quota errors
     }

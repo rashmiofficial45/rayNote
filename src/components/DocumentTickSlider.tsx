@@ -49,11 +49,11 @@ export function DocumentTickSlider({
 
     if (trackRef.current) {
       const h = trackRef.current.clientHeight;
-      if (h > 0 && Math.abs(h - trackHeight) > 4) {
-        setTrackHeight(h);
+      if (h > 0) {
+        setTrackHeight((prev) => (Math.abs(h - prev) > 4 ? h : prev));
       }
     }
-  }, [scrollContainerRef, trackHeight]);
+  }, [scrollContainerRef]);
 
   // Attach scroll & resize observers
   useEffect(() => {

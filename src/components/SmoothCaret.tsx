@@ -80,6 +80,7 @@ export function SmoothCaret({
   const caretRef = useRef<HTMLDivElement>(null);
   const lastPosRef = useRef<{ x: number; y: number; height: number } | null>(null);
   const blinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blinkStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseDownRef = useRef(false);
   const retryControllerRef = useRef(new SmoothCaretRetryController());
   const [isEnabled, setIsEnabled] = useState(() => {
@@ -184,11 +185,23 @@ export function SmoothCaret({
         if (blinkTimeoutRef.current) {
           clearTimeout(blinkTimeoutRef.current);
         }
+        if (blinkStopTimeoutRef.current) {
+          clearTimeout(blinkStopTimeoutRef.current);
+        }
         blinkTimeoutRef.current = setTimeout(() => {
           if (view.hasFocus() && editor.state.selection.empty) {
             caret.classList.add("is-blinking");
           }
         }, 500);
+
+        // Cap infinite blinking animation after 4.5s of inactivity (Apple Notes / Bear standard)
+        // Prevents WebKit compositor thread from consuming 80%-90% CPU while idle
+        blinkStopTimeoutRef.current = setTimeout(() => {
+          caret.classList.remove("is-blinking");
+          if (view.hasFocus() && editor.state.selection.empty) {
+            caret.style.opacity = "1";
+          }
+        }, 4500);
       } catch {
         // Coords might be unavailable during rapid unmounts
       }
@@ -244,10 +257,19 @@ export function SmoothCaret({
       scheduleUpdate(true);
     };
 
+    const handleBlur = () => {
+      if (caretRef.current) {
+        caretRef.current.style.opacity = "0";
+        caretRef.current.classList.remove("is-blinking");
+      }
+      handleSnapUpdate();
+    };
+
     editor.on("transaction", handleImmediateUpdate);
     editor.on("selectionUpdate", handleImmediateUpdate);
     editor.on("focus", handleSnapUpdate);
-    editor.on("blur", handleSnapUpdate);
+    editor.on("blur", handleBlur);
+    window.addEventListener("blur", handleBlur);
 
     const scrollEl = scrollContainerRef?.current;
     if (scrollEl) {
@@ -266,7 +288,8 @@ export function SmoothCaret({
       editor.off("transaction", handleImmediateUpdate);
       editor.off("selectionUpdate", handleImmediateUpdate);
       editor.off("focus", handleSnapUpdate);
-      editor.off("blur", handleSnapUpdate);
+      editor.off("blur", handleBlur);
+      window.removeEventListener("blur", handleBlur);
 
       if (scrollEl) {
         scrollEl.removeEventListener("scroll", handleSnapUpdate);
@@ -275,6 +298,9 @@ export function SmoothCaret({
 
       if (blinkTimeoutRef.current) {
         clearTimeout(blinkTimeoutRef.current);
+      }
+      if (blinkStopTimeoutRef.current) {
+        clearTimeout(blinkStopTimeoutRef.current);
       }
     };
   }, [editor, updatePosition, scrollContainerRef, isEnabled]);

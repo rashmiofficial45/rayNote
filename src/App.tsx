@@ -258,7 +258,11 @@ function App() {
           if (activeFetchIdRef.current === id && fullNote) {
             noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
             try {
-              localStorage.setItem("notefast_active_note_content", fullNote.content);
+              if (fullNote.content.length <= 65536) {
+                localStorage.setItem("notefast_active_note_content", fullNote.content);
+              } else {
+                localStorage.removeItem("notefast_active_note_content");
+              }
             } catch {}
           }
         })
@@ -267,7 +271,11 @@ function App() {
         });
     } else {
       try {
-        localStorage.setItem("notefast_active_note_content", cached.content);
+        if (cached.content.length <= 65536) {
+          localStorage.setItem("notefast_active_note_content", cached.content);
+        } else {
+          localStorage.removeItem("notefast_active_note_content");
+        }
       } catch {}
     }
   }, []);

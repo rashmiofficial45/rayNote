@@ -14,8 +14,6 @@
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { createDocument } from "@tiptap/core";
-import { EditorState } from "@tiptap/pm/state";
 import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -263,22 +261,17 @@ export function Editor({
     // Uses EditorState.create to clear prosemirror-history undo stack and detach old document nodes,
     // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
     const applyDocumentInPlace = (docData: any) => {
+      editor.commands.setContent(docData, { emitUpdate: false });
+      // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
       try {
-        const newDoc = createDocument(docData, editor.schema, {}, {
-          errorOnInvalidContent: editor.options.enableContentCheck,
-        });
-        const newState = EditorState.create({
-          schema: editor.schema,
-          doc: newDoc,
-          plugins: editor.state.plugins,
-        });
-        editor.view.updateState(newState);
-        setCharCount(newDoc.textContent.length);
-      } catch (err) {
-        console.warn("createDocument fallback to setContent:", err);
-        editor.commands.setContent(docData, { emitUpdate: false });
-        setCharCount(editor.state.doc.textContent.length);
-      }
+        const histPlugin = editor.state.plugins.find((p: any) => p.key?.startsWith?.("history$"));
+        if (histPlugin && (histPlugin as any).spec?.state?.init) {
+          const emptyHistory = (histPlugin as any).spec.state.init();
+          const tr = editor.state.tr.setMeta((histPlugin as any).key, { historyState: emptyHistory });
+          editor.view.dispatch(tr);
+        }
+      } catch {}
+      setCharCount(editor.state.doc.textContent.length);
     };
 
     // 3. Retrieve incoming note from in-memory LRU cache
@@ -395,7 +388,7 @@ export function Editor({
     if (!editor || editor.isDestroyed) return;
 
     const focusNote = () => {
-      if (editor && !editor.isDestroyed && !editor.isFocused) {
+      if (editor && !editor.isDestroyed && !editor.isFocused && currentNoteIdRef.current === noteId) {
         // focus with scrollIntoView: false prevents jumping away from restored scrollTop
         editor.commands.focus("end", { scrollIntoView: false });
       }
@@ -421,6 +414,7 @@ export function Editor({
    * Refocus editor on Tauri app-focused event
    */
   useEffect(() => {
+    let isCleanedUp = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen("app-focused", () => {
@@ -429,11 +423,16 @@ export function Editor({
         }
       })
       .then((fn) => {
-        unlisten = fn;
+        if (isCleanedUp) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
       })
       .catch(() => {});
 
     return () => {
+      isCleanedUp = true;
       unlisten?.();
     };
   }, []);
@@ -449,11 +448,16 @@ export function Editor({
     };
 
     window.addEventListener("focus", arm);
+    let isCleanedUp = false;
     let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .listen("app-focused", arm)
       .then((fn) => {
-        unlisten = fn;
+        if (isCleanedUp) {
+          fn();
+        } else {
+          unlisten = fn;
+        }
       })
       .catch(() => {});
 
@@ -469,6 +473,7 @@ export function Editor({
     window.addEventListener("keydown", onKeyDown, true);
 
     return () => {
+      isCleanedUp = true;
       window.removeEventListener("focus", arm);
       window.removeEventListener("keydown", onKeyDown, true);
       unlisten?.();
