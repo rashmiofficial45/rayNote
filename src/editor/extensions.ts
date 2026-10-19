@@ -19,6 +19,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { BlockSelection } from "../extensions/BlockSelection";
+import { ClickSelectionExtension } from "./clickSelectionExtension";
 
 
 function enhancedBash(hljs: any) {
@@ -181,6 +182,7 @@ export function getExtensions(slashCommandExtension?: any) {
     TableHeader,
     TableCell,
     BlockSelection,
+    ClickSelectionExtension,
   ];
 
   if (slashCommandExtension) {

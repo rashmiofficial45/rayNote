@@ -25,6 +25,7 @@ import { SmoothCaret } from "../components/SmoothCaret";
 import { FloatingCodeBlockToolbar } from "./FloatingCodeBlockToolbar";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import { useBlockDrag } from "../extensions/useBlockDrag";
+import { getLastDragEndTime } from "../extensions/BlockSelection";
 import {
   isMarkdownContent,
   markdownToTipTapHtml,
@@ -574,6 +575,26 @@ export function Editor({
     return () => window.removeEventListener("blur", handleBlur);
   }, [saveNow]);
 
+  const handleWrapperClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Clicks inside .tiptap or its child elements are handled natively by ProseMirror
+      if (target.closest(".tiptap")) return;
+      if (target.closest(".floating-code-block-toolbar")) return;
+      if (target.closest(".document-tick-slider")) return;
+
+      // If a drag just concluded, ignore
+      if (Date.now() - getLastDragEndTime() < 300) return;
+
+      if (editor && !editor.isDestroyed) {
+        editor.chain().focus("end").run();
+      }
+    },
+    [editor]
+  );
+
   if (!editor) return null;
 
   return (
@@ -586,6 +607,7 @@ export function Editor({
       <div
         ref={scrollContainerRef}
         data-scroll-container
+        onClick={handleWrapperClick}
         className="flex-1 min-h-0 overflow-y-auto pt-3 relative"
       >
         <div style={{ zoom: zoomLevel } as React.CSSProperties} className="relative">

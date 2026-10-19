@@ -562,9 +562,9 @@ body,
 .tiptap {
   isolation: isolate;
   outline: none;
-  min-height: calc(100vh - 44px);
+  min-height: auto;
   padding-top: 20px;
-  padding-bottom: 110px;
+  padding-bottom: 16px;
   padding-left: var(--editor-padding-left);
   /* Do not count the slider as part of padding:
      The right content padding is offset by the slider gutter so the text content
