@@ -237,7 +237,7 @@ export function CodeBlockComponent({
                   className="code-lang-search-box"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <Search size={11} className="code-lang-search-icon" />
+                  <Search size={9} className="code-lang-search-icon" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -283,7 +283,7 @@ export function CodeBlockComponent({
                         >
                           <div className="slash-command-item-icon code-lang-icon-cell">
                             {isCurrent ? (
-                              <Check size={11} strokeWidth={2.5} />
+                              <Check size={8.5} strokeWidth={2.8} />
                             ) : (
                               <span className="code-lang-dot" />
                             )}

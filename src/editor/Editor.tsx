@@ -69,6 +69,28 @@ const extractTitle = (json: any): string => {
   return "";
 };
 
+export function ensureHeadingOneForDoc(docData: any): any {
+  if (!docData) {
+    return {
+      type: "doc",
+      content: [{ type: "heading", attrs: { level: 1 }, content: [] }],
+    };
+  }
+  if (
+    docData.type === "doc" &&
+    Array.isArray(docData.content) &&
+    docData.content.length === 1 &&
+    docData.content[0].type === "paragraph" &&
+    (!docData.content[0].content || docData.content[0].content.length === 0)
+  ) {
+    return {
+      ...docData,
+      content: [{ type: "heading", attrs: { level: 1 }, content: [] }],
+    };
+  }
+  return docData;
+}
+
 export function Editor({
   initialContent,
   content,
@@ -146,11 +168,11 @@ export function Editor({
   const seedContent = useMemo(() => {
     const cached = noteCache.get(noteId);
     const raw = cached?.content ?? (initialContent || content || "");
-    if (!raw) return undefined;
+    if (!raw) return ensureHeadingOneForDoc(null);
     try {
-      return JSON.parse(raw);
+      return ensureHeadingOneForDoc(JSON.parse(raw));
     } catch {
-      return markdownToTipTapHtml(raw);
+      return ensureHeadingOneForDoc(markdownToTipTapHtml(raw));
     }
   }, []); // Only runs once on mount
 
@@ -261,7 +283,7 @@ export function Editor({
     // Uses EditorState.create to clear prosemirror-history undo stack and detach old document nodes,
     // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
     const applyDocumentInPlace = (docData: any) => {
-      editor.commands.setContent(docData, { emitUpdate: false });
+      editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false });
       // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
       try {
         const histPlugin = editor.state.plugins.find((p: any) => p.key?.startsWith?.("history$"));
@@ -576,6 +598,7 @@ export function Editor({
           <FloatingCodeBlockToolbar
             editor={editor}
             scrollContainerRef={scrollContainerRef}
+            zoomLevel={zoomLevel}
           />
         </div>
         {/* Notion-style Rubber-band Selection Box */}

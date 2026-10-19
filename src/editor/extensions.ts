@@ -18,8 +18,6 @@ import { Table } from "@tiptap/extension-table";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
-import { Youtube } from "@tiptap/extension-youtube";
-import { IframeExtension } from "./iframeExtension";
 import { BlockSelection } from "../extensions/BlockSelection";
 
 
@@ -63,13 +61,46 @@ lowlight.registerAlias("csharp", ["cs", "c#"]);
 lowlight.registerAlias("cpp", ["c++", "cc", "hpp"]);
 lowlight.registerAlias("markdown", ["md"]);
 
+import { Extension } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
+
 const CustomDocument = Document.extend({
   content: "block+",
+});
+
+/**
+ * Ensures the title bar line (first block) is always Heading 1 by default
+ * on blank notes or whenever the document content is cleared.
+ */
+export const TitleBarDefaultExtension = Extension.create({
+  name: "titleBarDefault",
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction: (transactions, _oldState, newState) => {
+          if (!transactions.some((tr) => tr.docChanged)) return null;
+
+          const { doc, schema } = newState;
+          if (doc.childCount === 1) {
+            const firstChild = doc.child(0);
+            if (firstChild.type.name === "paragraph" && firstChild.textContent.length === 0) {
+              if (schema.nodes.heading) {
+                return newState.tr.setNodeMarkup(0, schema.nodes.heading, { level: 1 });
+              }
+            }
+          }
+          return null;
+        },
+      }),
+    ];
+  },
 });
 
 export function getExtensions(slashCommandExtension?: any) {
   const extensions = [
     CustomDocument,
+    TitleBarDefaultExtension,
     StarterKit.configure({
       document: false,
       codeBlock: false, // we use CodeBlockLowlight instead
@@ -115,6 +146,10 @@ export function getExtensions(slashCommandExtension?: any) {
     CodeBlockLowlight.configure({
       lowlight,
       defaultLanguage: "bash",
+      exitOnTripleEnter: true,
+      exitOnArrowDown: true,
+      enableTabIndentation: true,
+      tabSize: 2,
       HTMLAttributes: {
         class: "code-block-wrapper notefast-code-block",
       },
@@ -145,17 +180,6 @@ export function getExtensions(slashCommandExtension?: any) {
     TableRow,
     TableHeader,
     TableCell,
-    Youtube.configure({
-      inline: false,
-      allowFullscreen: true,
-      nocookie: true,
-      HTMLAttributes: {
-        class: 'notefast-youtube-iframe',
-        referrerpolicy: 'strict-origin-when-cross-origin',
-        allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-      },
-    }),
-    IframeExtension,
     BlockSelection,
   ];
 

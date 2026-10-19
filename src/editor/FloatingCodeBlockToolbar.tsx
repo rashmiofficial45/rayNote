@@ -6,10 +6,10 @@ import { POPULAR_LANGUAGES } from "./CodeBlockComponent";
 interface FloatingCodeBlockToolbarProps {
   editor: Editor | null;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  zoomLevel?: number;
 }
 
 interface ActiveBlockState {
-  pos: number;
   dom: HTMLElement;
   language: string;
   top: number;
@@ -19,6 +19,7 @@ interface ActiveBlockState {
 export function FloatingCodeBlockToolbar({
   editor,
   scrollContainerRef,
+  zoomLevel = 1,
 }: FloatingCodeBlockToolbarProps) {
   const [activeBlock, setActiveBlock] = useState<ActiveBlockState | null>(null);
   const [copied, setCopied] = useState(false);
@@ -31,108 +32,168 @@ export function FloatingCodeBlockToolbar({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const isHoveringRef = useRef(false);
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoveredPreRef = useRef<HTMLElement | null>(null);
+  const activeBlockRef = useRef<ActiveBlockState | null>(null);
+  activeBlockRef.current = activeBlock;
 
-  // Updates toolbar position relative to scroll container
-  const updatePositionForBlock = useCallback(
-    (preEl: HTMLElement, nodePos: number, lang: string) => {
+  // Calculates exact top-right coordinates for a code block element within the zoomed container
+  const computePosition = useCallback(
+    (preEl: HTMLElement): { top: number; right: number } | null => {
       const container = scrollContainerRef.current;
-      if (!container) return;
+      if (!container || !preEl || !document.body.contains(preEl)) return null;
+
+      // The toolbar sits inside the zoomed content wrapper (offsetParent)
+      const parentEl =
+        (toolbarRef.current?.offsetParent as HTMLElement | null) ||
+        (container.firstElementChild as HTMLElement | null);
+      if (!parentEl) return null;
 
       const preRect = preEl.getBoundingClientRect();
+      const parentRect = parentEl.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
+      const zoom = zoomLevel > 0 ? zoomLevel : 1;
 
-      // Top-right aligned within the code block
-      const top = preRect.top - containerRect.top + container.scrollTop + 8;
-      const right = containerRect.right - preRect.right + 12;
+      // If the code block is completely scrolled outside visible viewport of the scroll container, hide it
+      if (preRect.bottom < containerRect.top + 10 || preRect.top > containerRect.bottom - 10) {
+        return null;
+      }
 
-      setActiveBlock({
-        pos: nodePos,
-        dom: preEl,
-        language: lang,
-        top,
-        right,
-      });
+      // Exact pixel position inside parentEl, normalized for zoom
+      const top = (preRect.top - parentRect.top) / zoom + 4;
+      const right = (parentRect.right - preRect.right) / zoom + 8;
+
+      return { top, right };
     },
-    [scrollContainerRef]
+    [scrollContainerRef, zoomLevel]
   );
 
-  // Find code block at DOM element or position
-  const findCodeBlockAtElement = useCallback(
-    (target: HTMLElement | null): { preEl: HTMLElement; pos: number; lang: string } | null => {
-      if (!editor || !target) return null;
-      const preEl = target.closest("pre.notefast-code-block") as HTMLElement | null;
-      if (!preEl) return null;
+  // Find the code block enclosing the current cursor selection
+  const getCursorCodeBlock = useCallback((): { preEl: HTMLElement; lang: string } | null => {
+    if (!editor || editor.isDestroyed) return null;
+    const { $from } = editor.state.selection;
+    for (let d = $from.depth; d >= 0; d--) {
+      const n = $from.node(d);
+      if (n && n.type.name === "codeBlock") {
+        const blockPos = $from.before(d);
+        try {
+          const domNode = editor.view.nodeDOM(blockPos) as HTMLElement | null;
+          const preEl = domNode?.tagName === "PRE" ? domNode : domNode?.querySelector("pre");
+          if (preEl && document.body.contains(preEl)) {
+            return { preEl: preEl as HTMLElement, lang: n.attrs.language || "bash" };
+          }
+        } catch {}
+        break;
+      }
+    }
+    return null;
+  }, [editor]);
 
+  // Synchronize toolbar position and visibility
+  const syncToolbar = useCallback(() => {
+    if (!editor || editor.isDestroyed) {
+      if (activeBlockRef.current) setActiveBlock(null);
+      return;
+    }
+
+    // 1. If dropdown is open, keep current code block anchored if still valid
+    if (isOpen && activeBlockRef.current?.dom) {
+      const dom = activeBlockRef.current.dom;
+      if (document.body.contains(dom)) {
+        const coords = computePosition(dom);
+        if (coords) {
+          setActiveBlock((prev) =>
+            prev ? { ...prev, top: coords.top, right: coords.right } : null
+          );
+          return;
+        }
+      }
+      // If code block was removed or scrolled out of view, close dropdown & hide
+      setIsOpen(false);
+      setActiveBlock(null);
+      return;
+    }
+
+    // 2. Prioritize block under cursor
+    const cursorBlock = getCursorCodeBlock();
+    if (cursorBlock && document.body.contains(cursorBlock.preEl)) {
+      const coords = computePosition(cursorBlock.preEl);
+      if (coords) {
+        setActiveBlock({
+          dom: cursorBlock.preEl,
+          language: cursorBlock.lang,
+          top: coords.top,
+          right: coords.right,
+        });
+        return;
+      }
+    }
+
+    // 3. Check block hovered by mouse
+    const hoveredEl = hoveredPreRef.current;
+    if (hoveredEl && document.body.contains(hoveredEl)) {
+      let lang = "bash";
       try {
-        const pos = editor.view.posAtDOM(preEl, 0);
-        const resolved = editor.state.doc.resolve(pos);
-        // Find enclosing codeBlock node
-        let codeBlockNode = null;
-        let blockPos = pos;
+        const nodePos = editor.view.posAtDOM(hoveredEl, 0);
+        const resolved = editor.state.doc.resolve(nodePos);
         for (let d = resolved.depth; d >= 0; d--) {
           const n = resolved.node(d);
-          if (n && n.type.name === "codeBlock") {
-            codeBlockNode = n;
-            blockPos = resolved.before(d);
+          if (n?.type.name === "codeBlock") {
+            lang = n.attrs.language || "bash";
             break;
           }
         }
-        if (!codeBlockNode) {
-          const atPos = editor.state.doc.nodeAt(pos);
-          if (atPos && atPos.type.name === "codeBlock") {
-            codeBlockNode = atPos;
-            blockPos = pos;
-          }
-        }
+      } catch {}
 
-        const lang = codeBlockNode?.attrs?.language || "bash";
-        return { preEl, pos: blockPos, lang };
-      } catch {
-        return null;
+      const coords = computePosition(hoveredEl);
+      if (coords) {
+        setActiveBlock({
+          dom: hoveredEl,
+          language: lang,
+          top: coords.top,
+          right: coords.right,
+        });
+        return;
       }
-    },
-    [editor]
-  );
+    }
 
-  // Listen for cursor selection updates
+    // 4. Neither cursor in code block nor hovering -> HIDE IMMEDIATELY
+    if (activeBlockRef.current) {
+      setActiveBlock(null);
+    }
+  }, [editor, isOpen, computePosition, getCursorCodeBlock]);
+
+  // Listen for editor updates (typing, deleting, formatting) and selection updates
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
 
-    const handleSelection = () => {
-      if (isHoveringRef.current || isOpen) return;
+    editor.on("selectionUpdate", syncToolbar);
+    editor.on("update", syncToolbar);
 
-      const { $from } = editor.state.selection;
-      let found = false;
-      for (let d = $from.depth; d >= 0; d--) {
-        const n = $from.node(d);
-        if (n && n.type.name === "codeBlock") {
-          const blockPos = $from.before(d);
-          try {
-            const domNode = editor.view.nodeDOM(blockPos) as HTMLElement | null;
-            const preEl = domNode?.tagName === "PRE" ? domNode : domNode?.querySelector("pre");
-            if (preEl && scrollContainerRef.current) {
-              updatePositionForBlock(preEl as HTMLElement, blockPos, n.attrs.language || "bash");
-              found = true;
-            }
-          } catch {}
-          break;
-        }
-      }
-
-      if (!found && !isHoveringRef.current && !isOpen) {
-        setActiveBlock(null);
-      }
-    };
-
-    editor.on("selectionUpdate", handleSelection);
     return () => {
-      editor.off("selectionUpdate", handleSelection);
+      editor.off("selectionUpdate", syncToolbar);
+      editor.off("update", syncToolbar);
     };
-  }, [editor, isOpen, scrollContainerRef, updatePositionForBlock]);
+  }, [editor, syncToolbar]);
 
-  // Listen for mousemove over scroll container to detect hovered code block
+  // Listen for scroll & window resize
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScrollOrResize = () => {
+      syncToolbar();
+    };
+
+    container.addEventListener("scroll", handleScrollOrResize, { passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+
+    return () => {
+      container.removeEventListener("scroll", handleScrollOrResize);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, [scrollContainerRef, syncToolbar]);
+
+  // Track mouse pointer over code blocks and toolbar
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -141,61 +202,45 @@ export function FloatingCodeBlockToolbar({
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      // If mouse is inside toolbar or dropdown is open, keep toolbar active
-      if (toolbarRef.current?.contains(target) || isOpen) {
-        isHoveringRef.current = true;
-        if (hideTimerRef.current) {
-          clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
+      // If mouse is inside toolbar or dropdown, keep toolbar active
+      if (toolbarRef.current?.contains(target)) {
         return;
       }
 
-      const match = findCodeBlockAtElement(target);
-      if (match) {
-        isHoveringRef.current = true;
-        if (hideTimerRef.current) {
-          clearTimeout(hideTimerRef.current);
-          hideTimerRef.current = null;
-        }
-        updatePositionForBlock(match.preEl, match.pos, match.lang);
-      } else {
-        isHoveringRef.current = false;
-        if (!isOpen && !hideTimerRef.current) {
-          hideTimerRef.current = setTimeout(() => {
-            // Check if cursor is still in a code block
-            if (editor && !editor.isDestroyed) {
-              const { $from } = editor.state.selection;
-              if ($from.parent.type.name === "codeBlock") return;
-            }
-            setActiveBlock(null);
-            hideTimerRef.current = null;
-          }, 300);
-        }
+      const pre = target.closest("pre.notefast-code-block") as HTMLElement | null;
+      if (pre !== hoveredPreRef.current) {
+        hoveredPreRef.current = pre;
+        syncToolbar();
       }
     };
 
-    const handleScroll = () => {
-      if (activeBlock?.dom && scrollContainerRef.current) {
-        const preRect = activeBlock.dom.getBoundingClientRect();
-        const containerRect = scrollContainerRef.current.getBoundingClientRect();
-        const top = preRect.top - containerRect.top + scrollContainerRef.current.scrollTop + 8;
-        const right = containerRect.right - preRect.right + 12;
-        setActiveBlock((prev) => (prev ? { ...prev, top, right } : null));
+    const handlePointerLeave = () => {
+      if (hoveredPreRef.current) {
+        hoveredPreRef.current = null;
+        syncToolbar();
       }
     };
 
     container.addEventListener("pointermove", handlePointerMove, { passive: true });
-    container.addEventListener("scroll", handleScroll, { passive: true });
+    container.addEventListener("pointerleave", handlePointerLeave, { passive: true });
 
     return () => {
       container.removeEventListener("pointermove", handlePointerMove);
-      container.removeEventListener("scroll", handleScroll);
-      if (hideTimerRef.current) {
-        clearTimeout(hideTimerRef.current);
-      }
+      container.removeEventListener("pointerleave", handlePointerLeave);
     };
-  }, [findCodeBlockAtElement, updatePositionForBlock, isOpen, activeBlock?.dom, editor, scrollContainerRef]);
+  }, [scrollContainerRef, syncToolbar]);
+
+  // Re-observe activeBlock DOM mutations / resizing
+  useEffect(() => {
+    if (!activeBlock?.dom) return;
+
+    const ro = new ResizeObserver(() => {
+      syncToolbar();
+    });
+
+    ro.observe(activeBlock.dom);
+    return () => ro.disconnect();
+  }, [activeBlock?.dom, syncToolbar]);
 
   // Copy code handler
   const handleCopy = useCallback(
@@ -270,13 +315,22 @@ export function FloatingCodeBlockToolbar({
         e.preventDefault();
         e.stopPropagation();
       }
-      if (!editor || !activeBlock) return;
+      if (!editor || !activeBlock?.dom) return;
 
       try {
-        const tr = editor.state.tr;
-        const node = editor.state.doc.nodeAt(activeBlock.pos);
+        const pos = editor.view.posAtDOM(activeBlock.dom, 0);
+        const resolved = editor.state.doc.resolve(pos);
+        let blockPos = pos;
+        for (let d = resolved.depth; d >= 0; d--) {
+          const n = resolved.node(d);
+          if (n && n.type.name === "codeBlock") {
+            blockPos = resolved.before(d);
+            break;
+          }
+        }
+        const node = editor.state.doc.nodeAt(blockPos);
         if (node && node.type.name === "codeBlock") {
-          tr.setNodeMarkup(activeBlock.pos, null, {
+          const tr = editor.state.tr.setNodeMarkup(blockPos, null, {
             ...node.attrs,
             language: langValue,
           });
@@ -288,6 +342,7 @@ export function FloatingCodeBlockToolbar({
 
       setActiveBlock((prev) => (prev ? { ...prev, language: langValue } : null));
       setIsOpen(false);
+      editor.view.focus();
     },
     [editor, activeBlock]
   );
@@ -299,6 +354,9 @@ export function FloatingCodeBlockToolbar({
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        requestAnimationFrame(() => {
+          syncToolbar();
+        });
       }
     };
 
@@ -306,7 +364,7 @@ export function FloatingCodeBlockToolbar({
     return () => {
       document.removeEventListener("mousedown", handleClickOutside, true);
     };
-  }, [isOpen]);
+  }, [isOpen, syncToolbar]);
 
   // Focus search input on open
   useEffect(() => {
@@ -327,6 +385,7 @@ export function FloatingCodeBlockToolbar({
         e.preventDefault();
         e.stopPropagation();
         setIsOpen(false);
+        editor?.view?.focus();
         return;
       }
 
@@ -353,10 +412,20 @@ export function FloatingCodeBlockToolbar({
         }
       }
     },
-    [isOpen, filteredLanguages, selectedIndex, handleSelectLanguage]
+    [isOpen, filteredLanguages, selectedIndex, handleSelectLanguage, editor]
   );
 
-  if (!activeBlock) return null;
+  // Scroll active item into view
+  useEffect(() => {
+    if (!isOpen || !menuRef.current) return;
+    const items = menuRef.current.querySelectorAll(".code-lang-item");
+    const activeItem = items[selectedIndex] as HTMLElement | undefined;
+    if (activeItem) {
+      activeItem.scrollIntoView({ block: "nearest" });
+    }
+  }, [selectedIndex, isOpen]);
+
+  if (!activeBlock || !document.body.contains(activeBlock.dom)) return null;
 
   return (
     <div
@@ -366,7 +435,7 @@ export function FloatingCodeBlockToolbar({
         position: "absolute",
         top: `${activeBlock.top}px`,
         right: `${activeBlock.right}px`,
-        zIndex: 30,
+        zIndex: 35,
       }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -375,18 +444,17 @@ export function FloatingCodeBlockToolbar({
           <button
             type="button"
             onMouseDown={(e) => {
-              e.preventDefault();
               e.stopPropagation();
             }}
             onClick={toggleDropdown}
             className={`code-block-lang-btn ${isOpen ? "is-active" : ""}`}
-            title="Select programming language"
             aria-label="Select code block language"
             aria-expanded={isOpen}
           >
             <span>{displayLabel}</span>
             <ChevronDown
-              size={12}
+              size={9}
+              strokeWidth={2.2}
               className={`code-block-chevron transition-transform duration-150 ${
                 isOpen ? "rotate-180" : ""
               }`}
@@ -403,7 +471,7 @@ export function FloatingCodeBlockToolbar({
               role="listbox"
             >
               <div className="code-lang-search-box" onMouseDown={(e) => e.stopPropagation()}>
-                <Search size={11} className="code-lang-search-icon" />
+                <Search size={9} className="code-lang-search-icon" />
                 <input
                   ref={searchInputRef}
                   type="text"
@@ -437,7 +505,6 @@ export function FloatingCodeBlockToolbar({
                           isHighlighted ? "is-selected" : ""
                         } ${isCurrent ? "is-current-active" : ""}`}
                         onMouseDown={(e) => {
-                          e.preventDefault();
                           e.stopPropagation();
                         }}
                         onClick={(e) => handleSelectLanguage(lang.value, e)}
@@ -449,7 +516,7 @@ export function FloatingCodeBlockToolbar({
                       >
                         <div className="slash-command-item-icon code-lang-icon-cell">
                           {isCurrent ? (
-                            <Check size={11} strokeWidth={2.5} />
+                            <Check size={8.5} strokeWidth={2.8} />
                           ) : (
                             <span className="code-lang-dot" />
                           )}
@@ -468,18 +535,16 @@ export function FloatingCodeBlockToolbar({
         <button
           type="button"
           onMouseDown={(e) => {
-            e.preventDefault();
             e.stopPropagation();
           }}
           onClick={handleCopy}
           className={`code-block-copy-btn ${copied ? "is-copied" : ""}`}
-          title={copied ? "Copied!" : "Copy code"}
-          aria-label="Copy code block"
+          aria-label={copied ? "Copied code" : "Copy code"}
         >
           {copied ? (
-            <Check size={14} className="text-emerald-400" />
+            <Check size={11} strokeWidth={2.2} className="text-emerald-400" />
           ) : (
-            <Copy size={14} />
+            <Copy size={11} strokeWidth={1.8} />
           )}
         </button>
       </div>

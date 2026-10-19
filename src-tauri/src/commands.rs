@@ -30,7 +30,7 @@ pub fn create_note(db: State<'_, Database>) -> Result<Note, String> {
     let note = Note {
         id: Uuid::new_v4().to_string(),
         title: String::new(),
-        content: "{\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[]}]}".to_string(),
+        content: "{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"level\":1},\"content\":[]}]}".to_string(),
         preview: String::new(),
         created_at: now.clone(),
         updated_at: now,
@@ -145,6 +145,105 @@ pub fn start_native_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug)]
+pub struct NativeWindowFrame {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[tauri::command]
+pub fn get_native_window_frame(window: tauri::WebviewWindow) -> Result<NativeWindowFrame, String> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        use tauri_nspanel::objc2_foundation::NSRect;
+
+        let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
+        unsafe {
+            if let Some(ns_win) = ns_window_ptr.as_ref() {
+                let frame: NSRect = msg_send![ns_win, frame];
+                return Ok(NativeWindowFrame {
+                    x: frame.origin.x,
+                    y: frame.origin.y,
+                    width: frame.size.width,
+                    height: frame.size.height,
+                });
+            }
+        }
+        Err("Failed to get NSWindow frame".to_string())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let pos = window.outer_position().map_err(|e| e.to_string())?;
+        let size = window.inner_size().map_err(|e| e.to_string())?;
+        Ok(NativeWindowFrame {
+            x: pos.x as f64,
+            y: pos.y as f64,
+            width: size.width as f64,
+            height: size.height as f64,
+        })
+    }
+}
+
+#[tauri::command]
+pub fn set_native_window_frame(
+    window: tauri::WebviewWindow,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    save: bool,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        use tauri_nspanel::objc2_foundation::{NSPoint, NSSize, NSRect};
+
+        let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
+        unsafe {
+            if let Some(ns_win) = ns_window_ptr.as_ref() {
+                let frame = NSRect {
+                    origin: NSPoint { x, y },
+                    size: NSSize { width, height },
+                };
+                let _: () = msg_send![ns_win, setFrame: frame, display: true];
+
+                if save && window.label() == "main" {
+                    use tauri::Manager;
+                    if let Ok(app_dir) = window.app_handle().path().app_data_dir() {
+                        let state_file = app_dir.join("window_state.json");
+                        let size_file = app_dir.join("window_size.json");
+                        let json = serde_json::json!({
+                            "x": frame.origin.x,
+                            "y": frame.origin.y,
+                            "width": frame.size.width,
+                            "height": frame.size.height
+                        });
+                        let _ = std::fs::write(state_file, json.to_string());
+                        let size_json = serde_json::json!({
+                            "width": frame.size.width,
+                            "height": frame.size.height
+                        });
+                        let _ = std::fs::write(size_file, size_json.to_string());
+                    }
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        use tauri::{Position, Size, PhysicalPosition, PhysicalSize};
+        let _ = window.set_position(Position::Physical(PhysicalPosition { x: x as i32, y: y as i32 }));
+        let _ = window.set_size(Size::Physical(PhysicalSize { width: width as u32, height: height as u32 }));
+    }
+    Ok(())
+}
+
 
 #[tauri::command]
 pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {

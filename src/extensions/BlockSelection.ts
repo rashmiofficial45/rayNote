@@ -148,6 +148,28 @@ export function findBlockAtPos(doc: ProseMirrorNode, pos: number): BlockInfo | n
     };
   }
 
+  if ($pos.depth === 0 && doc.childCount > 0) {
+    const firstChild = doc.child(0);
+    if (
+      (firstChild.type.name === "bulletList" ||
+        firstChild.type.name === "orderedList" ||
+        firstChild.type.name === "taskList") &&
+      firstChild.childCount > 0
+    ) {
+      const firstItem = firstChild.child(0);
+      return {
+        pos: 1,
+        node: firstItem,
+        nodeSize: firstItem.nodeSize,
+      };
+    }
+    return {
+      pos: 0,
+      node: firstChild,
+      nodeSize: firstChild.nodeSize,
+    };
+  }
+
   return null;
 }
 
@@ -193,19 +215,26 @@ export function getBlockDom(view: EditorView, pos: number): HTMLElement | null {
   }
 }
 
-export function deleteSelectedBlocks(view: EditorView): boolean {
+export function deleteSelectedBlocks(view: EditorView, explicitPositions?: number[]): boolean {
   const state = view.state;
   const pluginState = blockSelectionPluginKey.getState(state);
-  if (!pluginState || pluginState.selectedPositions.length === 0) return false;
+  const targetPositions =
+    explicitPositions && explicitPositions.length > 0
+      ? explicitPositions
+      : pluginState?.selectedPositions ?? [];
+  if (targetPositions.length === 0) return false;
 
   const allBlocks = getAllBlocks(state.doc);
   const isAllSelected =
     allBlocks.length > 0 &&
-    allBlocks.every((b) => pluginState.selectedPositions.includes(b.pos));
+    allBlocks.every((b) => targetPositions.includes(b.pos));
 
   if (isAllSelected) {
     let tr = state.tr;
-    tr = tr.replaceWith(0, tr.doc.content.size, state.schema.nodes.paragraph.create());
+    const defaultBlock = state.schema.nodes.heading
+      ? state.schema.nodes.heading.create({ level: 1 })
+      : state.schema.nodes.paragraph.create();
+    tr = tr.replaceWith(0, tr.doc.content.size, defaultBlock);
     tr = tr.setSelection(TextSelection.create(tr.doc, 1));
     tr = tr.setMeta(blockSelectionPluginKey, {
       anchor: null,
@@ -217,7 +246,7 @@ export function deleteSelectedBlocks(view: EditorView): boolean {
     return true;
   }
 
-  const positionsSet = new Set(pluginState.selectedPositions);
+  const positionsSet = new Set(targetPositions);
   const rangesToDelete: { from: number; to: number }[] = [];
 
   // Traverse top-level nodes in state.doc to detect full list deletions
@@ -269,6 +298,22 @@ export function deleteSelectedBlocks(view: EditorView): boolean {
     offset += child.nodeSize;
   }
 
+  // Fallback: If any position in targetPositions was not matched above (e.g. deeply nested block),
+  // delete it directly.
+  for (const pos of targetPositions) {
+    const alreadyCovered = rangesToDelete.some((r) => pos >= r.from && pos < r.to);
+    if (!alreadyCovered && pos < state.doc.content.size) {
+      try {
+        const node = state.doc.nodeAt(pos);
+        if (node) {
+          rangesToDelete.push({ from: pos, to: pos + node.nodeSize });
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   // Sort descending so deletions don't affect lower indices
   rangesToDelete.sort((a, b) => b.from - a.from);
 
@@ -277,18 +322,39 @@ export function deleteSelectedBlocks(view: EditorView): boolean {
     tr = tr.delete(range.from, range.to);
   }
 
-  // If document became completely empty, ensure a single paragraph exists
+  // If document became completely empty, ensure a single heading 1 exists
   if (tr.doc.childCount === 0 || tr.doc.content.size <= 2) {
-    tr = tr.replaceWith(0, tr.doc.content.size, state.schema.nodes.paragraph.create());
+    const defaultBlock = state.schema.nodes.heading
+      ? state.schema.nodes.heading.create({ level: 1 })
+      : state.schema.nodes.paragraph.create();
+    tr = tr.replaceWith(0, tr.doc.content.size, defaultBlock);
     tr = tr.setSelection(TextSelection.create(tr.doc, 1));
   } else {
-    const minPos = Math.min(...pluginState.selectedPositions);
-    const targetPos = Math.min(minPos, tr.doc.content.size - 1);
-    try {
-      const $pos = tr.doc.resolve(Math.max(1, targetPos));
-      tr = tr.setSelection(Selection.near($pos));
-    } catch {
-      tr = tr.setSelection(TextSelection.create(tr.doc, Math.max(1, targetPos)));
+    const minPos = Math.min(...targetPositions);
+    if (minPos >= tr.doc.content.size) {
+      // Deletions occurred at the end of the document.
+      // Append an empty block at the end so cursor stays on the same line row instead of jumping back!
+      const emptyBlock = state.schema.nodes.paragraph
+        ? state.schema.nodes.paragraph.create()
+        : state.schema.nodes.heading.create({ level: 1 });
+      tr = tr.insert(tr.doc.content.size, emptyBlock);
+      tr = tr.setSelection(TextSelection.create(tr.doc, minPos + 1));
+    } else {
+      // Keep cursor on the same line (the block that shifted into minPos) by resolving
+      // forward (+1) into the replacement block rather than falling back to the previous line.
+      const maxDocPos = Math.max(1, tr.doc.content.size - 1);
+      const targetPos = Math.min(minPos + 1, maxDocPos);
+      try {
+        const $pos = tr.doc.resolve(targetPos);
+        tr = tr.setSelection(Selection.near($pos, 1));
+      } catch {
+        try {
+          const $pos = tr.doc.resolve(Math.min(minPos, maxDocPos));
+          tr = tr.setSelection(Selection.near($pos, -1));
+        } catch {
+          tr = tr.setSelection(TextSelection.create(tr.doc, Math.min(minPos, maxDocPos)));
+        }
+      }
     }
   }
 

@@ -472,6 +472,8 @@ pub fn run() {
             toggle_pin,
             start_native_drag,
             get_drag_diagnostics,
+            get_native_window_frame,
+            set_native_window_frame,
             hide_window,
             save_window_size,
             quit_app,
