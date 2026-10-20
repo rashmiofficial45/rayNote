@@ -643,17 +643,21 @@ function App() {
     }
   }, [activeNoteId, notes, handleSelectNote, showToast]);
 
+  const setTitleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   /**
    * Sets note title explicitly, keeping React state, in-memory cache, and SQLite in sync.
+   * Updates React state synchronously so the title bar reflects first line edits instantly with 0ms lag.
    */
   const handleSetTitle = useCallback(
-    async (newTitle: string) => {
+    (newTitle: string) => {
       if (!activeNoteId) return;
       try {
         const cached = noteCache.get(activeNoteId);
         const content = cached?.content || "";
         noteCache.updateContent(activeNoteId, content, newTitle);
-        await updateNote(activeNoteId, newTitle, content);
+
+        // Instant UI update for zero-latency TitleBar synchronization
         setNotes((prev) => {
           const updated = prev.map((n) =>
             n.id === activeNoteId
@@ -669,6 +673,16 @@ function App() {
           } catch {}
           return updated;
         });
+
+        // Debounced SQLite write so rapid keystrokes don't flood IPC
+        if (setTitleTimerRef.current) {
+          clearTimeout(setTitleTimerRef.current);
+        }
+        setTitleTimerRef.current = setTimeout(() => {
+          updateNote(activeNoteId, newTitle, content).catch((err) => {
+            console.error("Failed to persist title to SQLite:", err);
+          });
+        }, 300);
       } catch (err) {
         console.error("Failed to set note title:", err);
       }

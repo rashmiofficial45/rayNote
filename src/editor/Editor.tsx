@@ -50,12 +50,24 @@ interface EditorProps {
  * Extracts note title from the first document node with text (heading, paragraph, or table)
  * to keep note drawer titles continuously up to date as the user types.
  */
+export const extractTitleFromDoc = (doc: any): string => {
+  if (!doc || !doc.childCount) return "";
+  for (let i = 0; i < doc.childCount; i++) {
+    const child = doc.child(i);
+    const text = child.textContent?.trim();
+    if (text) {
+      return text.replace(/^#+\s*/, "").trim();
+    }
+  }
+  return "";
+};
+
 const extractTitle = (json: any): string => {
   if (json && Array.isArray(json.content) && json.content.length > 0) {
     for (const node of json.content) {
       if (Array.isArray(node.content)) {
         const text = node.content.map((n: any) => n.text || "").join("").trim();
-        if (text) return text;
+        if (text) return text.replace(/^#+\s*/, "").trim();
       }
       if (node.type === "table" && Array.isArray(node.content)) {
         const texts: string[] = [];
@@ -135,7 +147,8 @@ export function Editor({
       const currentId = currentNoteIdRef.current;
       if (!currentId) return;
       const json = currentEditor.getJSON();
-      const title = currentTitleRef.current || extractTitle(json);
+      const title = extractTitle(json) || currentTitleRef.current || "Untitled";
+      currentTitleRef.current = title;
       const strContent = JSON.stringify(json);
       isDirtyRef.current = false;
 
@@ -150,12 +163,20 @@ export function Editor({
   /**
    * Handles document change events:
    * 1. Sets dirty flag so exit/switch handlers know changes exist.
-   * 2. Computes character count in O(1) time without expensive JSON serialization.
-   * 3. Schedules a debounced 300ms save to disk & cache.
+   * 2. Extracts title from the first document line instantly so the title bar updates with 0ms delay.
+   * 3. Computes character count in O(1) time without expensive JSON serialization.
+   * 4. Schedules a debounced 300ms save to disk & cache.
    */
   const handleEditorUpdate = useCallback(
     (editorInstance: any) => {
       isDirtyRef.current = true;
+
+      // Instant synchronization of the title bar with the first line
+      const docTitle = extractTitleFromDoc(editorInstance?.state?.doc);
+      if (docTitle !== currentTitleRef.current) {
+        currentTitleRef.current = docTitle;
+        onSetTitleRef.current?.(docTitle);
+      }
 
       // O(1) cheap metadata update
       const count = editorInstance?.state?.doc?.textContent?.length ?? 0;

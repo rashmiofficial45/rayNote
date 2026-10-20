@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view';
 import { findBlockAtPos, deleteSelectedBlocks } from '../../extensions/BlockSelection';
 import { handleDeleteLineOrBlock } from '../shortcutsExtension';
 
-describe('Command + Backspace (Line & Formatting Deletion) Tests', () => {
+describe('Command + Backspace (Line & Formglatting Deletion) Tests', () => {
   const schema = new Schema({
     nodes: {
       doc: { content: 'block+' },
