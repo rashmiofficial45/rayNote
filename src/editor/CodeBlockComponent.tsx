@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { NodeViewWrapper, NodeViewContent } from "@tiptap/react";
+import { NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 
 export const POPULAR_LANGUAGES = [
@@ -30,7 +30,7 @@ export const POPULAR_LANGUAGES = [
 export function CodeBlockComponent({
   node,
   updateAttributes,
-}: any) {
+}: NodeViewProps) {
   const [copied, setCopied] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

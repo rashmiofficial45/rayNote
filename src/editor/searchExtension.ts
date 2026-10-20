@@ -1,6 +1,20 @@
-import { Extension } from "@tiptap/react";
+import { Extension, CommandProps } from "@tiptap/react";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { Node as ProseMirrorNode } from "@tiptap/pm/model";
+
+declare module "@tiptap/core" {
+  interface Commands<ReturnType> {
+    search: {
+      setSearchTerm: (term: string) => ReturnType;
+      nextSearchResult: () => ReturnType;
+      previousSearchResult: () => ReturnType;
+      clearSearch: () => ReturnType;
+      replaceCurrentResult: (replacement: string) => ReturnType;
+      replaceAllResults: (replacement: string) => ReturnType;
+    };
+  }
+}
 
 export interface SearchMatch {
   from: number;
@@ -30,7 +44,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
     return {
       setSearchTerm:
         (term: string) =>
-        ({ editor, tr, dispatch }: { editor: any; tr: any; dispatch: any }) => {
+        ({ editor, tr, dispatch }: CommandProps) => {
           this.storage.searchTerm = term;
           this.storage.currentIndex = 0;
           this.storage.results = findMatches(editor.state.doc, term);
@@ -49,7 +63,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 
       nextSearchResult:
         () =>
-        ({ editor, tr, dispatch }: { editor: any; tr: any; dispatch: any }) => {
+        ({ editor, tr, dispatch }: CommandProps) => {
           const results = this.storage.results;
           if (results.length === 0) return false;
           this.storage.currentIndex = (this.storage.currentIndex + 1) % results.length;
@@ -65,7 +79,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 
       previousSearchResult:
         () =>
-        ({ editor, tr, dispatch }: { editor: any; tr: any; dispatch: any }) => {
+        ({ editor, tr, dispatch }: CommandProps) => {
           const results = this.storage.results;
           if (results.length === 0) return false;
           this.storage.currentIndex =
@@ -82,7 +96,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 
       clearSearch:
         () =>
-        ({ tr, dispatch }: { tr: any; dispatch: any }) => {
+        ({ tr, dispatch }: CommandProps) => {
           this.storage.searchTerm = "";
           this.storage.currentIndex = 0;
           this.storage.results = [];
@@ -94,7 +108,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 
       replaceCurrentResult:
         (replacement: string) =>
-        ({ editor }: { editor: any }) => {
+        ({ editor }: CommandProps) => {
           const results = this.storage.results;
           if (results.length === 0) return false;
           const currentMatch = results[this.storage.currentIndex];
@@ -125,7 +139,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 
       replaceAllResults:
         (replacement: string) =>
-        ({ editor }: { editor: any }) => {
+        ({ editor }: CommandProps) => {
           const results = this.storage.results;
           if (results.length === 0) return false;
 
@@ -141,7 +155,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
           this.storage.currentIndex = 0;
           return true;
         },
-    } as any;
+    };
   },
 
   addProseMirrorPlugins() {
@@ -194,12 +208,12 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
   },
 });
 
-function findMatches(doc: any, term: string): SearchMatch[] {
+function findMatches(doc: ProseMirrorNode, term: string): SearchMatch[] {
   if (!term || !term.trim()) return [];
   const matches: SearchMatch[] = [];
   const lowerTerm = term.toLowerCase();
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: ProseMirrorNode, pos: number) => {
     if (node.isText && node.text) {
       const text = node.text.toLowerCase();
       let index = text.indexOf(lowerTerm);

@@ -1,4 +1,5 @@
 import { Editor } from "@tiptap/react";
+import "@tiptap/extension-underline";
 import { useState, useEffect, useRef } from "react";
 import {
   Heading1,
@@ -34,35 +35,97 @@ import {
   setStoredThemeMode,
 } from "../lib/theme";
 
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 interface BottomToolbarProps {
   editor: Editor | null;
 }
 
 export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
   useEffect(() => {
-    const handleAccent = (e: any) => {
-      if (e.detail?.accent) setCurrentAccent(e.detail.accent);
+    const handleAccent = (e: Event) => {
+      const customEvent = e as CustomEvent<{ accent?: AccentColor }>;
+      if (customEvent.detail?.accent) setCurrentAccent(customEvent.detail.accent);
     };
-    const handleFont = (e: any) => {
-      if (e.detail?.fontId) setCurrentFont(e.detail.fontId);
+    const handleFont = (e: Event) => {
+      const customEvent = e as CustomEvent<{ fontId?: string }>;
+      if (customEvent.detail?.fontId) setCurrentFont(customEvent.detail.fontId);
     };
-    const handleTheme = (e: any) => {
-      if (e.detail?.mode) setCurrentThemeMode(e.detail.mode);
+    const handleTheme = (e: Event) => {
+      const customEvent = e as CustomEvent<{ mode?: ThemeMode }>;
+      if (customEvent.detail?.mode) setCurrentThemeMode(customEvent.detail.mode);
     };
     window.addEventListener("notefast_accent_changed", handleAccent);
     window.addEventListener("notefast_font_changed", handleFont);
     window.addEventListener("notefast_theme_changed", handleTheme);
+
+    let unlistenFocus: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (!focused) {
+          setIsHovered(false);
+          setIsMenuOpen(false);
+          setIsFontPickerOpen(false);
+        }
+      })
+      .then((fn) => {
+        unlistenFocus = fn;
+      })
+      .catch(() => {});
+
+    // Active pointer tracking: format button appears when cursor enters page width, disappears when moving away
+    const handlePointerMove = (e: PointerEvent) => {
+      const inPage =
+        e.clientX >= 0 &&
+        e.clientX <= window.innerWidth &&
+        e.clientY >= 0 &&
+        e.clientY <= window.innerHeight;
+
+      if (inPage) {
+        setIsHovered(true);
+      } else {
+        setIsHovered(false);
+        setIsMenuOpen(false);
+        setIsFontPickerOpen(false);
+      }
+    };
+
+    const handleReset = () => {
+      setIsHovered(false);
+      setIsMenuOpen(false);
+      setIsFontPickerOpen(false);
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) {
+        handleReset();
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("mouseout", handleMouseOut);
+    window.addEventListener("blur", handleReset);
+    document.addEventListener("mouseleave", handleReset);
+
     return () => {
       window.removeEventListener("notefast_accent_changed", handleAccent);
       window.removeEventListener("notefast_font_changed", handleFont);
       window.removeEventListener("notefast_theme_changed", handleTheme);
+      if (unlistenFocus) unlistenFocus();
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("mouseout", handleMouseOut);
+      window.removeEventListener("blur", handleReset);
+      document.removeEventListener("mouseleave", handleReset);
+      if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
     };
   }, []);
 
@@ -124,8 +187,27 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     editor.isActive("blockquote") ||
     editor.isActive("codeBlock");
 
+  const handleMouseEnter = () => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setIsMenuOpen(false);
+    setIsFontPickerOpen(false);
+  };
+
   return (
-    <div ref={containerRef} className="bottom-toolbar-corner-container">
+    <div
+      ref={containerRef}
+      className={`bottom-toolbar-corner-container ${isMenuOpen ? "is-menu-open" : ""} ${isHovered ? "is-hovered" : ""}`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       {isMenuOpen && (
         <div className="bottom-toolbar-expanded-menu">
           <div className="expanded-toolbar-row">
@@ -159,7 +241,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
               <Italic size={14} />
             </button>
             <button
-              onClick={() => (editor.chain().focus() as any).toggleUnderline().run()}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
               className={`toolbar-btn liquid-btn ${editor.isActive("underline") ? "is-active" : ""}`}
               title="Underline (⌘U)"
             >
@@ -319,7 +401,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         title="Format (Aa)"
         aria-label="Format"
       >
-        <ALargeSmall size={16} />
+        <ALargeSmall size={19} />
         {hasActiveFormatting && <span className="format-indicator-dot" />}
       </button>
     </div>

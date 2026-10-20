@@ -1,5 +1,6 @@
 import { marked } from "marked";
-import type { Slice } from "@tiptap/pm/model";
+import type { Slice, Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { Editor } from "@tiptap/core";
 
 /**
  * Checks if a string contains Markdown formatting syntax.
@@ -174,14 +175,14 @@ export function markdownToTipTapHtml(
  * Preserves headings, bold, italic, strikethrough, underline, links, code blocks,
  * bullet lists, ordered lists, and task lists without breaking format.
  */
-export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
+export function sliceToMarkdown(slice: Slice, editorInstance?: Editor | null): string {
   if (!slice || !slice.content || slice.content.size === 0) {
     return "";
   }
 
   // If editor has @tiptap/markdown registered, try its serializer first
   try {
-    const manager = editorInstance?.storage?.markdown?.manager;
+    const manager = (editorInstance?.storage as { markdown?: { manager?: { serialize: (doc: unknown) => string } } })?.markdown?.manager;
     if (manager && typeof manager.serialize === "function") {
       const jsonContent = slice.content.toJSON();
       if (jsonContent) {
@@ -200,7 +201,7 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
   }
 
   // Custom high-fidelity ProseMirror Node-to-Markdown serializer
-  const serializeNode = (node: any, indent = ""): string => {
+  const serializeNode = (node: ProseMirrorNode, indent = ""): string => {
     if (!node) return "";
 
     if (node.isText) {
@@ -230,7 +231,7 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: any): string {
     }
 
     const type = node.type?.name;
-    const childNodes: any[] = [];
+    const childNodes: ProseMirrorNode[] = [];
     if (node.content && node.content.childCount > 0) {
       for (let i = 0; i < node.content.childCount; i++) {
         childNodes.push(node.content.child(i));

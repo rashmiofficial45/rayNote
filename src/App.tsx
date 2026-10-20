@@ -139,6 +139,71 @@ function App() {
 
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
 
+  // Focus and cursor tracking for hiding menu bar and formatting controls in idle mode
+  const [isWindowFocused, setIsWindowFocused] = useState(() => {
+    return typeof document !== "undefined" ? document.hasFocus() : true;
+  });
+  const [isMouseOverApp, setIsMouseOverApp] = useState(false);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    getCurrentWindow().isFocused().then((focused) => {
+      setIsWindowFocused(focused);
+    }).catch(() => {});
+
+    getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      setIsWindowFocused(focused);
+      if (!focused) {
+        setIsMouseOverApp(false);
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    }).catch(() => {});
+
+    const handleFocus = () => setIsWindowFocused(true);
+    const handleBlur = () => {
+      setIsWindowFocused(false);
+      setIsMouseOverApp(false);
+    };
+
+    const handleMouseLeave = () => {
+      setIsMouseOverApp(false);
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) {
+        setIsMouseOverApp(false);
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const inBounds =
+        e.clientX >= 0 &&
+        e.clientX <= window.innerWidth &&
+        e.clientY >= 0 &&
+        e.clientY <= window.innerHeight;
+      setIsMouseOverApp(inBounds);
+    };
+
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("mouseout", handleMouseOut);
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    document.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      if (unlisten) unlisten();
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("mouseout", handleMouseOut);
+      window.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  const isCursorInPage = isWindowFocused && isMouseOverApp;
+
   useEffect(() => {
     localStorage.setItem("notefast_zoom_level", zoomLevel.toString());
   }, [zoomLevel]);
@@ -1171,7 +1236,12 @@ function App() {
 
   return (
     <div
-      className="app-shell"
+      className={`app-shell ${isCursorInPage ? "is-cursor-in-page is-interactive" : "is-idle"}`}
+      onMouseEnter={() => setIsMouseOverApp(true)}
+      onMouseLeave={() => setIsMouseOverApp(false)}
+      onPointerMove={() => {
+        if (!isMouseOverApp) setIsMouseOverApp(true);
+      }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1205,6 +1275,9 @@ function App() {
         onTriggerImportFile={handleTriggerImportFile}
         onTriggerViewFile={handleTriggerViewFile}
       />
+
+      {/* Top frosted glass blend scrim */}
+      <div className="app-top-blend" aria-hidden="true" />
 
       {/* Delete Confirmation Dialog */}
       {deleteConfirm && (
@@ -1324,6 +1397,7 @@ function App() {
           onCloseFind={() => setIsFindOpen(false)}
         />
       </div>
+
 
       {isCommandPaletteOpen && (
         <CommandPalette

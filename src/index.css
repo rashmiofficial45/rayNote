@@ -394,20 +394,112 @@ body,
 
 /* ── Title Bar ────────────────────────────────────────── */
 .title-bar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 114px minmax(0, 1fr) 114px;
   align-items: center;
-  justify-content: center;
-  height: 44px;
-  flex-shrink: 0;
-  position: relative;
+  height: 52px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 0 16px 0 18px;
+  box-sizing: border-box;
   background: transparent;
-  border-bottom: 1px solid var(--separator);
+  border-bottom: none;
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
   user-select: none !important;
   -webkit-user-select: none !important;
   -webkit-touch-callout: none !important;
   cursor: default;
+}
+
+@media (max-width: 360px) {
+  .title-bar {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
+
+/* Progressive Frosted Glass Blend Zones (Top & Bottom) */
+.app-top-blend {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  pointer-events: none;
+  z-index: 15;
+  background: linear-gradient(
+    180deg,
+    rgba(var(--app-bg-rgb), 0.98) 0%,
+    rgba(var(--app-bg-rgb), 0.92) 35%,
+    rgba(var(--app-bg-rgb), 0.75) 60%,
+    rgba(var(--app-bg-rgb), 0.35) 85%,
+    rgba(var(--app-bg-rgb), 0) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 35%,
+    rgba(0, 0, 0, 0.8) 60%,
+    rgba(0, 0, 0, 0.3) 85%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    black 0%,
+    black 35%,
+    rgba(0, 0, 0, 0.8) 60%,
+    rgba(0, 0, 0, 0.3) 85%,
+    transparent 100%
+  );
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.app-bottom-blend {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  pointer-events: none;
+  z-index: 15;
+  background: linear-gradient(
+    0deg,
+    rgba(var(--app-bg-rgb), 0.96) 0%,
+    rgba(var(--app-bg-rgb), 0.90) 30%,
+    rgba(var(--app-bg-rgb), 0.72) 55%,
+    rgba(var(--app-bg-rgb), 0.35) 80%,
+    rgba(var(--app-bg-rgb), 0) 100%
+  );
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  -webkit-mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 35%,
+    rgba(0, 0, 0, 0.8) 60%,
+    rgba(0, 0, 0, 0.3) 85%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to top,
+    black 0%,
+    black 35%,
+    rgba(0, 0, 0, 0.8) 60%,
+    rgba(0, 0, 0, 0.3) 85%,
+    transparent 100%
+  );
+  border-bottom-left-radius: 28px;
+  border-bottom-right-radius: 28px;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 /* Block all text selection on double-click */
@@ -419,52 +511,94 @@ body,
 }
 
 .title-bar .title-text {
-  font-size: 13px;
-  font-weight: 550;
+  font-size: 15.5px;
+  font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: 0.01em;
-  max-width: 55%;
-  padding: 0 12px;
+  letter-spacing: -0.01em;
+  padding: 0 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
   text-align: center;
   pointer-events: none;
+  cursor: default;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .title-bar-left {
-  position: absolute;
-  left: 18px;
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: flex-start;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .title-bar-right {
-  position: absolute;
-  right: 16px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: flex-end;
+  gap: 6px;
   -webkit-app-region: no-drag;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Reveal menubar options and red close button when cursor enters the page */
+.app-shell:hover .title-bar-left,
+.app-shell:hover .title-bar-right,
+.app-shell.is-cursor-in-page .title-bar-left,
+.app-shell.is-cursor-in-page .title-bar-right,
+.title-bar:hover .title-bar-left,
+.title-bar:hover .title-bar-right,
+.title-bar.is-hovered .title-bar-left,
+.title-bar.is-hovered .title-bar-right {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.app-shell:hover .title-bar-left *,
+.app-shell:hover .title-bar-right *,
+.app-shell.is-cursor-in-page .title-bar-left *,
+.app-shell.is-cursor-in-page .title-bar-right *,
+.title-bar:hover .title-bar-left *,
+.title-bar:hover .title-bar-right *,
+.title-bar.is-hovered .title-bar-left *,
+.title-bar.is-hovered .title-bar-right * {
+  pointer-events: auto !important;
+}
+
+/* Force hide when cursor moves away from the page or app is idle */
+.app-shell:not(:hover):not(.is-cursor-in-page) .title-bar-left,
+.app-shell:not(:hover):not(.is-cursor-in-page) .title-bar-right,
+.app-shell.is-idle .title-bar-left,
+.app-shell.is-idle .title-bar-right {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-2px) !important;
 }
 
 .title-bar-btn {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  border: 1px solid var(--btn-liquid-border);
-  background: var(--btn-liquid-bg);
-  box-shadow: var(--btn-liquid-shadow);
-  color: var(--text-muted);
+  border: 1px solid var(--surface-glass-border);
+  background: var(--surface-glass-elevated);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), var(--app-inner-highlight);
+  color: var(--text-primary);
   cursor: pointer;
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
 }
 
@@ -472,7 +606,8 @@ body,
   background: var(--btn-liquid-bg-hover);
   border-color: var(--btn-liquid-border);
   color: var(--text-primary);
-  transform: translateY(-0.5px);
+  transform: translateY(-0.5px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
 }
 
 .title-bar-btn:active {
@@ -481,17 +616,18 @@ body,
 
 /* ── Close Button (Single Red X — macOS Style) ─────────────────────── */
 .close-btn-x {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: none;
   background: #ff5f56;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   -webkit-app-region: no-drag;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
   line-height: 1;
   position: relative;
@@ -614,8 +750,8 @@ body,
   transform: translateZ(0);
   outline: none;
   min-height: auto;
-  padding-top: 20px;
-  padding-bottom: 48px;
+  padding-top: 58px;
+  padding-bottom: 60px;
   padding-left: var(--editor-padding-left);
   /* Do not count the slider as part of padding:
      The right content padding is offset by the slider gutter so the text content
@@ -1339,7 +1475,7 @@ pre.notefast-code-block:hover {
   text-decoration-color: var(--color-accent, #6C5CE7);
 }
 
-/* ── Bottom Right Format Button & Menu ───────────────────── */
+/* ── Bottom Right Format Button & Menu (Auto-Hides When Cursor Moves Away) ─ */
 .bottom-toolbar-corner-container {
   position: absolute;
   bottom: 14px;
@@ -1347,12 +1483,39 @@ pre.notefast-code-block:hover {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  z-index: 50;
+  z-index: 60;
+  isolation: isolate;
+  opacity: 0;
   pointer-events: none;
+  transform: translateY(2px);
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.bottom-toolbar-corner-container > * {
-  pointer-events: auto;
+/* Reveal format button when cursor enters the page */
+.app-shell:hover .bottom-toolbar-corner-container,
+.app-shell.is-cursor-in-page .bottom-toolbar-corner-container,
+.bottom-toolbar-corner-container:hover,
+.bottom-toolbar-corner-container.is-hovered,
+.bottom-toolbar-corner-container.is-menu-open {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.app-shell:hover .bottom-toolbar-corner-container > *,
+.app-shell.is-cursor-in-page .bottom-toolbar-corner-container > *,
+.bottom-toolbar-corner-container:hover > *,
+.bottom-toolbar-corner-container.is-hovered > *,
+.bottom-toolbar-corner-container.is-menu-open > * {
+  pointer-events: auto !important;
+}
+
+/* Force hide when cursor moves away from the page or app is idle */
+.app-shell:not(:hover):not(.is-cursor-in-page) .bottom-toolbar-corner-container:not(.is-menu-open),
+.app-shell.is-idle .bottom-toolbar-corner-container {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(2px) !important;
 }
 
 .format-corner-btn {
@@ -1360,17 +1523,16 @@ pre.notefast-code-block:hover {
   align-items: center;
   justify-content: center;
   position: relative;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   border-radius: 9999px;
-  color: var(--text-muted);
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  color: var(--text-primary);
+  background: var(--surface-glass-elevated);
+  border: 1px solid var(--surface-glass-border);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), var(--app-inner-highlight);
   cursor: pointer;
-  opacity: 0.65;
+  opacity: 0.95;
+  pointer-events: auto;
   transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1383,7 +1545,7 @@ pre.notefast-code-block:hover {
   background: var(--btn-liquid-bg-hover);
   color: var(--text-primary);
   transform: translateY(-1px) scale(1.05);
-  box-shadow: var(--btn-liquid-shadow), 0 6px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 
 .format-corner-btn:active {
@@ -2216,7 +2378,7 @@ body:has(.command-overlay) .editor-char-count {
 /* ── Find Bar Floating Pill (iOS 26 Liquid Glass) ──────── */
 .find-bar-container {
   position: absolute;
-  top: 8px;
+  top: 56px;
   right: 14px;
   z-index: 60;
   display: flex;
@@ -2646,7 +2808,7 @@ body:has(.command-overlay) .editor-char-count {
   letter-spacing: 0.015em;
   user-select: none;
   pointer-events: none;
-  z-index: 10;
+  z-index: 20;
   opacity: 0.85;
   white-space: nowrap;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
@@ -4617,8 +4779,8 @@ body:has(.command-overlay) .editor-char-count {
 .doc-tick-slider-wrapper {
   position: absolute;
   right: 6px;
-  top: 24px;
-  bottom: 44px;
+  top: 60px;
+  bottom: 54px;
   width: 22px;
   display: flex;
   flex-direction: column;
@@ -4653,10 +4815,18 @@ body:has(.command-overlay) .editor-char-count {
   }
 }
 
+.app-shell:hover .doc-tick-slider-wrapper,
+.app-shell.is-cursor-in-page .doc-tick-slider-wrapper,
 .editor-wrapper:hover .doc-tick-slider-wrapper,
 .doc-tick-slider-wrapper:hover,
 .doc-tick-slider-wrapper.is-dragging {
-  opacity: 0.8;
+  opacity: 0.8 !important;
+}
+
+.app-shell:not(:hover):not(.is-cursor-in-page) .doc-tick-slider-wrapper,
+.app-shell.is-idle .doc-tick-slider-wrapper {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 .doc-tick-slider-track {

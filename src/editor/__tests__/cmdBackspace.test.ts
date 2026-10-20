@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Schema } from '@tiptap/pm/model';
 import { EditorState, TextSelection } from '@tiptap/pm/state';
+import type { EditorView } from '@tiptap/pm/view';
 import { findBlockAtPos, deleteSelectedBlocks } from '../../extensions/BlockSelection';
 import { handleDeleteLineOrBlock } from '../shortcutsExtension';
 
@@ -20,7 +21,7 @@ describe('Command + Backspace (Line & Formatting Deletion) Tests', () => {
     },
   });
 
-  function createMockView(state: EditorState) {
+  function createMockView(state: EditorState): EditorView {
     let currentState = state;
     return {
       get state() {
@@ -30,7 +31,7 @@ describe('Command + Backspace (Line & Formatting Deletion) Tests', () => {
         currentState = currentState.apply(tr);
       }),
       focus: vi.fn(),
-    };
+    } as unknown as EditorView;
   }
 
   describe('findBlockAtPos resolution', () => {

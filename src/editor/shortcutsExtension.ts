@@ -1,6 +1,9 @@
 import { Extension } from "@tiptap/react";
 import { Selection, TextSelection } from "@tiptap/pm/state";
 import { joinBackward } from "@tiptap/pm/commands";
+import { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { EditorView } from "@tiptap/pm/view";
+import "@tiptap/extension-underline";
 import {
   blockSelectionPluginKey,
   deleteSelectedBlocks,
@@ -39,8 +42,8 @@ export const ShortcutsExtension = Extension.create({
       "Mod-B": () => this.editor.commands.toggleBold(),
       "Mod-i": () => this.editor.commands.toggleItalic(),
       "Mod-I": () => this.editor.commands.toggleItalic(),
-      "Mod-u": () => (this.editor.commands as any).toggleUnderline?.(),
-      "Mod-U": () => (this.editor.commands as any).toggleUnderline?.(),
+      "Mod-u": () => this.editor.commands.toggleUnderline(),
+      "Mod-U": () => this.editor.commands.toggleUnderline(),
       "Mod-Shift-x": () => this.editor.commands.toggleStrike(),
       "Mod-Shift-X": () => this.editor.commands.toggleStrike(),
       "Mod-Shift-s": () => this.editor.commands.toggleStrike(),
@@ -424,7 +427,7 @@ export const ShortcutsExtension = Extension.create({
  * Deletes the current line/block including all formatting and content.
  * Used for Command + Backspace (and Command + Delete) on Mac.
  */
-export function handleDeleteLineOrBlock(editor: any): boolean {
+export function handleDeleteLineOrBlock(editor: { view: EditorView }): boolean {
   const view = editor.view;
   const { state, dispatch } = view;
   const { selection } = state;
@@ -604,7 +607,7 @@ export function handleDeleteLineOrBlock(editor: any): boolean {
       let tr = state.tr;
 
       if (itemIndex === 0) {
-        const remainingItems: any[] = [];
+        const remainingItems: ProseMirrorNode[] = [];
         for (let i = 1; i < listNode.childCount; i++) {
           remainingItems.push(listNode.child(i));
         }
@@ -612,7 +615,7 @@ export function handleDeleteLineOrBlock(editor: any): boolean {
         tr = tr.replaceWith(listPos, listPos + listNode.nodeSize, [emptyPara, remainingList]);
         tr = tr.setSelection(TextSelection.create(tr.doc, listPos + 1));
       } else if (itemIndex === listNode.childCount - 1) {
-        const remainingItems: any[] = [];
+        const remainingItems: ProseMirrorNode[] = [];
         for (let i = 0; i < listNode.childCount - 1; i++) {
           remainingItems.push(listNode.child(i));
         }
@@ -621,11 +624,11 @@ export function handleDeleteLineOrBlock(editor: any): boolean {
         const targetPos = listPos + remainingList.nodeSize + 1;
         tr = tr.setSelection(TextSelection.create(tr.doc, targetPos));
       } else {
-        const beforeItems: any[] = [];
+        const beforeItems: ProseMirrorNode[] = [];
         for (let i = 0; i < itemIndex; i++) {
           beforeItems.push(listNode.child(i));
         }
-        const afterItems: any[] = [];
+        const afterItems: ProseMirrorNode[] = [];
         for (let i = itemIndex + 1; i < listNode.childCount; i++) {
           afterItems.push(listNode.child(i));
         }

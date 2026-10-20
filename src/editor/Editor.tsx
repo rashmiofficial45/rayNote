@@ -678,7 +678,7 @@ export function Editor({
         ref={scrollContainerRef}
         data-scroll-container
         onClick={handleWrapperClick}
-        className="flex-1 min-h-0 overflow-y-auto pt-3 relative"
+        className="flex-1 min-h-0 overflow-y-auto relative"
       >
         <div
           style={zoomLevel && zoomLevel !== 1 ? ({ zoom: zoomLevel } as React.CSSProperties) : undefined}
@@ -714,6 +714,8 @@ export function Editor({
       <div className="editor-char-count">
         {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
       </div>
+      {/* Bottom frosted glass blend scrim for scrolling text */}
+      <div className="app-bottom-blend" aria-hidden="true" />
       <BottomToolbar editor={editor} />
     </div>
   );

@@ -1,5 +1,6 @@
 import { Command, Trash2, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { listenToSettingsSync } from "../lib/settingsSync";
 import { getStoredCommandsConfig, getCommandHotkey, CommandRow } from "../lib/commandsConfig";
@@ -58,6 +59,8 @@ export function TitleBar({
       window.getSelection()?.removeAllRanges();
 
       if (e.button === 0) {
+        setIsTitleBarHovered(false);
+        setIsCloseHovered(false);
         invoke("start_native_drag").catch((err) => {
           console.error("start_native_drag error:", err);
         });
@@ -74,13 +77,26 @@ export function TitleBar({
       window.getSelection()?.removeAllRanges();
     };
 
+    const handleWheel = (e: WheelEvent) => {
+      const scrollEl = document.querySelector<HTMLElement>("[data-scroll-container]");
+      if (scrollEl) {
+        scrollEl.scrollBy({
+          top: e.deltaY,
+          left: e.deltaX,
+          behavior: "auto",
+        });
+      }
+    };
+
     titleBar.addEventListener("mousedown", handleMouseDown);
     titleBar.addEventListener("selectstart", handleSelectStart);
     titleBar.addEventListener("dblclick", handleDblClick);
+    titleBar.addEventListener("wheel", handleWheel, { passive: true });
     return () => {
       titleBar.removeEventListener("mousedown", handleMouseDown);
       titleBar.removeEventListener("selectstart", handleSelectStart);
       titleBar.removeEventListener("dblclick", handleDblClick);
+      titleBar.removeEventListener("wheel", handleWheel);
     };
   }, []);
 
@@ -92,11 +108,72 @@ export function TitleBar({
   };
 
   const [isCloseHovered, setIsCloseHovered] = useState(false);
+  const [isTitleBarHovered, setIsTitleBarHovered] = useState(false);
+
+  useEffect(() => {
+    let unlistenFocus: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (!focused) {
+          setIsTitleBarHovered(false);
+          setIsCloseHovered(false);
+        }
+      })
+      .then((fn) => {
+        unlistenFocus = fn;
+      })
+      .catch(() => {});
+
+    // Active pointer tracking: appears when cursor is anywhere in page width, disappears when moving away
+    const handlePointerMove = (e: PointerEvent) => {
+      const inPage =
+        e.clientY >= 0 &&
+        e.clientY <= window.innerHeight &&
+        e.clientX >= 0 &&
+        e.clientX <= window.innerWidth;
+
+      if (inPage) {
+        setIsTitleBarHovered(true);
+      } else {
+        setIsTitleBarHovered(false);
+        setIsCloseHovered(false);
+      }
+    };
+
+    const handleReset = () => {
+      setIsTitleBarHovered(false);
+      setIsCloseHovered(false);
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) {
+        handleReset();
+      }
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, { passive: true });
+    window.addEventListener("mouseout", handleMouseOut);
+    window.addEventListener("blur", handleReset);
+    document.addEventListener("mouseleave", handleReset);
+
+    return () => {
+      if (unlistenFocus) unlistenFocus();
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("mouseout", handleMouseOut);
+      window.removeEventListener("blur", handleReset);
+      document.removeEventListener("mouseleave", handleReset);
+    };
+  }, []);
 
   return (
     <div
       ref={titleBarRef}
-      className="title-bar"
+      className={`title-bar ${isTitleBarHovered ? "is-hovered" : ""}`}
+      onMouseEnter={() => setIsTitleBarHovered(true)}
+      onMouseLeave={() => {
+        setIsTitleBarHovered(false);
+        setIsCloseHovered(false);
+      }}
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (!target.closest("button") && !target.closest(".command-popover")) {
@@ -125,15 +202,15 @@ export function TitleBar({
           aria-label="Hide rayNote"
         >
           <svg
-            width="8"
-            height="8"
-            viewBox="0 0 8 8"
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="close-x-icon"
           >
             <path
-              d="M1.2 1.2L6.8 6.8M6.8 1.2L1.2 6.8"
+              d="M2 2L8 8M8 2L2 8"
               stroke="#000000"
               strokeWidth="2"
               strokeLinecap="round"
@@ -153,7 +230,7 @@ export function TitleBar({
           title={`Copy Note as Markdown (${copyMarkdownHotkey})`}
           aria-label="Copy Note as Markdown"
         >
-          <FileText size={13} />
+          <FileText size={15} />
         </button>
         <button
           className="title-bar-btn liquid-btn delete-btn"
@@ -161,7 +238,7 @@ export function TitleBar({
           title={`Delete Note (${deleteHotkey})`}
           aria-label="Delete Note"
         >
-          <Trash2 size={13} />
+          <Trash2 size={15} />
         </button>
         <button
           className="title-bar-btn liquid-btn command-palette-btn"
@@ -169,7 +246,7 @@ export function TitleBar({
           title={`Command Palette (${commandPaletteHotkey})`}
           aria-label="Command Palette"
         >
-          <Command size={14} />
+          <Command size={16} />
         </button>
       </div>
     </div>

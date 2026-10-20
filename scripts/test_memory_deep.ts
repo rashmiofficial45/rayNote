@@ -1,12 +1,12 @@
 /// <reference types="node" />
 import { execSync } from "child_process";
-import fs from "fs";
 
 function sh(cmd: string): string {
   try {
     return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }).trim();
-  } catch (err: any) {
-    return (err.stdout || err.stderr || "").toString().trim();
+  } catch (err: unknown) {
+    const error = err as { stdout?: Buffer | string; stderr?: Buffer | string };
+    return (error.stdout || error.stderr || "").toString().trim();
   }
 }
 

@@ -34,6 +34,7 @@ export function FloatingCodeBlockToolbar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hoveredPreRef = useRef<HTMLElement | null>(null);
   const activeBlockRef = useRef<ActiveBlockState | null>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   activeBlockRef.current = activeBlock;
 
   // Calculates exact top-right coordinates for a code block element within the zoomed container
@@ -121,7 +122,7 @@ export function FloatingCodeBlockToolbar({
       return;
     }
 
-    // 2. Prioritize block under cursor
+    // 2. Prioritize block under cursor (text caret)
     const cursorBlock = getCursorCodeBlock();
     if (cursorBlock && document.body.contains(cursorBlock.preEl)) {
       const coords = computePosition(cursorBlock.preEl);
@@ -133,6 +134,21 @@ export function FloatingCodeBlockToolbar({
           right: coords.right,
         });
         return;
+      }
+    }
+
+    // If text cursor has moved away, verify if mouse pointer is genuinely still over the block
+    if (hoveredPreRef.current && lastMousePosRef.current) {
+      const elAtPoint = document.elementFromPoint(
+        lastMousePosRef.current.x,
+        lastMousePosRef.current.y
+      );
+      if (
+        !elAtPoint ||
+        (!hoveredPreRef.current.contains(elAtPoint) &&
+          !toolbarRef.current?.contains(elAtPoint))
+      ) {
+        hoveredPreRef.current = null;
       }
     }
 
@@ -167,6 +183,9 @@ export function FloatingCodeBlockToolbar({
     // 4. Neither cursor in code block nor hovering -> HIDE IMMEDIATELY
     if (activeBlockRef.current) {
       setActiveBlock(null);
+    }
+    if (isOpen) {
+      setIsOpen(false);
     }
   }, [editor, isOpen, computePosition, getCursorCodeBlock]);
 
@@ -212,6 +231,7 @@ export function FloatingCodeBlockToolbar({
     if (!container) return;
 
     const handlePointerMove = (e: PointerEvent) => {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
@@ -234,12 +254,28 @@ export function FloatingCodeBlockToolbar({
       }
     };
 
+    const handleWindowMouseOut = (e: MouseEvent) => {
+      if (!e.relatedTarget) {
+        hoveredPreRef.current = null;
+        syncToolbar();
+      }
+    };
+
+    const handleWindowBlur = () => {
+      hoveredPreRef.current = null;
+      syncToolbar();
+    };
+
     container.addEventListener("pointermove", handlePointerMove, { passive: true });
     container.addEventListener("pointerleave", handlePointerLeave, { passive: true });
+    window.addEventListener("mouseout", handleWindowMouseOut);
+    window.addEventListener("blur", handleWindowBlur);
 
     return () => {
       container.removeEventListener("pointermove", handlePointerMove);
       container.removeEventListener("pointerleave", handlePointerLeave);
+      window.removeEventListener("mouseout", handleWindowMouseOut);
+      window.removeEventListener("blur", handleWindowBlur);
     };
   }, [scrollContainerRef, syncToolbar]);
 

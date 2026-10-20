@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Editor } from "@tiptap/react";
 import { Search, ChevronUp, ChevronDown, X, Replace, ArrowRight } from "lucide-react";
+import type { SearchStorage } from "../editor/searchExtension";
 
 interface FindBarProps {
   isOpen: boolean;
@@ -20,7 +21,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
 
   const updateStats = useCallback(() => {
     if (!editor) return;
-    const searchStorage = (editor.storage as any).search;
+    const searchStorage = (editor.storage as { search?: SearchStorage })?.search;
     if (searchStorage) {
       setMatchCount(searchStorage.results?.length || 0);
       setCurrentIndex(searchStorage.currentIndex || 0);
@@ -35,7 +36,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
         const text = editor.state.doc.textBetween(from, to).trim();
         if (text && text.length < 60 && !text.includes("\n")) {
           setQuery(text);
-          (editor.commands as any).setSearchTerm(text);
+          editor.commands.setSearchTerm(text);
           setTimeout(() => updateStats(), 20);
         }
       }
@@ -44,38 +45,38 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
         searchInputRef.current?.select();
       }, 50);
     } else if (!isOpen && editor) {
-      (editor.commands as any).clearSearch();
+      editor.commands.clearSearch();
     }
   }, [isOpen, editor, updateStats]);
 
   const handleSearchChange = (val: string) => {
     setQuery(val);
     if (!editor) return;
-    (editor.commands as any).setSearchTerm(val);
+    editor.commands.setSearchTerm(val);
     updateStats();
   };
 
   const handleNext = () => {
     if (!editor || matchCount === 0) return;
-    (editor.commands as any).nextSearchResult();
+    editor.commands.nextSearchResult();
     updateStats();
   };
 
   const handlePrevious = () => {
     if (!editor || matchCount === 0) return;
-    (editor.commands as any).previousSearchResult();
+    editor.commands.previousSearchResult();
     updateStats();
   };
 
   const handleReplaceCurrent = () => {
     if (!editor || matchCount === 0) return;
-    (editor.commands as any).replaceCurrentResult(replacement);
+    editor.commands.replaceCurrentResult(replacement);
     updateStats();
   };
 
   const handleReplaceAll = () => {
     if (!editor || matchCount === 0) return;
-    (editor.commands as any).replaceAllResults(replacement);
+    editor.commands.replaceAllResults(replacement);
     updateStats();
   };
 
