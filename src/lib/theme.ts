@@ -85,6 +85,7 @@ export function applyThemeMode(mode: ThemeMode, useTransition = false): void {
   const updateDOM = () => {
     document.documentElement.classList.toggle("dark", isDark);
     document.documentElement.classList.toggle("light", !isDark);
+    document.documentElement.dataset.theme = isDark ? "dark" : "light";
     document.documentElement.dataset.themeMode = mode;
     document.documentElement.dataset.resolvedTheme = isDark ? "dark" : "light";
     document.documentElement.style.colorScheme = isDark ? "dark" : "light";

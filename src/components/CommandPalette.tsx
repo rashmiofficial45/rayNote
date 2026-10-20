@@ -4,7 +4,6 @@ import { getNoteTitle, formatDate } from "../lib/utils";
 import {
   Plus,
   Copy,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   Search,
@@ -50,6 +49,12 @@ import {
 } from "../lib/theme";
 import { broadcastSync, listenToSettingsSync } from "../lib/settingsSync";
 import { getStoredAliases } from "../lib/aliases";
+import {
+  getStoredCommandsConfig,
+  getCommandHotkey,
+  splitHotkeyToKeys,
+  CommandRow,
+} from "../lib/commandsConfig";
 import { invoke } from "@tauri-apps/api/core";
 
 export interface CommandPaletteProps {
@@ -83,6 +88,7 @@ export interface CommandPaletteProps {
   onTriggerImportFile?: () => void;
   onTriggerViewFile?: () => void;
   onPromptClearAllNotes?: () => void;
+  onOpenSmartSearch?: () => void;
 }
 
 type PaletteView = "actions" | "browse" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom";
@@ -131,6 +137,7 @@ export function CommandPalette({
   onTriggerImportFile,
   onTriggerViewFile,
   onPromptClearAllNotes,
+  onOpenSmartSearch,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -170,11 +177,15 @@ export function CommandPalette({
     return localStorage.getItem("notefast_show_menubar") !== "false";
   });
   const [aliases, setAliases] = useState<Record<string, string>>(getStoredAliases);
+  const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
 
   useEffect(() => {
     return listenToSettingsSync({
       onAliasesConfigChange: (newAliases) => {
         setAliases(newAliases || {});
+      },
+      onCommandsConfigChange: (newConfig) => {
+        setCommandsConfig(newConfig || getStoredCommandsConfig());
       },
       onThemeModeChange: (mode) => setCurrentTheme(mode),
       onAccentChange: (acc) => setCurrentAccent(acc),
@@ -182,6 +193,14 @@ export function CommandPalette({
       onEscLosesFocusChange: (v) => setEscLosesFocus(v),
     });
   }, []);
+
+  const getShortcut = (id: string, defaultHotkey: string): string[] | undefined => {
+    const { enabled, hotkey } = getCommandHotkey(commandsConfig, id, defaultHotkey);
+    if (!enabled) return undefined;
+    return splitHotkeyToKeys(hotkey);
+  };
+
+  const browseHotkey = getCommandHotkey(commandsConfig, "browse", "⌘P").hotkey;
 
   const activeNote = notes.find((n) => n.id === activeNoteId);
 
@@ -278,7 +297,7 @@ export function CommandPalette({
       label: "Copy Note as Markdown",
       badge: "GFM",
       icon: <ClipboardCopy size={14} className="text-emerald-400" />,
-      shortcut: ["⇧", "⌘", "C"],
+      shortcut: getShortcut("copy_markdown", "⇧⌘C"),
       disabled: !activeNoteId,
       keywords: ["copy", "markdown", "md", "clipboard", "format", "whole", "all"],
       action: () => {
@@ -303,7 +322,7 @@ export function CommandPalette({
       category: "File Operations",
       label: "Copy Note Deeplink",
       icon: <Link2 size={14} />,
-      shortcut: ["⇧", "⌘", "D"],
+      shortcut: getShortcut("copy_deeplink", "⇧⌘D"),
       disabled: !activeNoteId,
       keywords: ["deeplink", "link", "url", "raycast", "alfred", "shortcut"],
       action: () => {
@@ -317,7 +336,7 @@ export function CommandPalette({
       label: "Export Note as Markdown",
       badge: "Download",
       icon: <FileDown size={14} />,
-      shortcut: ["⇧", "⌘", "E"],
+      shortcut: getShortcut("export_note", "⇧⌘E"),
       disabled: !activeNoteId,
       keywords: ["export", "markdown", "md", "save", "download", "file"],
       action: () => {
@@ -397,7 +416,7 @@ export function CommandPalette({
       category: "Appearance",
       label: "Zoom In (+10%)",
       icon: <ZoomIn size={14} />,
-      shortcut: ["⌘", "="],
+      shortcut: getShortcut("zoom_in", "⌘="),
       keywords: ["zoom in", "bigger", "enlarge", "plus"],
       action: () => {
         onClose();
@@ -409,7 +428,7 @@ export function CommandPalette({
       category: "Appearance",
       label: "Zoom Out (-10%)",
       icon: <ZoomOut size={14} />,
-      shortcut: ["⌘", "-"],
+      shortcut: getShortcut("zoom_out", "⌘-"),
       keywords: ["zoom out", "smaller", "shrink", "minus"],
       action: () => {
         onClose();
@@ -421,7 +440,7 @@ export function CommandPalette({
       category: "Appearance",
       label: "Reset Zoom (120%)",
       icon: <RotateCcw size={14} />,
-      shortcut: ["⌘", "0"],
+      shortcut: getShortcut("reset_zoom", "⌘0"),
       keywords: ["reset zoom", "default", "normal", "120%"],
       action: () => {
         onClose();
@@ -501,7 +520,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "New Note",
       icon: <Plus size={14} />,
-      shortcut: ["⌘", "N"],
+      shortcut: getShortcut("create", "⌘N"),
       keywords: ["new", "create", "note", "add"],
       action: () => {
         onNewNote();
@@ -511,14 +530,13 @@ export function CommandPalette({
     {
       id: "browse-notes",
       category: "Note Actions",
-      label: "Browse Notes List",
-      icon: <BookOpen size={14} />,
-      shortcut: ["⌘", "P"],
-      keywords: ["browse", "switch", "open", "notes", "list", "find"],
+      label: "Search & Navigate Notes",
+      icon: <Search size={14} />,
+      shortcut: getShortcut("browse", "⌘P"),
+      keywords: ["search", "notes", "browse", "switch", "open", "list", "find", "navigation"],
       action: () => {
-        setView("browse");
-        setSearch("");
-        setSelectedIndex(0);
+        onClose();
+        onOpenSmartSearch?.();
       },
     },
     {
@@ -526,7 +544,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Find in Current Note",
       icon: <Search size={14} />,
-      shortcut: ["⌘", "F"],
+      shortcut: getShortcut("find", "⌘F"),
       disabled: !activeNoteId,
       keywords: ["find", "search", "in note", "text", "replace"],
       action: () => {
@@ -539,7 +557,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Duplicate Note",
       icon: <Copy size={14} />,
-      shortcut: ["⌘", "D"],
+      shortcut: getShortcut("duplicate", "⌘D"),
       disabled: !activeNoteId,
       keywords: ["duplicate", "clone", "copy note"],
       action: () => {
@@ -552,7 +570,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: activeNote?.is_pinned ? "Unpin Note from Top" : "Pin Note to Top",
       icon: <Pin size={14} />,
-      shortcut: ["⇧", "⌘", "P"],
+      shortcut: getShortcut("pin", "⇧⌘P"),
       disabled: !activeNoteId,
       keywords: ["pin", "unpin", "top", "sticky", "favorite"],
       action: () => {
@@ -567,7 +585,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Delete Note",
       icon: <Trash2 size={14} className="text-red-400" />,
-      shortcut: ["⇧", "⌘", "⌫"],
+      shortcut: getShortcut("delete", "⇧⌘⌫"),
       disabled: !activeNoteId,
       keywords: ["delete", "trash", "remove", "erase"],
       action: () => {
@@ -582,7 +600,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Previous Note in List",
       icon: <ArrowUp size={14} />,
-      shortcut: ["⌥", "↑"],
+      shortcut: getShortcut("prev_note", "⌥↑"),
       keywords: ["previous", "prev", "up", "note"],
       action: () => {
         onClose();
@@ -594,7 +612,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Next Note in List",
       icon: <ArrowDown size={14} />,
-      shortcut: ["⌥", "↓"],
+      shortcut: getShortcut("next_note", "⌥↓"),
       keywords: ["next", "down", "note"],
       action: () => {
         onClose();
@@ -606,7 +624,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Go Back in History",
       icon: <ChevronLeft size={14} />,
-      shortcut: ["⌘", "["],
+      shortcut: getShortcut("history_back", "⌘["),
       keywords: ["back", "history"],
       action: () => {
         onGoBack();
@@ -618,7 +636,7 @@ export function CommandPalette({
       category: "Note Actions",
       label: "Go Forward in History",
       icon: <ChevronRight size={14} />,
-      shortcut: ["⌘", "]"],
+      shortcut: getShortcut("history_forward", "⌘]"),
       keywords: ["forward", "history"],
       action: () => {
         onGoForward();
@@ -633,7 +651,7 @@ export function CommandPalette({
       label: "Open Settings Window",
       badge: "Window",
       icon: <Settings size={14} />,
-      shortcut: ["⌘", ","],
+      shortcut: getShortcut("settings", "⌘,"),
       keywords: ["settings", "preferences", "config", "window", "options", "setup", "aliases"],
       action: () => {
         onClose();
@@ -645,7 +663,7 @@ export function CommandPalette({
       category: "App Controls",
       label: "Shortcuts Cheatsheet",
       icon: <Keyboard size={14} />,
-      shortcut: ["⌘", "/"],
+      shortcut: getShortcut("shortcuts_help", "⌘/"),
       keywords: ["shortcuts", "cheatsheet", "hotkeys", "keys", "help"],
       action: () => {
         onClose();
@@ -657,7 +675,7 @@ export function CommandPalette({
       category: "App Controls",
       label: "Hide Window",
       icon: <X size={14} />,
-      shortcut: ["⌘", "W"],
+      shortcut: getShortcut("hide", "⌘W"),
       keywords: ["hide", "close", "minimize", "dismiss", "background"],
       action: () => {
         onClose();
@@ -669,7 +687,7 @@ export function CommandPalette({
       category: "App Controls",
       label: "Quit rayNote",
       icon: <Power size={14} className="text-red-400" />,
-      shortcut: ["⌘", "Q"],
+      shortcut: getShortcut("quit", "⌘Q"),
       keywords: ["quit", "exit", "close app", "terminate", "kill"],
       action: () => {
         quitApp().catch(console.error);
@@ -917,12 +935,11 @@ export function CommandPalette({
         }
         return;
       }
-      if (e.key === "Tab") {
+      if (e.key === "Tab" || ((e.metaKey || e.ctrlKey) && (e.key === "p" || e.key === "P"))) {
         e.preventDefault();
         e.stopPropagation();
-        setView((prev) => (prev === "actions" ? "browse" : "actions"));
-        setSearch("");
-        setSelectedIndex(0);
+        onClose();
+        onOpenSmartSearch?.();
         return;
       }
       if (e.key === "ArrowDown") {
@@ -1053,13 +1070,12 @@ export function CommandPalette({
               type="button"
               className="command-view-switch-btn"
               onClick={() => {
-                setView((prev) => (prev === "actions" ? "browse" : "actions"));
-                setSearch("");
-                setTimeout(() => inputRef.current?.focus(), 20);
+                onClose();
+                onOpenSmartSearch?.();
               }}
-              title="Press Tab to switch mode"
+              title="Search and navigate notes"
             >
-              {view === "actions" ? "Notes (⌘P)" : "Commands (⌘K)"}
+              Notes ({browseHotkey})
             </button>
           )}
         </div>

@@ -54,42 +54,13 @@ import {
   setStoredAliases,
 } from "./lib/aliases";
 
+import {
+  DEFAULT_COMMANDS,
+  CommandRow,
+  getStoredCommandsConfig,
+} from "./lib/commandsConfig";
+
 type SettingsPane = "general" | "commands" | "aliases" | "storage" | "about";
-
-interface CommandRow {
-  id: string;
-  title: string;
-  hotkey: string;
-  enabled: boolean;
-  category: "commands" | "extensions";
-}
-
-const DEFAULT_COMMANDS: CommandRow[] = [
-  { id: "create", title: "Create Note", hotkey: "⌘N", enabled: true, category: "commands" },
-  { id: "browse", title: "Quick Open / Browse Notes", hotkey: "⌘P", enabled: true, category: "commands" },
-  { id: "search", title: "Search Notes / Command Palette", hotkey: "⌘K", enabled: true, category: "commands" },
-  { id: "find", title: "Find in Note", hotkey: "⌘F", enabled: true, category: "commands" },
-  { id: "duplicate", title: "Duplicate Note", hotkey: "⌘D", enabled: true, category: "commands" },
-  { id: "pin", title: "Pin / Unpin Note", hotkey: "⇧⌘P", enabled: true, category: "commands" },
-  { id: "delete", title: "Delete Note", hotkey: "⇧⌘⌫", enabled: true, category: "commands" },
-  { id: "next_note", title: "Next Note in List", hotkey: "⌥↓", enabled: true, category: "commands" },
-  { id: "prev_note", title: "Previous Note in List", hotkey: "⌥↑", enabled: true, category: "commands" },
-  { id: "history_back", title: "Go Back in History", hotkey: "⌘[", enabled: true, category: "commands" },
-  { id: "history_forward", title: "Go Forward in History", hotkey: "⌘]", enabled: true, category: "commands" },
-  { id: "copy_markdown", title: "Copy Note as Markdown", hotkey: "⇧⌘C", enabled: true, category: "commands" },
-  { id: "copy_deeplink", title: "Copy Deeplink", hotkey: "⇧⌘D", enabled: true, category: "commands" },
-  { id: "export_note", title: "Export Note", hotkey: "⇧⌘E", enabled: true, category: "commands" },
-  { id: "zoom_in", title: "Zoom In", hotkey: "⌘=", enabled: true, category: "commands" },
-  { id: "zoom_out", title: "Zoom Out", hotkey: "⌘-", enabled: true, category: "commands" },
-  { id: "reset_zoom", title: "Reset Zoom", hotkey: "⌘0", enabled: true, category: "commands" },
-  { id: "shortcuts_help", title: "Shortcuts Cheatsheet", hotkey: "⌘/", enabled: true, category: "commands" },
-  { id: "settings", title: "Open Settings", hotkey: "⌘,", enabled: true, category: "commands" },
-  { id: "hide", title: "Hide Window", hotkey: "⌘W", enabled: true, category: "commands" },
-  { id: "quit", title: "Quit rayNote", hotkey: "⌘Q", enabled: true, category: "commands" },
-  { id: "toggle", title: "rayNote (Toggle Notes)", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
-  { id: "slash", title: "Slash Commands Menu", hotkey: "/", enabled: true, category: "extensions" },
-  { id: "tables", title: "Tables & Embeds", hotkey: "/table & /video", enabled: true, category: "extensions" },
-];
 
 export default function SettingsApp() {
   // Restore most recently viewed pane (Apple standard)
@@ -126,21 +97,7 @@ export default function SettingsApp() {
 
   // Commands state
   const [commands, setCommands] = useState<CommandRow[]>(() => {
-    const saved = localStorage.getItem("notefast_commands_config");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return DEFAULT_COMMANDS.map((def) => {
-            const found = parsed.find((p: any) => p.id === def.id);
-            return found ? { ...def, ...found } : def;
-          });
-        }
-      } catch {
-        return DEFAULT_COMMANDS;
-      }
-    }
-    return DEFAULT_COMMANDS;
+    return getStoredCommandsConfig();
   });
 
   // Aliases state

@@ -712,7 +712,7 @@ export function Editor({
       </div>
       <DocumentTickSlider scrollContainerRef={scrollContainerRef} />
       <div className="editor-char-count">
-        {charCount} {charCount === 1 ? "char" : "chars"}
+        {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
       </div>
       <BottomToolbar editor={editor} />
     </div>

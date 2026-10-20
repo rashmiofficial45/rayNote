@@ -176,6 +176,10 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
       handlePayload({ type: "esc_loses_focus", value: e.newValue === "true" });
     } else if (e.key === "notefast_always_on_top" && e.newValue) {
       handlePayload({ type: "always_on_top", value: e.newValue === "true" });
+    } else if (e.key === "notefast_commands_config" && e.newValue) {
+      try {
+        handlePayload({ type: "commands_config", value: JSON.parse(e.newValue) });
+      } catch {}
     }
   };
   window.addEventListener("storage", handleStorage);

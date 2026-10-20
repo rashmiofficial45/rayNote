@@ -1,7 +1,8 @@
-import { Command, Copy, Plus, Trash2, Settings, FileText, Upload, Eye, Search } from "lucide-react";
+import { Command, Trash2, FileText } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
-import { openSettingsWindow } from "../lib/db";
+import { listenToSettingsSync } from "../lib/settingsSync";
+import { getStoredCommandsConfig, getCommandHotkey, CommandRow } from "../lib/commandsConfig";
 
 interface TitleBarProps {
   title: string;
@@ -17,33 +18,26 @@ interface TitleBarProps {
 
 export function TitleBar({
   title,
-  onNewNote,
   onOpenCommandPalette,
-  onOpenSmartSearch,
-  onDuplicateNote,
   onDeleteNote,
   onCopyMarkdown,
-  onTriggerImportFile,
-  onTriggerViewFile,
 }: TitleBarProps) {
   const titleBarRef = useRef<HTMLDivElement>(null);
-  const [commandMenuOpen, setCommandMenuOpen] = useState(false);
-  const commandMenuRef = useRef<HTMLDivElement>(null);
+  const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
 
-  // Close command menu on outside click
+  // Auto-reflect shortcut updates across the entire app
   useEffect(() => {
-    if (!commandMenuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        commandMenuRef.current &&
-        !commandMenuRef.current.contains(e.target as Node)
-      ) {
-        setCommandMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [commandMenuOpen]);
+    return listenToSettingsSync({
+      onCommandsConfigChange: (newConfig) => {
+        if (newConfig) setCommandsConfig(newConfig);
+      },
+    });
+  }, []);
+
+  const copyMarkdownHotkey = getCommandHotkey(commandsConfig, "copy_markdown", "⇧⌘C").hotkey;
+  const deleteHotkey = getCommandHotkey(commandsConfig, "delete", "⇧⌘⌫").hotkey;
+  const commandPaletteHotkey = getCommandHotkey(commandsConfig, "search", "⌘K").hotkey;
+  const hideHotkey = getCommandHotkey(commandsConfig, "hide", "⌘W").hotkey;
 
   // Native drag on mousedown (skip if clicking buttons or the command menu)
   useEffect(() => {
@@ -127,7 +121,7 @@ export function TitleBar({
           onMouseEnter={() => setIsCloseHovered(true)}
           onMouseLeave={() => setIsCloseHovered(false)}
           className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
-          title="Hide (⌘W)"
+          title={`Hide (${hideHotkey})`}
           aria-label="Hide rayNote"
         >
           <svg
@@ -151,12 +145,12 @@ export function TitleBar({
       {/* Center: Note title */}
       <div className="title-text">{title || "Untitled"}</div>
 
-      {/* Right: Copy Markdown + Delete + Command (Command opens popover) */}
+      {/* Right: Copy Markdown + Delete + Command Palette (Direct Action) */}
       <div className="title-bar-right">
         <button
           className="title-bar-btn liquid-btn copy-md-btn"
           onClick={onCopyMarkdown}
-          title="Copy Note as Markdown (⇧⌘C)"
+          title={`Copy Note as Markdown (${copyMarkdownHotkey})`}
           aria-label="Copy Note as Markdown"
         >
           <FileText size={13} />
@@ -164,113 +158,19 @@ export function TitleBar({
         <button
           className="title-bar-btn liquid-btn delete-btn"
           onClick={onDeleteNote}
-          title="Delete Note (⇧⌘⌫)"
+          title={`Delete Note (${deleteHotkey})`}
+          aria-label="Delete Note"
         >
           <Trash2 size={13} />
         </button>
-        <div style={{ position: "relative" }} ref={commandMenuRef}>
-          <button
-            className="title-bar-btn liquid-btn"
-            onClick={() => setCommandMenuOpen(!commandMenuOpen)}
-            title="Actions"
-          >
-            <Command size={14} />
-          </button>
-          {commandMenuOpen && (
-            <div className="command-popover">
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  onCopyMarkdown();
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <FileText size={13} />
-                <span>Copy as Markdown</span>
-                <kbd className="popover-kbd">⇧⌘C</kbd>
-              </button>
-              <div className="command-popover-divider" />
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  setCommandMenuOpen(false);
-                  onTriggerImportFile?.();
-                }}
-              >
-                <Upload size={13} className="text-sky-400" />
-                <span>Import .md File (Upload)</span>
-              </button>
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  setCommandMenuOpen(false);
-                  onTriggerViewFile?.();
-                }}
-              >
-                <Eye size={13} className="text-violet-400" />
-                <span>View .md File (No Upload)</span>
-              </button>
-              <div className="command-popover-divider" />
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  onDuplicateNote();
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <Copy size={13} />
-                <span>Duplicate</span>
-                <kbd className="popover-kbd">⌘D</kbd>
-              </button>
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  onNewNote();
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <Plus size={13} />
-                <span>New Note</span>
-                <kbd className="popover-kbd">⌘N</kbd>
-              </button>
-              <div className="command-popover-divider" />
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  onOpenSmartSearch?.();
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <Search size={13} />
-                <span>Search Notes</span>
-                <kbd className="popover-kbd">⌘P</kbd>
-              </button>
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  onOpenCommandPalette();
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <Command size={13} />
-                <span>Command & Settings Palette</span>
-                <kbd className="popover-kbd">⌘K</kbd>
-              </button>
-              <div className="command-popover-divider" />
-              <button
-                className="command-popover-item"
-                onClick={() => {
-                  openSettingsWindow().catch(console.error);
-                  setCommandMenuOpen(false);
-                }}
-              >
-                <Settings size={13} />
-                <span>Settings…</span>
-                <kbd className="popover-kbd">⌘,</kbd>
-              </button>
-            </div>
-          )}
-        </div>
+        <button
+          className="title-bar-btn liquid-btn command-palette-btn"
+          onClick={onOpenCommandPalette}
+          title={`Command Palette (${commandPaletteHotkey})`}
+          aria-label="Command Palette"
+        >
+          <Command size={14} />
+        </button>
       </div>
     </div>
   );

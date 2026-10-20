@@ -52,6 +52,7 @@ import {
 import { initTheme } from "./lib/theme";
 import { noteCache } from "./lib/noteCache";
 import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
+import { getStoredCommandsConfig, CommandRow } from "./lib/commandsConfig";
 import {
   Check,
   Copy,
@@ -136,17 +137,7 @@ function App() {
     return localStorage.getItem("notefast_esc_loses_focus") === "true";
   });
 
-  const [commandsConfig, setCommandsConfig] = useState<any[]>(() => {
-    const saved = localStorage.getItem("notefast_commands_config");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
 
   useEffect(() => {
     localStorage.setItem("notefast_zoom_level", zoomLevel.toString());
@@ -160,7 +151,7 @@ function App() {
       onAlwaysOnTopChange: (val) => {
         setAlwaysOnTop(val).catch(console.error);
       },
-      onCommandsConfigChange: (val) => setCommandsConfig(val),
+      onCommandsConfigChange: (val) => setCommandsConfig(val || getStoredCommandsConfig()),
       onNotesCleared: () => {
         setNotes([]);
         setActiveNoteId(null);
@@ -931,12 +922,8 @@ function App() {
         return;
       }
 
-      // Search Notes / Toggle Command Palette (Cmd+K)
-      const isSearchShortcut =
-        isTriggered("search", "⌘K") ||
-        (isCmd && !e.shiftKey && !e.altKey && (e.key === "k" || e.key === "K" || e.code === "KeyK"));
-
-      if (isSearchShortcut) {
+      // Command Palette (Cmd+K)
+      if (isTriggered("search", "⌘K")) {
         e.preventDefault();
         e.stopPropagation();
         setPaletteInitialView("actions");
@@ -945,12 +932,7 @@ function App() {
       }
 
       // Dedicated Smart Document Search & Quick Switcher (Cmd+P)
-      const isSmartSearchShortcut =
-        isTriggered("smart_search", "⌘P") ||
-        isTriggered("browse", "⌘P") ||
-        (isCmd && !e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P" || e.code === "KeyP"));
-
-      if (isSmartSearchShortcut) {
+      if (isTriggered("browse", "⌘P") || isTriggered("smart_search", "⌘P")) {
         e.preventDefault();
         e.stopPropagation();
         setIsSmartSearchOpen((prev) => !prev);
@@ -1391,6 +1373,7 @@ function App() {
               }).catch(console.error);
             }
           }}
+          onOpenSmartSearch={() => setIsSmartSearchOpen(true)}
         />
       )}
 

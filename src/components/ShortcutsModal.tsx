@@ -1,5 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Search, X, Keyboard } from "lucide-react";
+import { listenToSettingsSync } from "../lib/settingsSync";
+import {
+  getStoredCommandsConfig,
+  getCommandHotkey,
+  splitHotkeyToKeys,
+  CommandRow,
+} from "../lib/commandsConfig";
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -12,22 +19,7 @@ interface ShortcutItem {
   category: "Navigation & App" | "Formatting" | "Blocks & Lists" | "Sharing & View";
 }
 
-const SHORTCUTS: ShortcutItem[] = [
-  // Navigation & App
-  { keys: ["⌘", "N"], description: "New Note", category: "Navigation & App" },
-  { keys: ["⌘", "P"], description: "Smart Search & Quick Switcher", category: "Navigation & App" },
-  { keys: ["⌘", "K"], description: "Actions / Command Palette", category: "Navigation & App" },
-  { keys: ["⌘", "D"], description: "Duplicate Note", category: "Navigation & App" },
-  { keys: ["⇧", "⌘", "P"], description: "Pin / Unpin Note", category: "Navigation & App" },
-  { keys: ["⌥", "↑"], description: "Previous Note in List", category: "Navigation & App" },
-  { keys: ["⌥", "↓"], description: "Next Note in List", category: "Navigation & App" },
-  { keys: ["⌘", "["], description: "Go Back in History", category: "Navigation & App" },
-  { keys: ["⌘", "]"], description: "Go Forward in History", category: "Navigation & App" },
-  { keys: ["⌘", ","], description: "Open Settings / Preferences", category: "Navigation & App" },
-  { keys: ["⌘", "W"], description: "Hide Window (Run in Background)", category: "Navigation & App" },
-  { keys: ["⌘", "Q"], description: "Quit rayNote Completely", category: "Navigation & App" },
-  { keys: ["⇧", "⌘", "⌫"], description: "Delete Current Note", category: "Navigation & App" },
-
+const STATIC_FORMATTING_SHORTCUTS: ShortcutItem[] = [
   // Formatting
   { keys: ["⌘", "B"], description: "Toggle Bold", category: "Formatting" },
   { keys: ["⌘", "I"], description: "Toggle Italic", category: "Formatting" },
@@ -53,20 +45,19 @@ const SHORTCUTS: ShortcutItem[] = [
   { keys: ["⌘", "⌥", "-"], description: "Horizontal Ruler / Separation Line", category: "Blocks & Lists" },
   { keys: ["-", "-", "-"], description: "Horizontal Line (Type --- on new line)", category: "Blocks & Lists" },
   { keys: ["/"], description: "Slash Command Menu", category: "Blocks & Lists" },
-
-  // Sharing & View
-  { keys: ["⇧", "⌘", "C"], description: "Copy Note as Markdown", category: "Sharing & View" },
-  { keys: ["⇧", "⌘", "D"], description: "Copy Deeplink", category: "Sharing & View" },
-  { keys: ["⇧", "⌘", "E"], description: "Export Note as Markdown", category: "Sharing & View" },
-  { keys: ["⌘", "+"], description: "Zoom In", category: "Sharing & View" },
-  { keys: ["⌘", "-"], description: "Zoom Out", category: "Sharing & View" },
-  { keys: ["⌘", "0"], description: "Reset Zoom (120% Default)", category: "Sharing & View" },
-  { keys: ["⌘", "/"], description: "Toggle Shortcuts Sheet", category: "Sharing & View" },
-  { keys: ["Esc"], description: "Close Active Modal / Overlay", category: "Sharing & View" },
 ];
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
   const [filter, setFilter] = useState("");
+  const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
+
+  useEffect(() => {
+    return listenToSettingsSync({
+      onCommandsConfigChange: (newConfig) => {
+        setCommandsConfig(newConfig || getStoredCommandsConfig());
+      },
+    });
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -82,9 +73,45 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
     }
   }, [isOpen, onClose]);
 
+  const shortcutsList = useMemo(() => {
+    const getKeys = (id: string, defaultHotkey: string): string[] => {
+      const { enabled, hotkey } = getCommandHotkey(commandsConfig, id, defaultHotkey);
+      return enabled ? splitHotkeyToKeys(hotkey) : ["Disabled"];
+    };
+
+    const navShortcuts: ShortcutItem[] = [
+      { keys: getKeys("create", "⌘N"), description: "New Note", category: "Navigation & App" },
+      { keys: getKeys("browse", "⌘P"), description: "Smart Search & Quick Switcher", category: "Navigation & App" },
+      { keys: getKeys("search", "⌘K"), description: "Actions / Command Palette", category: "Navigation & App" },
+      { keys: getKeys("duplicate", "⌘D"), description: "Duplicate Note", category: "Navigation & App" },
+      { keys: getKeys("pin", "⇧⌘P"), description: "Pin / Unpin Note", category: "Navigation & App" },
+      { keys: getKeys("prev_note", "⌥↑"), description: "Previous Note in List", category: "Navigation & App" },
+      { keys: getKeys("next_note", "⌥↓"), description: "Next Note in List", category: "Navigation & App" },
+      { keys: getKeys("history_back", "⌘["), description: "Go Back in History", category: "Navigation & App" },
+      { keys: getKeys("history_forward", "⌘]"), description: "Go Forward in History", category: "Navigation & App" },
+      { keys: getKeys("settings", "⌘,"), description: "Open Settings / Preferences", category: "Navigation & App" },
+      { keys: getKeys("hide", "⌘W"), description: "Hide Window (Run in Background)", category: "Navigation & App" },
+      { keys: getKeys("quit", "⌘Q"), description: "Quit rayNote Completely", category: "Navigation & App" },
+      { keys: getKeys("delete", "⇧⌘⌫"), description: "Delete Current Note", category: "Navigation & App" },
+    ];
+
+    const shareShortcuts: ShortcutItem[] = [
+      { keys: getKeys("copy_markdown", "⇧⌘C"), description: "Copy Note as Markdown", category: "Sharing & View" },
+      { keys: getKeys("copy_deeplink", "⇧⌘D"), description: "Copy Deeplink", category: "Sharing & View" },
+      { keys: getKeys("export_note", "⇧⌘E"), description: "Export Note as Markdown", category: "Sharing & View" },
+      { keys: getKeys("zoom_in", "⌘="), description: "Zoom In", category: "Sharing & View" },
+      { keys: getKeys("zoom_out", "⌘-"), description: "Zoom Out", category: "Sharing & View" },
+      { keys: getKeys("reset_zoom", "⌘0"), description: "Reset Zoom (120% Default)", category: "Sharing & View" },
+      { keys: getKeys("shortcuts_help", "⌘/"), description: "Toggle Shortcuts Sheet", category: "Sharing & View" },
+      { keys: ["Esc"], description: "Close Active Modal / Overlay", category: "Sharing & View" },
+    ];
+
+    return [...navShortcuts, ...STATIC_FORMATTING_SHORTCUTS, ...shareShortcuts];
+  }, [commandsConfig]);
+
   if (!isOpen) return null;
 
-  const filteredShortcuts = SHORTCUTS.filter(
+  const filteredShortcuts = shortcutsList.filter(
     (s) =>
       s.description.toLowerCase().includes(filter.toLowerCase()) ||
       s.keys.some((k) => k.toLowerCase().includes(filter.toLowerCase())) ||

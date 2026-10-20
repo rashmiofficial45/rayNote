@@ -2,6 +2,12 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { SearchResult, searchDocuments } from "../lib/db";
 import { getHighlightedSegments } from "../lib/searchRanking";
 import { Search, FileText, Pin, X } from "lucide-react";
+import { listenToSettingsSync } from "../lib/settingsSync";
+import {
+  getStoredCommandsConfig,
+  getCommandHotkey,
+  CommandRow,
+} from "../lib/commandsConfig";
 
 export interface SmartSearchProps {
   isOpen: boolean;
@@ -21,6 +27,17 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>(cachedRecentNotes);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
+
+  useEffect(() => {
+    return listenToSettingsSync({
+      onCommandsConfigChange: (newConfig) => {
+        setCommandsConfig(newConfig || getStoredCommandsConfig());
+      },
+    });
+  }, []);
+
+  const browseHotkey = getCommandHotkey(commandsConfig, "browse", "⌘P").hotkey;
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -203,9 +220,11 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             </button>
           )}
 
-          <div className="smart-search-badge">
-            <span>⌘P</span>
-          </div>
+          {browseHotkey && (
+            <div className="smart-search-badge">
+              <span>{browseHotkey}</span>
+            </div>
+          )}
         </div>
 
         {/* Minimalist Results List (Strict single-item highlight) */}

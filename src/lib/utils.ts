@@ -72,10 +72,13 @@ export function getPreviewText(contentOrPreview: string): string {
 }
 
 export function getNoteTitle(title: string, previewOrContent?: string): string {
-  if (title && title.trim()) return title.trim();
-  if (!previewOrContent) return "Untitled Note";
-  const preview = getPreviewText(previewOrContent);
-  return preview.length > 30 ? preview.slice(0, 30) + "…" : preview;
+  const raw = (title && title.trim())
+    ? title.trim()
+    : (previewOrContent ? getPreviewText(previewOrContent) : "Untitled Note");
+  // Clean markdown prefixes like '> # ', '# ', '## ', '- ', '* ' so titlebar displays crisp text
+  const cleaned = raw.replace(/^[>\s#*-]+/, "").trim();
+  const display = cleaned || raw || "Untitled Note";
+  return display.length > 40 ? display.slice(0, 40) + "…" : display;
 }
 
 /**
