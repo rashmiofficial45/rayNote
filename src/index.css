@@ -556,11 +556,11 @@ body,
 
 /* ── Tiptap Editor Container ──────────────────────────── */
 .editor-wrapper {
-  contain: layout size;
+  contain: layout style;
 }
 
 .tiptap {
-  isolation: isolate;
+  transform: translateZ(0);
   outline: none;
   min-height: auto;
   padding-top: 20px;
@@ -1757,8 +1757,8 @@ pre.notefast-code-block:hover {
 /* ── Notion-style Block Selection ──────────────────────── */
 .raynote-block-selected,
 .notefast-block-selected {
-  background-color: rgba(14, 165, 233, 0.22) !important;
-  box-shadow: 0 0 0 1.5px rgba(14, 165, 233, 0.45) !important;
+  background-color: rgba(14, 165, 233, 0.08) !important;
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.20) !important;
   border-radius: 8px !important;
   transition: background-color 80ms ease, box-shadow 80ms ease, border-radius 80ms ease;
   position: relative;
@@ -1769,8 +1769,8 @@ pre.notefast-code-block:hover {
 .dark .notefast-block-selected,
 [data-theme="dark"] .raynote-block-selected,
 [data-theme="dark"] .notefast-block-selected {
-  background-color: rgba(35, 131, 226, 0.28) !important;
-  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.5) !important;
+  background-color: rgba(56, 189, 248, 0.10) !important;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.22) !important;
 }
 
 /* Ensure ALL selected blocks are rounded consistently on all corners */
@@ -1822,6 +1822,8 @@ pre.notefast-code-block:hover {
 
 [data-scroll-container] {
   overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  transform: translateZ(0);
 }
 
 /* Hide native text selection when blocks are selected */

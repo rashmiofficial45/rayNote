@@ -38,6 +38,8 @@ interface EditorProps {
   initialContent?: string;
   content?: string;
   noteId: string;
+  noteTitle?: string;
+  onSetTitle?: (title: string) => void;
   onUpdate: (content: string, titleHint?: string) => void;
   zoomLevel?: number;
   isFindOpen?: boolean;
@@ -96,6 +98,8 @@ export function Editor({
   initialContent,
   content,
   noteId,
+  noteTitle,
+  onSetTitle,
   onUpdate,
   zoomLevel,
   isFindOpen,
@@ -107,6 +111,13 @@ export function Editor({
   const editorRef = useRef<any>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
+  const onSetTitleRef = useRef(onSetTitle);
+  onSetTitleRef.current = onSetTitle;
+
+  const currentTitleRef = useRef<string>(noteTitle || "");
+  useEffect(() => {
+    currentTitleRef.current = noteTitle || "";
+  }, [noteTitle]);
 
   // Track the active note ID internally to identify transitions (starts null so initial note mounts cleanly)
   const currentNoteIdRef = useRef<string | null>(null);
@@ -124,7 +135,7 @@ export function Editor({
       const currentId = currentNoteIdRef.current;
       if (!currentId) return;
       const json = currentEditor.getJSON();
-      const title = extractTitle(json);
+      const title = currentTitleRef.current || extractTitle(json);
       const strContent = JSON.stringify(json);
       isDirtyRef.current = false;
 
@@ -161,7 +172,17 @@ export function Editor({
     [saveNow]
   );
 
-  const extensions = useMemo(() => getExtensions(SlashCommand), []);
+  const extensions = useMemo(
+    () =>
+      getExtensions(SlashCommand, {
+        getCurrentTitle: () => currentTitleRef.current,
+        onSetTitle: (newTitle: string) => {
+          currentTitleRef.current = newTitle;
+          onSetTitleRef.current?.(newTitle);
+        },
+      }),
+    []
+  );
 
   /**
    * Hydrates initial document payload on mount from LRU cache or initialContent.
@@ -173,7 +194,7 @@ export function Editor({
     try {
       return ensureHeadingOneForDoc(JSON.parse(raw));
     } catch {
-      return ensureHeadingOneForDoc(markdownToTipTapHtml(raw));
+      return ensureHeadingOneForDoc(markdownToTipTapHtml(raw, { ensureFirstLineH1: true }));
     }
   }, []); // Only runs once on mount
 
@@ -215,23 +236,72 @@ export function Editor({
               event.preventDefault();
               file.text().then((mdText) => {
                 if (editorRef.current) {
-                  const html = markdownToTipTapHtml(mdText);
-                  editorRef.current.commands.insertContent(html);
+                  const fallbackTitle = file.name.replace(/\.[^/.]+$/, "");
+                  const html = markdownToTipTapHtml(mdText, {
+                    ensureFirstLineH1: true,
+                    fallbackTitle,
+                  });
+
+                  const isBlankNote =
+                    editorRef.current.state.doc.textContent.trim().length === 0;
+                  const isAtStart =
+                    (editorRef.current.state.selection.from ?? 0) <= 2;
+
+                  if (isBlankNote) {
+                    editorRef.current.commands.setContent(html, { emitUpdate: true });
+                  } else if (isAtStart) {
+                    const firstNode = editorRef.current.state.doc.child(0);
+                    if (firstNode.textContent.trim().length === 0) {
+                      editorRef.current.chain()
+                        .deleteRange({ from: 0, to: firstNode.nodeSize })
+                        .insertContentAt(0, html)
+                        .run();
+                    } else {
+                      editorRef.current.commands.insertContent(html);
+                    }
+                  } else {
+                    editorRef.current.commands.insertContent(html);
+                  }
                 }
               });
               return true;
             }
           }
 
-          // 2. Check if pasted plain text contains Markdown formatting
+          // 2. Check if pasted plain text contains Markdown formatting or is pasted into a blank note
           const plainText = clipboardData.getData("text/plain");
-          if (plainText && isMarkdownContent(plainText)) {
-            event.preventDefault();
-            const html = markdownToTipTapHtml(plainText);
-            if (editorRef.current) {
-              editorRef.current.commands.insertContent(html);
+          if (plainText) {
+            const isBlankNote =
+              editorRef.current?.state.doc.textContent.trim().length === 0;
+            const isAtStart =
+              (editorRef.current?.state.selection.from ?? 0) <= 2;
+
+            if (isMarkdownContent(plainText) || isBlankNote) {
+              event.preventDefault();
+              const shouldEnsureH1 = isBlankNote || isAtStart;
+              const html = markdownToTipTapHtml(plainText, {
+                ensureFirstLineH1: shouldEnsureH1,
+              });
+
+              if (editorRef.current) {
+                if (isBlankNote) {
+                  editorRef.current.commands.setContent(html, { emitUpdate: true });
+                } else if (isAtStart) {
+                  const firstNode = editorRef.current.state.doc.child(0);
+                  if (firstNode.textContent.trim().length === 0) {
+                    editorRef.current.chain()
+                      .deleteRange({ from: 0, to: firstNode.nodeSize })
+                      .insertContentAt(0, html)
+                      .run();
+                  } else {
+                    editorRef.current.commands.insertContent(html);
+                  }
+                } else {
+                  editorRef.current.commands.insertContent(html);
+                }
+              }
+              return true;
             }
-            return true;
           }
 
           return false;
@@ -308,7 +378,7 @@ export function Editor({
         try {
           docData = JSON.parse(cached.content);
         } catch {
-          docData = markdownToTipTapHtml(cached.content);
+          docData = markdownToTipTapHtml(cached.content, { ensureFirstLineH1: true });
         }
         applyDocumentInPlace(docData);
       }
@@ -332,7 +402,7 @@ export function Editor({
               try {
                 freshDoc = JSON.parse(fullNote.content);
               } catch {
-                freshDoc = markdownToTipTapHtml(fullNote.content);
+                freshDoc = markdownToTipTapHtml(fullNote.content, { ensureFirstLineH1: true });
               }
               applyDocumentInPlace(freshDoc);
             }
@@ -349,7 +419,7 @@ export function Editor({
             try {
               freshDoc = JSON.parse(fullNote.content);
             } catch {
-              freshDoc = markdownToTipTapHtml(fullNote.content);
+              freshDoc = markdownToTipTapHtml(fullNote.content, { ensureFirstLineH1: true });
             }
             applyDocumentInPlace(freshDoc);
             if (scrollContainerRef.current) {
@@ -610,7 +680,10 @@ export function Editor({
         onClick={handleWrapperClick}
         className="flex-1 min-h-0 overflow-y-auto pt-3 relative"
       >
-        <div style={{ zoom: zoomLevel } as React.CSSProperties} className="relative">
+        <div
+          style={zoomLevel && zoomLevel !== 1 ? ({ zoom: zoomLevel } as React.CSSProperties) : undefined}
+          className="relative"
+        >
           <SmoothCaret
             editor={editor}
             zoomLevel={zoomLevel}
@@ -629,8 +702,8 @@ export function Editor({
           style={{
             position: "absolute",
             display: "none",
-            backgroundColor: "rgba(14, 165, 233, 0.16)",
-            border: "1px solid rgba(14, 165, 233, 0.65)",
+            backgroundColor: "rgba(14, 165, 233, 0.08)",
+            border: "1px solid rgba(14, 165, 233, 0.35)",
             borderRadius: "8px",
             pointerEvents: "none",
             zIndex: 50,

@@ -30,6 +30,15 @@ export function DocumentTickSlider({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const updateTrackHeight = useCallback(() => {
+    if (trackRef.current) {
+      const h = trackRef.current.clientHeight;
+      if (h > 0) {
+        setTrackHeight((prev) => (Math.abs(h - prev) > 4 ? h : prev));
+      }
+    }
+  }, []);
+
   // Update scroll metrics and progress (0.0 to 1.0)
   const updateScrollProgress = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -45,13 +54,6 @@ export function DocumentTickSlider({
       setScrollProgress(progress);
     } else {
       setScrollProgress(0);
-    }
-
-    if (trackRef.current) {
-      const h = trackRef.current.clientHeight;
-      if (h > 0) {
-        setTrackHeight((prev) => (Math.abs(h - prev) > 4 ? h : prev));
-      }
     }
   }, [scrollContainerRef]);
 
@@ -70,10 +72,12 @@ export function DocumentTickSlider({
     container.addEventListener("scroll", onScroll, { passive: true });
 
     const observer = new ResizeObserver(() => {
+      updateTrackHeight();
       updateScrollProgress();
     });
     observer.observe(container);
 
+    updateTrackHeight();
     updateScrollProgress();
 
     return () => {
@@ -81,7 +85,7 @@ export function DocumentTickSlider({
       container.removeEventListener("scroll", onScroll);
       observer.disconnect();
     };
-  }, [scrollContainerRef, updateScrollProgress]);
+  }, [scrollContainerRef, updateTrackHeight, updateScrollProgress]);
 
   // Generate discrete tick marks representing sections / parts of the document with big and small bars
   const ticks = useMemo(() => {

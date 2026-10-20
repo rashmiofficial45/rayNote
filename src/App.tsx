@@ -33,6 +33,7 @@ import {
   downloadFile,
   extractTitleFromMarkdown,
 } from "./lib/utils";
+import { ensureFirstLineHeading } from "./editor/markdownUtils";
 import {
   getAllNotes,
   getNote,
@@ -304,11 +305,13 @@ function App() {
     async (file: File) => {
       try {
         const text = await file.text();
-        const title = extractTitleFromMarkdown(text, file.name);
+        const fallbackTitle = file.name.replace(/\.[^/.]+$/, "");
+        const formattedText = ensureFirstLineHeading(text, fallbackTitle);
+        const title = extractTitleFromMarkdown(formattedText, file.name);
         const newNote = await createNote();
-        await updateNote(newNote.id, title, text);
-        noteCache.set(newNote.id, text, new Date().toISOString(), title, 0);
-        const preview = getPreviewText(text);
+        await updateNote(newNote.id, title, formattedText);
+        noteCache.set(newNote.id, formattedText, new Date().toISOString(), title, 0);
+        const preview = getPreviewText(formattedText);
         const summary: NoteSummary = {
           id: newNote.id,
           title,
@@ -585,6 +588,39 @@ function App() {
   }, [activeNoteId, notes, handleSelectNote, showToast]);
 
   /**
+   * Sets note title explicitly, keeping React state, in-memory cache, and SQLite in sync.
+   */
+  const handleSetTitle = useCallback(
+    async (newTitle: string) => {
+      if (!activeNoteId) return;
+      try {
+        const cached = noteCache.get(activeNoteId);
+        const content = cached?.content || "";
+        noteCache.updateContent(activeNoteId, content, newTitle);
+        await updateNote(activeNoteId, newTitle, content);
+        setNotes((prev) => {
+          const updated = prev.map((n) =>
+            n.id === activeNoteId
+              ? {
+                  ...n,
+                  title: newTitle,
+                  updated_at: new Date().toISOString(),
+                }
+              : n
+          );
+          try {
+            localStorage.setItem("notefast_cached_notes", JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      } catch (err) {
+        console.error("Failed to set note title:", err);
+      }
+    },
+    [activeNoteId]
+  );
+
+  /**
    * Updates note content and metadata:
    * - Extracts title from the first document node (or uses `titleHint` if provided).
    * - Updates synchronous memory cache and localStorage immediately for zero UI lag.
@@ -595,8 +631,9 @@ function App() {
     async (content: string, titleHint?: string) => {
       if (!activeNoteId) return;
       try {
-        let title = titleHint !== undefined ? titleHint : "";
-        if (titleHint === undefined) {
+        const currentSummary = notes.find((n) => n.id === activeNoteId);
+        let title = titleHint !== undefined ? titleHint : (currentSummary?.title || "");
+        if (!title) {
           try {
             const doc = JSON.parse(content);
             if (doc.content && Array.isArray(doc.content)) {
@@ -1297,6 +1334,8 @@ function App() {
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <NoteEditor
           noteId={activeNoteId}
+          noteTitle={activeNote?.title || ""}
+          onSetTitle={handleSetTitle}
           onUpdate={handleUpdateNote}
           zoomLevel={zoomLevel}
           isFindOpen={isFindOpen}

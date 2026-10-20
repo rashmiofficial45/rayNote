@@ -95,6 +95,14 @@ export function FloatingCodeBlockToolbar({
       return;
     }
 
+    // If text selection is active (range selection or Mod-A), toolbar should not appear
+    if (!editor.state.selection.empty) {
+      if (activeBlockRef.current) {
+        setActiveBlock(null);
+      }
+      return;
+    }
+
     // 1. If dropdown is open, keep current code block anchored if still valid
     if (isOpen && activeBlockRef.current?.dom) {
       const dom = activeBlockRef.current.dom;
@@ -180,14 +188,19 @@ export function FloatingCodeBlockToolbar({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    let rafId: number | null = null;
     const handleScrollOrResize = () => {
-      syncToolbar();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        syncToolbar();
+      });
     };
 
     container.addEventListener("scroll", handleScrollOrResize, { passive: true });
     window.addEventListener("resize", handleScrollOrResize, { passive: true });
 
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       container.removeEventListener("scroll", handleScrollOrResize);
       window.removeEventListener("resize", handleScrollOrResize);
     };

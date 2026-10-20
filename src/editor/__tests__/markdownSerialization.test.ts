@@ -44,6 +44,35 @@ describe('Markdown Serialization & Clipboard Utilities (Test C)', () => {
       expect(html).toContain('<h1>Main Header</h1>');
       expect(html).toContain('<strong>Important</strong>');
     });
+
+    it('automatically ensures first line takes H1 when ensureFirstLineH1 option is enabled', () => {
+      // 1. Plain text first line becomes H1
+      const plainMd = 'My Note Title\n\nThis is paragraph content.';
+      const html1 = markdownToTipTapHtml(plainMd, { ensureFirstLineH1: true });
+      expect(html1).toContain('<h1>My Note Title</h1>');
+      expect(html1).toContain('<p>This is paragraph content.</p>');
+
+      // 2. Existing H1 remains H1
+      const h1Md = '# Already Main Header\n\nSome body text.';
+      const html2 = markdownToTipTapHtml(h1Md, { ensureFirstLineH1: true });
+      expect(html2).toContain('<h1>Already Main Header</h1>');
+
+      // 3. Sub-heading (H2) on first line is promoted to H1
+      const h2Md = '## Sub Section Title\n\nDetails here.';
+      const html3 = markdownToTipTapHtml(h2Md, { ensureFirstLineH1: true });
+      expect(html3).toContain('<h1>Sub Section Title</h1>');
+
+      // 4. YAML frontmatter title is converted to H1
+      const yamlMd = '---\ntitle: "Architecture Plan"\ndate: "2026-10-20"\n---\nOverview of design.';
+      const html4 = markdownToTipTapHtml(yamlMd, { ensureFirstLineH1: true });
+      expect(html4).toContain('<h1>Architecture Plan</h1>');
+      expect(html4).toContain('<p>Overview of design.</p>');
+
+      // 5. Fallback title for empty file
+      const emptyMd = '';
+      const html5 = markdownToTipTapHtml(emptyMd, { ensureFirstLineH1: true, fallbackTitle: 'Untitled Note' });
+      expect(html5).toContain('<h1>Untitled Note</h1>');
+    });
   });
 
   describe('sliceToMarkdown serializer', () => {

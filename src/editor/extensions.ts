@@ -20,6 +20,7 @@ import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { BlockSelection } from "../extensions/BlockSelection";
 import { ClickSelectionExtension } from "./clickSelectionExtension";
+import { PasteTitleExtension, PasteTitleOptions } from "./pasteTitleExtension";
 
 
 function enhancedBash(hljs: any) {
@@ -98,10 +99,14 @@ export const TitleBarDefaultExtension = Extension.create({
   },
 });
 
-export function getExtensions(slashCommandExtension?: any) {
+export function getExtensions(
+  slashCommandExtension?: any,
+  pasteTitleOptions?: PasteTitleOptions
+) {
   const extensions = [
     CustomDocument,
     TitleBarDefaultExtension,
+    PasteTitleExtension.configure(pasteTitleOptions),
     StarterKit.configure({
       document: false,
       codeBlock: false, // we use CodeBlockLowlight instead

@@ -4,6 +4,8 @@ import { FileText } from "lucide-react";
 interface NoteEditorProps {
   noteId: string | null;
   content?: string | null;
+  noteTitle?: string;
+  onSetTitle?: (title: string) => void;
   onUpdate: (content: string, titleHint?: string) => void;
   zoomLevel: number;
   isFindOpen?: boolean;
@@ -13,6 +15,8 @@ interface NoteEditorProps {
 export function NoteEditor({
   noteId,
   content,
+  noteTitle,
+  onSetTitle,
   onUpdate,
   zoomLevel,
   isFindOpen,
@@ -43,6 +47,8 @@ export function NoteEditor({
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <Editor
         noteId={noteId}
+        noteTitle={noteTitle}
+        onSetTitle={onSetTitle}
         initialContent={content || ""}
         onUpdate={onUpdate}
         zoomLevel={zoomLevel}

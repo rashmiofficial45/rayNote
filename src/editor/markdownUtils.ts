@@ -37,14 +37,109 @@ export function isMarkdownContent(text: string): boolean {
 }
 
 /**
+ * Ensures the first content line of a Markdown document is formatted as a Heading 1 (# Title).
+ * - Extracts and converts frontmatter `title: ...` into an H1 if present.
+ * - Leaves existing `# Title` and setext `Title\n===` untouched.
+ * - Promotes leading sub-headings (`## Title`, `### Title`, etc.) to H1.
+ * - Promotes the first non-empty text line / paragraph to H1.
+ * - Uses fallbackTitle if the markdown has no text lines.
+ */
+export function ensureFirstLineHeading(md: string, fallbackTitle?: string): string {
+  if (!md || !md.trim()) {
+    return fallbackTitle ? `# ${fallbackTitle}\n` : "";
+  }
+
+  let text = md.trim();
+
+  // 1. Handle YAML frontmatter: --- ... ---
+  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+  const match = text.match(frontmatterRegex);
+  let frontmatterTitle: string | null = null;
+  if (match) {
+    const yaml = match[1];
+    const titleMatch = yaml.match(/(?:^|\n)\s*title\s*:\s*["']?([^"'\r\n]+)["']?/i);
+    if (titleMatch) {
+      frontmatterTitle = titleMatch[1].trim();
+    }
+    // Remove frontmatter from the body
+    text = text.slice(match[0].length).trim();
+  }
+
+  if (frontmatterTitle) {
+    if (/^#\s+/m.test(text)) {
+      return text;
+    }
+    return `# ${frontmatterTitle}\n\n${text}`;
+  }
+
+  // 2. If it already starts with H1: e.g. '# Title'
+  if (/^#\s+\S+/m.test(text)) {
+    return text;
+  }
+
+  // Check Setext H1: 'Title\n==='
+  const firstBlock = text.split(/\r?\n\r?\n/)[0] || "";
+  if (/^.+\r?\n={3,}\s*$/m.test(firstBlock)) {
+    return text;
+  }
+
+  // 3. If it starts with H2-H6: e.g. '## Title', promote to H1 '# Title'
+  const subHeadingMatch = text.match(/^#{2,6}\s+(.+)$/m);
+  if (subHeadingMatch && text.indexOf(subHeadingMatch[0]) === 0) {
+    return text.replace(/^#{2,6}\s+/, "# ");
+  }
+
+  // 4. If it starts with a normal line of text (paragraph), promote that first line to H1
+  const lines = text.split(/\r?\n/);
+  let firstLineIdx = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim().length > 0) {
+      firstLineIdx = i;
+      break;
+    }
+  }
+
+  if (firstLineIdx !== -1) {
+    const firstLine = lines[firstLineIdx].trim();
+    // Do not promote if it's a code block fence (```), horizontal rule (---), or table (|)
+    const isSpecialBlock =
+      firstLine.startsWith("```") ||
+      firstLine.startsWith("~~~") ||
+      /^(?:---|___|\*\*\*)$/.test(firstLine) ||
+      firstLine.startsWith("|");
+
+    if (!isSpecialBlock) {
+      const cleanTitle = firstLine.replace(/^[-*+]\s+/, "").replace(/^\d+\.\s+/, "");
+      lines[firstLineIdx] = `# ${cleanTitle}`;
+      return lines.join("\n");
+    }
+  }
+
+  if (fallbackTitle) {
+    return `# ${fallbackTitle}\n\n${text}`;
+  }
+
+  return text;
+}
+
+/**
  * Converts Markdown text into TipTap-compatible HTML with full task list,
  * link, and heading support.
  */
-export function markdownToTipTapHtml(md: string): string {
-  if (!md) return "";
+export function markdownToTipTapHtml(
+  md: string,
+  options?: { ensureFirstLineH1?: boolean; fallbackTitle?: string }
+): string {
+  if (!md && !options?.fallbackTitle) return "";
+
+  let processedMd = md;
+  if (options?.ensureFirstLineH1) {
+    processedMd = ensureFirstLineHeading(md, options.fallbackTitle);
+  }
+  if (!processedMd) return "";
 
   // Parse using marked with GFM (GitHub Flavored Markdown)
-  let html = marked.parse(md, {
+  let html = marked.parse(processedMd, {
     gfm: true,
     breaks: true,
     async: false,

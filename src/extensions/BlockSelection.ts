@@ -16,7 +16,7 @@ export interface BlockSelectionState {
 export const blockSelectionPluginKey = new PluginKey<BlockSelectionState>("blockSelection");
 
 export const blockSelectionVariants = cva(
-  "raynote-block-selected bg-sky-500/15 transition-colors duration-100",
+  "raynote-block-selected bg-sky-500/[0.08] transition-colors duration-100",
   {
     variants: {
       position: {
