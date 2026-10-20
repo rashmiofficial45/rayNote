@@ -2074,9 +2074,61 @@ body:has(.command-overlay) .editor-char-count {
   border-bottom-right-radius: 8px !important;
 }
 
-/* Code block selection rounding */
-.tiptap pre.notefast-code-block.raynote-block-selected {
+/* ── Code Block Selection Styling (Light & Dark Mode) ──── */
+/* Light Mode */
+[data-theme="light"] .tiptap pre.notefast-code-block.raynote-block-selected,
+.light .tiptap pre.notefast-code-block.raynote-block-selected,
+[data-resolved-theme="light"] .tiptap pre.notefast-code-block.raynote-block-selected,
+[data-theme="light"] .tiptap .code-block-wrapper.raynote-block-selected,
+.light .tiptap .code-block-wrapper.raynote-block-selected,
+[data-theme="light"] .tiptap pre.notefast-code-block.notefast-block-selected,
+.light .tiptap pre.notefast-code-block.notefast-block-selected,
+[data-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"],
+.light .tiptap pre.notefast-code-block[data-block-selected="true"],
+[data-resolved-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"] {
+  background: #e0f2fe !important;
+  border: 1px solid rgba(14, 165, 233, 0.50) !important;
+  box-shadow: 0 0 0 1.5px rgba(14, 165, 233, 0.40), 0 4px 14px rgba(14, 165, 233, 0.12) !important;
   border-radius: 12px !important;
+}
+
+[data-theme="light"] .tiptap pre.notefast-code-block.raynote-block-selected:hover,
+.light .tiptap pre.notefast-code-block.raynote-block-selected:hover,
+[data-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"]:hover {
+  border-color: rgba(14, 165, 233, 0.65) !important;
+}
+
+/* Dark Mode */
+.tiptap pre.notefast-code-block.raynote-block-selected,
+.tiptap .code-block-wrapper.raynote-block-selected,
+.tiptap pre.notefast-code-block.notefast-block-selected,
+.tiptap pre.notefast-code-block[data-block-selected="true"],
+.dark .tiptap pre.notefast-code-block.raynote-block-selected,
+[data-theme="dark"] .tiptap pre.notefast-code-block.raynote-block-selected,
+[data-theme="dark"] .tiptap pre.notefast-code-block[data-block-selected="true"] {
+  background: rgba(14, 165, 233, 0.16) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.35), 0 4px 20px rgba(0, 0, 0, 0.35) !important;
+  border-radius: 12px !important;
+}
+
+.tiptap pre.notefast-code-block.raynote-block-selected:hover,
+.tiptap pre.notefast-code-block[data-block-selected="true"]:hover,
+[data-theme="dark"] .tiptap pre.notefast-code-block.raynote-block-selected:hover {
+  border-color: rgba(56, 189, 248, 0.60) !important;
+}
+
+/* Ensure code inside selected code block is clearly legible */
+[data-theme="light"] .tiptap pre.notefast-code-block.raynote-block-selected code,
+.light .tiptap pre.notefast-code-block.raynote-block-selected code {
+  color: #0f172a !important;
+}
+
+/* Hide floating toolbar when code block is selected in block selection */
+.tiptap pre.notefast-code-block.raynote-block-selected ~ .floating-code-block-toolbar,
+.raynote-block-selected .floating-code-block-toolbar {
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* In block selection drag mode: suppress text selection and WKWebView overscroll jank */

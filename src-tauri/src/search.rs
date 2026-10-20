@@ -338,47 +338,63 @@ pub fn generate_contextual_snippet(
 
     // Find the earliest match of any query token in the original text
     let lower_text = search_text.to_lowercase();
-    let mut best_pos = None;
+    let mut best_match: Option<(usize, usize)> = None; // (char_start, char_len)
 
     // Check full query phrase first
-    if let Some(pos) = lower_text.find(&norm_query) {
-        best_pos = Some((pos, norm_query.len()));
+    if let Some(byte_pos) = lower_text.find(&norm_query) {
+        let char_pos = lower_text[..byte_pos].chars().count();
+        let char_len = norm_query.chars().count();
+        best_match = Some((char_pos, char_len));
     } else {
         for tok in &tokens {
-            if let Some(pos) = lower_text.find(tok) {
-                if best_pos.is_none() || pos < best_pos.unwrap().0 {
-                    best_pos = Some((pos, tok.len()));
+            if let Some(byte_pos) = lower_text.find(tok) {
+                let char_pos = lower_text[..byte_pos].chars().count();
+                let char_len = tok.chars().count();
+                if best_match.is_none() || char_pos < best_match.unwrap().0 {
+                    best_match = Some((char_pos, char_len));
                 }
             }
         }
     }
 
-    if let Some((pos, match_len)) = best_pos {
-        // Center snippet around match
+    if let Some((match_char_idx, match_char_len)) = best_match {
+        let chars: Vec<char> = search_text.chars().collect();
+        let total_chars = chars.len();
+
+        if total_chars == 0 {
+            return truncate_text(preview, max_len);
+        }
+
         let chars_before = max_len / 3;
-        let start_byte = if pos > chars_before {
-            // Find a valid UTF-8 boundary and space before
-            let approx = pos - chars_before;
-            search_text[approx..pos]
-                .find(' ')
-                .map(|space| approx + space + 1)
-                .unwrap_or(approx)
+        let mut start_idx = if match_char_idx > chars_before {
+            match_char_idx - chars_before
         } else {
             0
         };
 
-        let end_byte = (pos + match_len + (max_len * 2 / 3)).min(search_text.len());
-        // Snap to valid UTF-8 boundary
-        let safe_start = floor_char_boundary(search_text, start_byte);
-        let safe_end = ceil_char_boundary(search_text, end_byte);
+        // Snap start_idx to the next space so we don't awkwardly split words in half
+        if start_idx > 0 && start_idx < match_char_idx {
+            if let Some(space_offset) = chars[start_idx..match_char_idx].iter().position(|&c| c == ' ') {
+                start_idx = start_idx + space_offset + 1;
+            }
+        }
 
-        let snippet_slice = &search_text[safe_start..safe_end];
+        let chars_after = max_len.saturating_sub(match_char_idx.saturating_sub(start_idx) + match_char_len);
+        let end_idx = (match_char_idx + match_char_len + chars_after).min(total_chars);
+
+        if start_idx >= end_idx {
+            return truncate_text(preview, max_len);
+        }
+
+        let snippet_str: String = chars[start_idx..end_idx].iter().collect();
+        let trimmed = snippet_str.trim();
+
         let mut result = String::new();
-        if safe_start > 0 {
+        if start_idx > 0 {
             result.push('…');
         }
-        result.push_str(snippet_slice.trim());
-        if safe_end < search_text.len() {
+        result.push_str(trimmed);
+        if end_idx < total_chars {
             result.push('…');
         }
         return result;
@@ -394,30 +410,6 @@ fn truncate_text(s: &str, max_len: usize) -> String {
     }
     let truncated: String = trimmed.chars().take(max_len).collect();
     format!("{}…", truncated.trim_end())
-}
-
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        s.len()
-    } else {
-        let mut i = index;
-        while i > 0 && !s.is_char_boundary(i) {
-            i -= 1;
-        }
-        i
-    }
-}
-
-fn ceil_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        s.len()
-    } else {
-        let mut i = index;
-        while i < s.len() && !s.is_char_boundary(i) {
-            i += 1;
-        }
-        i
-    }
 }
 
 #[cfg(test)]
@@ -559,5 +551,21 @@ mod tests {
         let (s1, _) = score_document("performance", &doc);
         let (s2, _) = score_document("performance", &doc);
         assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn test_snippet_multibyte_utf8_boundary() {
+        // "📘" is 4 bytes (indices 0..4).
+        // Let's position "en" so approx = pos - 36 lands at index 1, 2, or 3!
+        // "📘" = 4 bytes. Add 34 'a's: 4 + 34 = 38 bytes.
+        // Add "en" at index 38.
+        // chars_before = 110 / 3 = 36.
+        // approx = 38 - 36 = 2!
+        // Index 2 is in the middle of '📘'!
+        let mut text = String::from("📘");
+        text.push_str(&"a".repeat(34));
+        text.push_str("en");
+        let snippet = generate_contextual_snippet(&text, "en", None, &text, 110);
+        assert!(!snippet.is_empty());
     }
 }

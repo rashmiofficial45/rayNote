@@ -203,8 +203,16 @@ export function getBlockDom(view: EditorView, pos: number): HTMLElement | null {
     if (dom instanceof HTMLElement) return dom;
     const resolved = view.domAtPos(pos + 1);
     let el = resolved.node instanceof HTMLElement ? resolved.node : resolved.node.parentElement;
-    while (el && el.parentElement && el.parentElement !== view.dom) {
-      if (el.tagName === "LI" || el.classList.contains("notefast-code-block")) {
+    while (el && el !== view.dom) {
+      if (
+        el.tagName === "LI" ||
+        el.tagName === "PRE" ||
+        el.classList.contains("notefast-code-block") ||
+        el.classList.contains("code-block-wrapper")
+      ) {
+        return el;
+      }
+      if (el.parentElement === view.dom) {
         return el;
       }
       el = el.parentElement;
@@ -843,30 +851,28 @@ export const BlockSelection = Extension.create({
               event.preventDefault();
               event.stopPropagation();
 
+              // 1. If in block selection mode, unselect all blocks
               if (isBlockMode) {
-                // Esc again -> exit block mode
                 const tr = state.tr.setMeta(blockSelectionPluginKey, {
                   anchor: null,
                   head: null,
                   selectedPositions: [],
                 });
                 dispatch(tr);
-                view.focus();
                 return true;
               }
 
-              // Esc while cursor in a block -> select that block
-              const block = findBlockAtPos(state.doc, state.selection.from);
-              if (block) {
-                const tr = state.tr.setMeta(blockSelectionPluginKey, {
-                  anchor: block.pos,
-                  head: block.pos,
-                  selectedPositions: [block.pos],
-                });
+              // 2. If text range is selected, unselect it (collapse to cursor)
+              if (!state.selection.empty) {
+                const tr = state.tr.setSelection(TextSelection.near(state.selection.$to));
                 dispatch(tr);
                 return true;
               }
-              return false;
+
+              // 3. If nothing is selected, defocus the editor cleanly
+              view.dom.blur();
+              (document.activeElement as HTMLElement)?.blur();
+              return true;
             }
 
             // ── Progressive ⌘A ──────────────────────────────────────────────

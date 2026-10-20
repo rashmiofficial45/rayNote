@@ -3,6 +3,7 @@ import {
   getIntersectingBlockIndices,
   findBlockIndexByDocY,
   rectsIntersect,
+  getBlockContentRects,
   type CachedBlockRect,
 } from '../useBlockDrag';
 import { getAllBlocks } from '../BlockSelection';
@@ -235,4 +236,64 @@ describe('BlockSelection Geometry & Collision Tests', () => {
       expect(range.to).toBe(45);
     });
   });
+
+  describe('Code Block Selection & Geometry', () => {
+    it('getBlockContentRects classifies pre elements as non-text blocks and uses element bounds', () => {
+      const preEl = {
+        tagName: 'PRE',
+        classList: {
+          contains: (cls: string) => cls === 'code-block-wrapper' || cls === 'notefast-code-block',
+        },
+        querySelector: () => null,
+        getBoundingClientRect: () => ({
+          left: 40,
+          right: 640,
+          top: 100,
+          bottom: 250,
+          width: 600,
+          height: 150,
+          x: 40,
+          y: 100,
+        }),
+      } as any;
+
+      const containerRect = {
+        left: 0,
+        top: 0,
+        right: 800,
+        bottom: 1000,
+        width: 800,
+        height: 1000,
+        x: 0,
+        y: 0,
+      } as any;
+
+      const rects = getBlockContentRects(preEl, containerRect, 0);
+      expect(rects.length).toBe(1);
+      expect(rects[0].left).toBe(40);
+      expect(rects[0].right).toBe(640);
+      expect(rects[0].top).toBe(100);
+      expect(rects[0].bottom).toBe(250);
+    });
+
+    it('Dragging from outside left margin across a code block correctly selects it', () => {
+      const codeBlock: CachedBlockRect = {
+        index: 0,
+        pos: 0,
+        nodeSize: 50,
+        docTop: 100,
+        docBottom: 250,
+        docLeft: 40,
+        docRight: 640,
+        contentRects: [{ left: 40, right: 640, top: 100, bottom: 250 }],
+      };
+
+      // Drag starts outside at x: 10 (margin) and extends into the code block at x: 120
+      // Vertically covering docTop 100..250 (e.g. 110..220)
+      const hit = getIntersectingBlockIndices([codeBlock], 110, 220, 10, 120);
+      expect(hit).not.toBeNull();
+      expect(hit?.selectedIndices).toEqual([0]);
+    });
+  });
 });
+

@@ -183,7 +183,7 @@ function App() {
         e.clientX <= window.innerWidth &&
         e.clientY >= 0 &&
         e.clientY <= window.innerHeight;
-      setIsMouseOverApp(inBounds);
+      setIsMouseOverApp((prev) => (prev !== inBounds ? inBounds : prev));
     };
 
     window.addEventListener("focus", handleFocus);
@@ -1189,22 +1189,13 @@ function App() {
           setIsFindOpen(false);
           return;
         }
-        if (escLosesFocus) {
-          const active = document.activeElement as HTMLElement | null;
-          if (
-            active &&
-            (active.tagName === "INPUT" ||
-              active.tagName === "TEXTAREA" ||
-              active.isContentEditable ||
-              Boolean(active.closest(".tiptap")))
-          ) {
-            active.blur();
-          }
-          return;
-        } else {
-          hideWindow().catch(console.error);
-          return;
+        // Defocus and unselect: collapse window selection & blur active element
+        window.getSelection()?.removeAllRanges();
+        const active = document.activeElement as HTMLElement | null;
+        if (active) {
+          active.blur();
         }
+        return;
       }
     };
 

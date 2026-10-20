@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { Editor } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 import { POPULAR_LANGUAGES } from "./CodeBlockComponent";
+import { blockSelectionPluginKey } from "../extensions/BlockSelection";
 
 interface FloatingCodeBlockToolbarProps {
   editor: Editor | null;
@@ -96,8 +97,16 @@ export function FloatingCodeBlockToolbar({
       return;
     }
 
-    // If text selection is active (range selection or Mod-A), toolbar should not appear
+    // If text selection is active or blocks are selected in block selection mode, toolbar should not appear
     if (!editor.state.selection.empty) {
+      if (activeBlockRef.current) {
+        setActiveBlock(null);
+      }
+      return;
+    }
+
+    const blockPluginState = blockSelectionPluginKey.getState(editor.state);
+    if (blockPluginState && blockPluginState.selectedPositions.length > 0) {
       if (activeBlockRef.current) {
         setActiveBlock(null);
       }

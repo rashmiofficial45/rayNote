@@ -42,6 +42,7 @@ export function getBlockContentRects(
 ): ContentRect[] {
   // Non-text blocks: code blocks, tables, hr, iframe
   const isNonText =
+    dom.tagName === "PRE" ||
     dom.classList.contains("code-block-wrapper") ||
     dom.classList.contains("notefast-code-block") ||
     dom.classList.contains("notefast-table") ||
@@ -51,7 +52,8 @@ export function getBlockContentRects(
     Boolean(dom.querySelector("pre, table, hr, iframe"));
 
   if (isNonText) {
-    const r = dom.getBoundingClientRect();
+    const targetEl = dom.tagName === "PRE" ? dom : dom.querySelector("pre") || dom;
+    const r = targetEl.getBoundingClientRect();
     return [
       {
         left: r.left - containerRect.left,
