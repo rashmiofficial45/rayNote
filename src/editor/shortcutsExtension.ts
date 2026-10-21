@@ -10,6 +10,8 @@ import {
   getAllBlocks,
   findBlockAtPos,
 } from "../extensions/BlockSelection";
+import { smartToggleBlockFormat, smartToggleMark } from "./formatMemory";
+import { toggleDictation } from "../lib/dictation";
 
 export const ShortcutsExtension = Extension.create({
   name: "shortcutsExtension",
@@ -18,47 +20,47 @@ export const ShortcutsExtension = Extension.create({
   addKeyboardShortcuts() {
     return {
       // Headings
-      "Mod-Alt-1": () => this.editor.commands.toggleHeading({ level: 1 }),
-      "Mod-Shift-1": () => this.editor.commands.toggleHeading({ level: 1 }),
-      "Mod-Alt-2": () => this.editor.commands.toggleHeading({ level: 2 }),
-      "Mod-Shift-2": () => this.editor.commands.toggleHeading({ level: 2 }),
-      "Mod-Alt-3": () => this.editor.commands.toggleHeading({ level: 3 }),
-      "Mod-Shift-3": () => this.editor.commands.toggleHeading({ level: 3 }),
+      "Mod-Alt-1": () => smartToggleBlockFormat(this.editor, "heading1"),
+      "Mod-Shift-1": () => smartToggleBlockFormat(this.editor, "heading1"),
+      "Mod-Alt-2": () => smartToggleBlockFormat(this.editor, "heading2"),
+      "Mod-Shift-2": () => smartToggleBlockFormat(this.editor, "heading2"),
+      "Mod-Alt-3": () => smartToggleBlockFormat(this.editor, "heading3"),
+      "Mod-Shift-3": () => smartToggleBlockFormat(this.editor, "heading3"),
       "Mod-Alt-0": () => this.editor.commands.setParagraph(),
       "Mod-Shift-0": () => this.editor.commands.setParagraph(),
 
       // Lists & Tasks
-      "Mod-Shift-8": () => this.editor.commands.toggleBulletList(),
-      "Mod-Alt-8": () => this.editor.commands.toggleBulletList(),
-      "Mod-Shift-7": () => this.editor.commands.toggleOrderedList(),
-      "Mod-Alt-7": () => this.editor.commands.toggleOrderedList(),
-      "Mod-Shift-9": () => this.editor.commands.toggleTaskList(),
-      "Mod-Alt-9": () => this.editor.commands.toggleTaskList(),
-      "Mod-Shift-t": () => this.editor.commands.toggleTaskList(),
-      "Mod-Shift-T": () => this.editor.commands.toggleTaskList(),
+      "Mod-Shift-8": () => smartToggleBlockFormat(this.editor, "bulletList"),
+      "Mod-Alt-8": () => smartToggleBlockFormat(this.editor, "bulletList"),
+      "Mod-Shift-7": () => smartToggleBlockFormat(this.editor, "orderedList"),
+      "Mod-Alt-7": () => smartToggleBlockFormat(this.editor, "orderedList"),
+      "Mod-Shift-9": () => smartToggleBlockFormat(this.editor, "taskList"),
+      "Mod-Alt-9": () => smartToggleBlockFormat(this.editor, "taskList"),
+      "Mod-Shift-t": () => smartToggleBlockFormat(this.editor, "taskList"),
+      "Mod-Shift-T": () => smartToggleBlockFormat(this.editor, "taskList"),
 
       // Formatting
-      "Mod-b": () => this.editor.commands.toggleBold(),
-      "Mod-B": () => this.editor.commands.toggleBold(),
-      "Mod-i": () => this.editor.commands.toggleItalic(),
-      "Mod-I": () => this.editor.commands.toggleItalic(),
-      "Mod-u": () => this.editor.commands.toggleUnderline(),
-      "Mod-U": () => this.editor.commands.toggleUnderline(),
-      "Mod-Shift-x": () => this.editor.commands.toggleStrike(),
-      "Mod-Shift-X": () => this.editor.commands.toggleStrike(),
-      "Mod-Shift-s": () => this.editor.commands.toggleStrike(),
-      "Mod-Shift-S": () => this.editor.commands.toggleStrike(),
+      "Mod-b": () => smartToggleMark(this.editor, "bold"),
+      "Mod-B": () => smartToggleMark(this.editor, "bold"),
+      "Mod-i": () => smartToggleMark(this.editor, "italic"),
+      "Mod-I": () => smartToggleMark(this.editor, "italic"),
+      "Mod-u": () => smartToggleMark(this.editor, "underline"),
+      "Mod-U": () => smartToggleMark(this.editor, "underline"),
+      "Mod-Shift-x": () => smartToggleMark(this.editor, "strike"),
+      "Mod-Shift-X": () => smartToggleMark(this.editor, "strike"),
+      "Mod-Shift-s": () => smartToggleMark(this.editor, "strike"),
+      "Mod-Shift-S": () => smartToggleMark(this.editor, "strike"),
       "Mod-e": () => this.editor.commands.toggleCode(),
       "Mod-E": () => this.editor.commands.toggleCode(),
-      "Mod-Shift-h": () => this.editor.commands.toggleHighlight(),
-      "Mod-Shift-H": () => this.editor.commands.toggleHighlight(),
-      "Mod-Shift-b": () => this.editor.commands.toggleBlockquote(),
-      "Mod-Shift-B": () => this.editor.commands.toggleBlockquote(),
-      "Mod-Shift-.": () => this.editor.commands.toggleBlockquote(),
-      "Mod-Alt-.": () => this.editor.commands.toggleBlockquote(),
-      "Mod-Alt-c": () => this.editor.commands.toggleCodeBlock(),
-      "Mod-Shift-c": () => this.editor.commands.toggleCodeBlock(),
-      "Mod-Shift-C": () => this.editor.commands.toggleCodeBlock(),
+      "Mod-Shift-h": () => smartToggleMark(this.editor, "highlight"),
+      "Mod-Shift-H": () => smartToggleMark(this.editor, "highlight"),
+      "Mod-Shift-b": () => smartToggleBlockFormat(this.editor, "blockquote"),
+      "Mod-Shift-B": () => smartToggleBlockFormat(this.editor, "blockquote"),
+      "Mod-Shift-.": () => smartToggleBlockFormat(this.editor, "blockquote"),
+      "Mod-Alt-.": () => smartToggleBlockFormat(this.editor, "blockquote"),
+      "Mod-Alt-c": () => smartToggleBlockFormat(this.editor, "codeBlock"),
+      "Mod-Shift-c": () => smartToggleBlockFormat(this.editor, "codeBlock"),
+      "Mod-Shift-C": () => smartToggleBlockFormat(this.editor, "codeBlock"),
       "Mod-Alt--": () => this.editor.commands.setHorizontalRule(),
       "Mod-Shift--": () => this.editor.commands.setHorizontalRule(),
       "Mod-_": () => this.editor.commands.setHorizontalRule(),
@@ -84,6 +86,16 @@ export const ShortcutsExtension = Extension.create({
         } else {
           this.editor.chain().focus().setLink({ href: url.trim() }).run();
         }
+        return true;
+      },
+
+      // Voice Dictation: ⌥D or ⌘⌥D
+      "Alt-d": () => {
+        toggleDictation(this.editor);
+        return true;
+      },
+      "Mod-Alt-d": () => {
+        toggleDictation(this.editor);
         return true;
       },
 

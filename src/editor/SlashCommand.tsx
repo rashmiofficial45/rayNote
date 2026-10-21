@@ -29,7 +29,9 @@ import {
   Strikethrough,
   Highlighter,
   Table as TableIcon,
+  Mic,
 } from "lucide-react";
+import { toggleDictation } from "../lib/dictation";
 
 export interface CommandItem {
   title: string;
@@ -202,6 +204,16 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
         .deleteRange(range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run();
+    },
+  },
+  {
+    title: "Voice Dictation",
+    badge: "mic",
+    aliases: ["dictate", "dictation", "voice", "speech", "mic", "talk", "transcribe"],
+    icon: <Mic size={13} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      toggleDictation(editor);
     },
   },
 ];

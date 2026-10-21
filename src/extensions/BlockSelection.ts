@@ -810,8 +810,8 @@ export const BlockSelection = Extension.create({
               const pluginState = blockSelectionPluginKey.getState(view.state);
               if (pluginState && pluginState.selectedPositions.length > 0) {
                 const inputType = event.inputType;
-                if (inputType === "insertText" && event.data) {
-                  // Typing printable character exits block mode and starts editing
+                if (inputType.startsWith("insert")) {
+                  // Dictation, typing or composition: exit block mode and insert text
                   const firstPos = pluginState.selectedPositions[0];
                   let tr = view.state.tr.setMeta(blockSelectionPluginKey, {
                     anchor: null,
@@ -824,10 +824,15 @@ export const BlockSelection = Extension.create({
                   } catch {
                     tr = tr.setSelection(TextSelection.create(tr.doc, firstPos + 1));
                   }
-                  tr = tr.insertText(event.data);
-                  view.dispatch(tr);
-                  event.preventDefault();
-                  return true;
+                  if (event.data) {
+                    tr = tr.insertText(event.data);
+                    view.dispatch(tr);
+                    event.preventDefault();
+                    return true;
+                  } else {
+                    view.dispatch(tr);
+                    return false;
+                  }
                 }
                 event.preventDefault();
                 return true;

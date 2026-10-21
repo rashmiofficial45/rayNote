@@ -4,5 +4,9 @@
 <dict>
     <key>LSUIElement</key>
     <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>rayNote requires microphone access to enable voice dictation and speech recognition.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>rayNote uses speech recognition to convert spoken words into notes.</string>
 </dict>
 </plist>

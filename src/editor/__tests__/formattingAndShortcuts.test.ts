@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import { Editor } from "@tiptap/core";
 import { getExtensions } from "../extensions";
 import { POPULAR_LANGUAGES } from "../CodeBlockComponent";
+import { getAllBlocks, blockSelectionPluginKey } from "../../extensions/BlockSelection";
+import { smartToggleBlockFormat, smartToggleMark } from "../formatMemory";
 
 describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
   function createTestEditor(initialContent: string = "") {
@@ -200,6 +202,131 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
       expect(editor.isActive("bold")).toBe(true);
       editor.commands.toggleBold();
       expect(editor.isActive("bold")).toBe(false);
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off heading on ordered list returns to ordered list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection(5);
+      expect(editor.isActive("orderedList")).toBe(true);
+
+      // Press Heading 1 -> becomes H1
+      smartToggleBlockFormat(editor, "heading1");
+      expect(editor.isActive("heading", { level: 1 })).toBe(true);
+      expect(editor.getHTML()).toContain("<h1>This is my first line.</h1>");
+
+      // Press Heading 1 again -> returns to ordered list! (Number formatting preserved)
+      smartToggleBlockFormat(editor, "heading1");
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleMark: toggling bold preserves list item structure", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection({ from: 3, to: 26 });
+      
+      // Press Bold -> bold inside list item
+      smartToggleMark(editor, "bold");
+      expect(editor.isActive("bold")).toBe(true);
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toBe("<ol><li><p><strong>This is my first line.</strong></p></li></ol>");
+
+      // Press Bold again -> un-bold inside list item (orderedList preserved)
+      smartToggleMark(editor, "bold");
+      expect(editor.isActive("bold")).toBe(false);
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toBe("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleMark with block selection: toggles bold across selected blocks without destroying list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      const blocks = getAllBlocks(editor.state.doc);
+      const targetPos = blocks[0].pos;
+
+      // Select list item block via blockSelection
+      editor.view.dispatch(
+        editor.state.tr.setMeta(blockSelectionPluginKey, {
+          anchor: targetPos,
+          head: targetPos,
+          selectedPositions: [targetPos],
+        })
+      );
+
+      // Toggle bold in block mode
+      smartToggleMark(editor, "bold");
+      expect(editor.getHTML()).toBe("<ol><li><p><strong>This is my first line.</strong></p></li></ol>");
+
+      // Toggle bold again in block mode
+      smartToggleMark(editor, "bold");
+      expect(editor.getHTML()).toBe("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off bulletList on ordered list returns to ordered list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection(5);
+
+      smartToggleBlockFormat(editor, "bulletList");
+      expect(editor.isActive("bulletList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ul><li><p>This is my first line.</p></li></ul>");
+
+      smartToggleBlockFormat(editor, "bulletList");
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off codeBlock on ordered list returns to ordered list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection(5);
+
+      smartToggleBlockFormat(editor, "codeBlock");
+      expect(editor.isActive("codeBlock")).toBe(true);
+
+      smartToggleBlockFormat(editor, "codeBlock");
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off blockquote on ordered list returns to ordered list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection(5);
+
+      smartToggleBlockFormat(editor, "blockquote");
+      expect(editor.isActive("blockquote")).toBe(true);
+
+      smartToggleBlockFormat(editor, "blockquote");
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off taskList on ordered list returns to ordered list", () => {
+      const editor = createTestEditor("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.commands.setTextSelection(5);
+
+      smartToggleBlockFormat(editor, "taskList");
+      expect(editor.isActive("taskList")).toBe(true);
+
+      smartToggleBlockFormat(editor, "taskList");
+      expect(editor.isActive("orderedList")).toBe(true);
+      expect(editor.getHTML()).toContain("<ol><li><p>This is my first line.</p></li></ol>");
+      editor.destroy();
+    });
+
+    it("smartToggleBlockFormat: toggling off heading on normal paragraph returns to paragraph", () => {
+      const editor = createTestEditor("<p>Simple line</p>");
+      editor.commands.setTextSelection(3);
+
+      smartToggleBlockFormat(editor, "heading1");
+      expect(editor.isActive("heading", { level: 1 })).toBe(true);
+
+      smartToggleBlockFormat(editor, "heading1");
+      expect(editor.isActive("heading")).toBe(false);
+      expect(editor.getHTML()).toBe("<p>Simple line</p>");
       editor.destroy();
     });
 

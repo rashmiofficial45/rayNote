@@ -270,6 +270,78 @@ fn setup_macos_panel(app: &tauri::App) {
             eprintln!("=== NoteFast Diagnostics: is_panel={}, level={}, behavior={:#x}, styleMask={:#x}, is_visible={}, frame=({:.1}, {:.1}) {:.1}x{:.1} ===", is_panel, current_level, current_behavior, current_mask, is_visible, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
         }
     }
+
+    #[cfg(target_os = "macos")]
+    unsafe {
+        setup_macos_edit_menu();
+    }
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn setup_macos_edit_menu() {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+
+    let app_class = objc2::class!(NSApplication);
+    let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+
+    let existing_main_menu: *mut AnyObject = msg_send![shared_app, mainMenu];
+    let main_menu: *mut AnyObject = if existing_main_menu.is_null() {
+        let m: *mut AnyObject = msg_send![objc2::class!(NSMenu), new];
+        let _: () = msg_send![shared_app, setMainMenu: m];
+        m
+    } else {
+        existing_main_menu
+    };
+
+    let ns_str = |s: &[u8]| -> *mut AnyObject {
+        msg_send![objc2::class!(NSString), stringWithUTF8String: s.as_ptr()]
+    };
+
+    // 1. App Submenu (if empty)
+    let count: usize = msg_send![main_menu, numberOfItems];
+    if count == 0 {
+        let app_item: *mut AnyObject = msg_send![objc2::class!(NSMenuItem), new];
+        let app_menu: *mut AnyObject = msg_send![objc2::class!(NSMenu), new];
+        let _: () = msg_send![app_item, setSubmenu: app_menu];
+        let _: () = msg_send![main_menu, addItem: app_item];
+    }
+
+    // 2. Edit Submenu
+    let edit_title = ns_str(b"Edit\0");
+    let edit_item: *mut AnyObject = msg_send![objc2::class!(NSMenuItem), new];
+    let _: () = msg_send![edit_item, setTitle: edit_title];
+    let edit_menu: *mut AnyObject = msg_send![objc2::class!(NSMenu), alloc];
+    let edit_menu: *mut AnyObject = msg_send![edit_menu, initWithTitle: edit_title];
+
+    let add_item = |menu: *mut AnyObject, title: &[u8], sel: objc2::runtime::Sel, key: &[u8], mask: usize| {
+        let t = ns_str(title);
+        let k = ns_str(key);
+        let item: *mut AnyObject = msg_send![objc2::class!(NSMenuItem), alloc];
+        let item: *mut AnyObject = msg_send![item, initWithTitle: t, action: sel, keyEquivalent: k];
+        if mask > 0 {
+            let _: () = msg_send![item, setKeyEquivalentModifierMask: mask];
+        }
+        let _: () = msg_send![menu, addItem: item];
+    };
+
+    add_item(edit_menu, b"Undo\0", objc2::sel!(undo:), b"z\0", 1 << 20);
+    add_item(edit_menu, b"Redo\0", objc2::sel!(redo:), b"Z\0", 1 << 20);
+    let sep1: *mut AnyObject = msg_send![objc2::class!(NSMenuItem), separatorItem];
+    let _: () = msg_send![edit_menu, addItem: sep1];
+
+    add_item(edit_menu, b"Cut\0", objc2::sel!(cut:), b"x\0", 1 << 20);
+    add_item(edit_menu, b"Copy\0", objc2::sel!(copy:), b"c\0", 1 << 20);
+    add_item(edit_menu, b"Paste\0", objc2::sel!(paste:), b"v\0", 1 << 20);
+    add_item(edit_menu, b"Select All\0", objc2::sel!(selectAll:), b"a\0", 1 << 20);
+    let sep2: *mut AnyObject = msg_send![objc2::class!(NSMenuItem), separatorItem];
+    let _: () = msg_send![edit_menu, addItem: sep2];
+
+    // Dictation menu item: enables system dictation & Fn/Mic key natively in macOS
+    add_item(edit_menu, b"Start Dictation...\0", objc2::sel!(startDictation:), b"\0", 0);
+
+    let _: () = msg_send![edit_item, setSubmenu: edit_menu];
+    let _: () = msg_send![main_menu, addItem: edit_item];
 }
 
 pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
@@ -485,6 +557,7 @@ pub fn run() {
             set_menu_bar_visible,
             export_notes_to_folder,
             export_all_notes_from_db,
+            start_native_dictation,
         ])
         .build(tauri::generate_context!())
         .expect("error while building rayNote");

@@ -984,3 +984,22 @@ pub fn get_storage_stats(
     }))
 }
 
+#[tauri::command]
+pub fn start_native_dictation() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    unsafe {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        let app_class = objc2::class!(NSApplication);
+        let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
+        let sel = objc2::sel!(startDictation:);
+        let _: () = msg_send![
+            shared_app,
+            sendAction: sel,
+            to: std::ptr::null_mut::<AnyObject>(),
+            from: std::ptr::null_mut::<AnyObject>()
+        ];
+    }
+    Ok(())
+}
+

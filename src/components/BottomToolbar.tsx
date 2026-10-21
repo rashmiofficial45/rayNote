@@ -5,6 +5,7 @@ import {
   Heading1,
   Heading2,
   List,
+  ListOrdered,
   CheckSquare,
   Quote,
   Code2,
@@ -21,7 +22,10 @@ import {
   Sun,
   Moon,
   Monitor,
+  Mic,
 } from "lucide-react";
+import { smartToggleBlockFormat, smartToggleMark } from "../editor/formatMemory";
+import { toggleDictation, subscribeDictationState } from "../lib/dictation";
 import {
   ACCENT_OPTIONS,
   FONT_OPTIONS,
@@ -50,6 +54,13 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
+  const [isDictating, setIsDictating] = useState(false);
+
+  useEffect(() => {
+    return subscribeDictationState((listening) => {
+      setIsDictating(listening);
+    });
+  }, []);
 
   useEffect(() => {
     const handleAccent = (e: Event) => {
@@ -183,6 +194,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     editor.isActive("highlight") ||
     editor.isActive("heading") ||
     editor.isActive("bulletList") ||
+    editor.isActive("orderedList") ||
     editor.isActive("taskList") ||
     editor.isActive("blockquote") ||
     editor.isActive("codeBlock");
@@ -212,14 +224,16 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         <div className="bottom-toolbar-expanded-menu">
           <div className="expanded-toolbar-row">
             <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "heading1")}
               className={`toolbar-btn liquid-btn ${editor.isActive("heading", { level: 1 }) ? "is-active" : ""}`}
               title="Heading 1 (⌘⌥1)"
             >
               <Heading1 size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "heading2")}
               className={`toolbar-btn liquid-btn ${editor.isActive("heading", { level: 2 }) ? "is-active" : ""}`}
               title="Heading 2 (⌘⌥2)"
             >
@@ -227,39 +241,53 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             </button>
             <div className="toolbar-separator" />
             <button
-              onClick={() => editor.chain().focus().toggleBold().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "bold")}
               className={`toolbar-btn liquid-btn ${editor.isActive("bold") ? "is-active" : ""}`}
               title="Bold (⌘B)"
             >
               <Bold size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleItalic().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "italic")}
               className={`toolbar-btn liquid-btn ${editor.isActive("italic") ? "is-active" : ""}`}
               title="Italic (⌘I)"
             >
               <Italic size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "underline")}
               className={`toolbar-btn liquid-btn ${editor.isActive("underline") ? "is-active" : ""}`}
               title="Underline (⌘U)"
             >
               <UnderlineIcon size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleStrike().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "strike")}
               className={`toolbar-btn liquid-btn ${editor.isActive("strike") ? "is-active" : ""}`}
               title="Strikethrough (⇧⌘X)"
             >
               <Strikethrough size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "highlight")}
               className={`toolbar-btn liquid-btn ${editor.isActive("highlight") ? "is-active" : ""}`}
               title="Highlight (⇧⌘H)"
             >
               <HighlightIcon size={14} />
+            </button>
+            <div className="toolbar-separator" />
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => toggleDictation(editor)}
+              className={`toolbar-btn liquid-btn ${isDictating ? "is-dictating is-active" : ""}`}
+              title={isDictating ? "Stop Dictation (⌥D)" : "Voice Dictation (⌥D or Fn twice)"}
+            >
+              <Mic size={14} className={isDictating ? "animate-pulse" : ""} />
             </button>
           </div>
 
@@ -267,34 +295,47 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
           <div className="expanded-toolbar-row">
             <button
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "bulletList")}
               className={`toolbar-btn liquid-btn ${editor.isActive("bulletList") ? "is-active" : ""}`}
               title="Bullet List (⇧⌘8)"
             >
               <List size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleTaskList().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "orderedList")}
+              className={`toolbar-btn liquid-btn ${editor.isActive("orderedList") ? "is-active" : ""}`}
+              title="Numbered List (⇧⌘7)"
+            >
+              <ListOrdered size={14} />
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "taskList")}
               className={`toolbar-btn liquid-btn ${editor.isActive("taskList") ? "is-active" : ""}`}
               title="Task List (⇧⌘9)"
             >
               <CheckSquare size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "blockquote")}
               className={`toolbar-btn liquid-btn ${editor.isActive("blockquote") ? "is-active" : ""}`}
               title="Quote (⇧⌘B)"
             >
               <Quote size={14} />
             </button>
             <button
-              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleBlockFormat(editor, "codeBlock")}
               className={`toolbar-btn liquid-btn ${editor.isActive("codeBlock") ? "is-active" : ""}`}
               title="Code Block (⌘⌥C)"
             >
               <Code2 size={14} />
             </button>
             <button
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().setHorizontalRule().run()}
               className="toolbar-btn liquid-btn"
               title="Horizontal Ruler / Separation Line (--- or ⌘⌥-)"
@@ -302,6 +343,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
               <Minus size={14} />
             </button>
             <button
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
               className="toolbar-btn liquid-btn"
               title="Insert Table (3x3)"
@@ -395,15 +437,29 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         </div>
       )}
 
-      <button
-        onClick={() => setIsMenuOpen((prev) => !prev)}
-        className={`format-corner-btn liquid-btn ${hasActiveFormatting ? "has-formatting" : ""} ${isMenuOpen ? "is-active" : ""}`}
-        title="Format (Aa)"
-        aria-label="Format"
-      >
-        <ALargeSmall size={19} />
-        {hasActiveFormatting && <span className="format-indicator-dot" />}
-      </button>
+      <div className="bottom-corner-buttons-row">
+        <button
+          type="button"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => toggleDictation(editor)}
+          className={`format-corner-btn liquid-btn dictation-corner-btn ${isDictating ? "is-dictating is-active" : ""}`}
+          title={isDictating ? "Stop Dictation (⌥D)" : "Voice Dictation (⌥D or Fn twice)"}
+          aria-label="Voice Dictation"
+        >
+          <Mic size={17} className={isDictating ? "animate-pulse" : ""} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          className={`format-corner-btn liquid-btn ${hasActiveFormatting ? "has-formatting" : ""} ${isMenuOpen ? "is-active" : ""}`}
+          title="Format (Aa)"
+          aria-label="Format"
+        >
+          <ALargeSmall size={19} />
+          {hasActiveFormatting && <span className="format-indicator-dot" />}
+        </button>
+      </div>
     </div>
   );
 }

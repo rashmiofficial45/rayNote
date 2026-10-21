@@ -21,6 +21,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { BlockSelection } from "../extensions/BlockSelection";
 import { ClickSelectionExtension } from "./clickSelectionExtension";
 import { PasteTitleExtension, PasteTitleOptions } from "./pasteTitleExtension";
+import { FormatMemoryExtension } from "./formatMemory";
 
 
 function enhancedBash(hljs: any) {
@@ -188,6 +189,7 @@ export function getExtensions(
     TableCell,
     BlockSelection,
     ClickSelectionExtension,
+    FormatMemoryExtension,
   ];
 
   if (slashCommandExtension) {
