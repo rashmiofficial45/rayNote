@@ -725,8 +725,8 @@ body,
 :root {
   /* Dedicated gutter reserved for the right-side tick-mark slider (6px offset + 22px slider width = 28px) */
   --slider-gutter-width: 28px;
-  /* Fluid professional content margin: ~22px on compact/default 380px, smoothly scaling as window resizes */
-  --editor-padding-left: clamp(22px, 5.5vw, 68px);
+  /* Fluid professional content margin: generous left margin for comfortable reading and block selection */
+  --editor-padding-left: clamp(32px, 6vw, 76px);
 }
 
 @media (min-width: 900px) {
@@ -947,14 +947,25 @@ html[data-smooth-caret="false"] .tiptap {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 2px;
+  margin-bottom: 6px;
+  line-height: 1.85;
+}
+
+.tiptap ul[data-type="taskList"] li > div {
+  flex: 1 1 auto;
+  line-height: 1.85;
+}
+
+.tiptap ul[data-type="taskList"] li > div > p {
+  margin: 0;
+  line-height: 1.85;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
@@ -1576,27 +1587,109 @@ pre.notefast-code-block:hover {
   gap: 8px;
 }
 
+/* ══════════════════════════════════════════════════════════
+   Apple Native Dictation Live Glaze & Shimmer Theme
+   ══════════════════════════════════════════════════════════ */
+
 .dictation-corner-btn.is-dictating,
 .toolbar-btn.is-dictating {
-  background: rgba(239, 68, 68, 0.22) !important;
-  border-color: rgba(239, 68, 68, 0.65) !important;
-  color: #ef4444 !important;
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.45), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35) !important;
-  animation: dictationPulse 1.4s infinite ease-in-out;
+  position: relative;
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.24) 0%, rgba(139, 92, 246, 0.32) 50%, rgba(56, 189, 248, 0.24) 100%) !important;
+  border-color: rgba(168, 85, 247, 0.75) !important;
+  color: #c084fc !important;
+  box-shadow:
+    0 0 16px -1px rgba(168, 85, 247, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.4),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 2px 0 rgba(147, 51, 234, 0.35) !important;
+  backdrop-filter: blur(18px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(200%) !important;
+  animation: dictationGlazeAura 2.2s infinite ease-in-out;
+  overflow: hidden;
+  opacity: 1 !important;
 }
 
-@keyframes dictationPulse {
+/* Shimmering glass glaze reflection moving softly across the icon */
+.dictation-corner-btn.is-dictating::after,
+.toolbar-btn.is-dictating::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: linear-gradient(
+    60deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.38) 50%,
+    transparent 65%
+  );
+  transform: rotate(25deg);
+  animation: dictationGlazeShine 2.8s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.dictation-corner-btn.is-dictating svg,
+.toolbar-btn.is-dictating svg {
+  filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.85));
+  animation: dictationMicGlow 1.8s infinite ease-in-out;
+  color: #c084fc !important;
+}
+
+/* Light theme glaze with crisp Apple vibrancy */
+.light .dictation-corner-btn.is-dictating,
+[data-theme="light"] .dictation-corner-btn.is-dictating,
+.light .toolbar-btn.is-dictating,
+[data-theme="light"] .toolbar-btn.is-dictating {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.25) 0%, rgba(167, 139, 250, 0.34) 50%, rgba(96, 165, 250, 0.25) 100%) !important;
+  border-color: rgba(147, 51, 234, 0.6) !important;
+  color: #7c3aed !important;
+  box-shadow:
+    0 0 16px -1px rgba(147, 51, 234, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.95),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+.light .dictation-corner-btn.is-dictating svg,
+[data-theme="light"] .dictation-corner-btn.is-dictating svg,
+.light .toolbar-btn.is-dictating svg,
+[data-theme="light"] .toolbar-btn.is-dictating svg {
+  filter: drop-shadow(0 0 5px rgba(124, 58, 237, 0.7));
+  color: #7c3aed !important;
+}
+
+@keyframes dictationGlazeAura {
+  0%, 100% {
+    box-shadow:
+      0 0 14px -2px rgba(168, 85, 247, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.35),
+      inset 0 1px 2px 0 rgba(255, 255, 255, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 22px 2px rgba(168, 85, 247, 0.8),
+      0 0 0 1.5px rgba(255, 255, 255, 0.55),
+      inset 0 1px 2px 0 rgba(255, 255, 255, 0.85);
+  }
+}
+
+@keyframes dictationGlazeShine {
   0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+    transform: translateX(-100%) rotate(25deg);
   }
-  60% {
+  25%, 100% {
+    transform: translateX(100%) rotate(25deg);
+  }
+}
+
+@keyframes dictationMicGlow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(192, 132, 252, 0.7));
+  }
+  50% {
     transform: scale(1.08);
-    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.9));
   }
 }
 
@@ -2059,10 +2152,19 @@ body:has(.command-overlay) .editor-char-count {
 .notefast-block-selected {
   background-color: rgba(14, 165, 233, 0.08) !important;
   box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.20) !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   transition: background-color 80ms ease, box-shadow 80ms ease, border-radius 80ms ease;
   position: relative;
   outline: none !important;
+}
+
+/* Apply left/right margin ONLY to text block spaces, NEVER tables or code blocks */
+.raynote-block-selected:not(table):not(.tableWrapper):not(pre):not(.code-block-wrapper):not(.notefast-code-block),
+.notefast-block-selected:not(table):not(.tableWrapper):not(pre):not(.code-block-wrapper):not(.notefast-code-block) {
+  margin-left: -10px !important;
+  padding-left: 10px !important;
+  margin-right: -8px !important;
+  padding-right: 8px !important;
 }
 
 .dark .raynote-block-selected,
@@ -2080,28 +2182,42 @@ body:has(.command-overlay) .editor-char-count {
 [data-selection-edge="first"],
 [data-selection-edge="middle"],
 [data-selection-edge="last"] {
-  border-radius: 8px !important;
+  border-radius: 6px !important;
 }
 
-/* Table block selection rounding */
-.tiptap table.raynote-block-selected {
-  border-radius: 8px !important;
+/* Table block selection: strictly NO extra margin or padding shift */
+.tiptap table.raynote-block-selected,
+.tiptap .tableWrapper.raynote-block-selected {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  border-radius: 6px !important;
   overflow: hidden !important;
 }
 
 .tiptap table.raynote-block-selected tr:first-child th:first-child,
 .tiptap table.raynote-block-selected tr:first-child td:first-child {
-  border-top-left-radius: 8px !important;
+  border-top-left-radius: 6px !important;
 }
 .tiptap table.raynote-block-selected tr:first-child th:last-child,
 .tiptap table.raynote-block-selected tr:first-child td:last-child {
-  border-top-right-radius: 8px !important;
+  border-top-right-radius: 6px !important;
 }
 .tiptap table.raynote-block-selected tr:last-child td:first-child {
-  border-bottom-left-radius: 8px !important;
+  border-bottom-left-radius: 6px !important;
 }
 .tiptap table.raynote-block-selected tr:last-child td:last-child {
-  border-bottom-right-radius: 8px !important;
+  border-bottom-right-radius: 6px !important;
+}
+
+/* Code block selection: strictly NO extra margin or padding shift */
+.tiptap pre.notefast-code-block.raynote-block-selected,
+.tiptap .code-block-wrapper.raynote-block-selected,
+.tiptap pre.notefast-code-block[data-block-selected="true"],
+.tiptap .code-block-wrapper[data-block-selected="true"] {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 /* ── Code Block Selection Styling (Light & Dark Mode) ──── */
@@ -5343,7 +5459,5 @@ body:has(.command-overlay) .editor-char-count {
   flex-shrink: 0;
   user-select: none;
 }
-
-
 
 

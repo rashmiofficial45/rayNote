@@ -20,10 +20,10 @@ export const blockSelectionVariants = cva(
   {
     variants: {
       position: {
-        single: "rounded-lg",
-        first: "rounded-lg",
-        middle: "rounded-lg",
-        last: "rounded-lg",
+        single: "rounded-md",
+        first: "rounded-md",
+        middle: "rounded-md",
+        last: "rounded-md",
       },
     },
     defaultVariants: {
