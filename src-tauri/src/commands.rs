@@ -1002,4 +1002,3 @@ pub fn start_native_dictation() -> Result<(), String> {
     }
     Ok(())
 }
-
