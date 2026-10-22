@@ -14,7 +14,7 @@
  */
 
 import { useEditor, EditorContent } from "@tiptap/react";
-import { useEffect, useRef, useCallback, useState, useMemo } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getExtensions } from "./extensions";
@@ -33,6 +33,47 @@ import {
 } from "./markdownUtils";
 import { noteCache } from "../lib/noteCache";
 import { getNote } from "../lib/db";
+
+export interface EditorCharCountProps {
+  editor: any;
+  noteId: string;
+}
+
+export const EditorCharCount = memo(function EditorCharCount({
+  editor,
+  noteId,
+}: EditorCharCountProps) {
+  const [count, setCount] = useState<number>(
+    () => editor?.state?.doc?.textContent?.length ?? 0
+  );
+
+  useEffect(() => {
+    if (!editor) return;
+    const update = () => {
+      const c: number = editor.state?.doc?.textContent?.length ?? 0;
+      setCount((prev: number) => (prev === c ? prev : c));
+    };
+
+    update();
+
+    const handleTransaction = ({ transaction }: { transaction: any }) => {
+      if (transaction.docChanged) {
+        update();
+      }
+    };
+
+    editor.on("transaction", handleTransaction);
+    return () => {
+      editor.off("transaction", handleTransaction);
+    };
+  }, [editor, noteId]);
+
+  return (
+    <div className="editor-char-count">
+      {count.toLocaleString()} {count === 1 ? "character" : "characters"}
+    </div>
+  );
+});
 
 interface EditorProps {
   initialContent?: string;
@@ -134,8 +175,6 @@ export function Editor({
   // Track the active note ID internally to identify transitions (starts null so initial note mounts cleanly)
   const currentNoteIdRef = useRef<string | null>(null);
 
-  const [charCount, setCharCount] = useState(0);
-
   /**
    * Synchronously flushes any uncommitted editor changes to the memory cache, parent state, & SQLite.
    * Clears the `isDirtyRef` flag so redundant writes are avoided.
@@ -177,10 +216,6 @@ export function Editor({
         currentTitleRef.current = docTitle;
         onSetTitleRef.current?.(docTitle);
       }
-
-      // O(1) cheap metadata update
-      const count = editorInstance?.state?.doc?.textContent?.length ?? 0;
-      setCharCount(count);
 
       // Reset 300ms debounce timer
       if (debounceTimer.current) {
@@ -385,7 +420,6 @@ export function Editor({
           editor.view.dispatch(tr);
         }
       } catch {}
-      setCharCount(editor.state.doc.textContent.length);
     };
 
     // 3. Retrieve incoming note from in-memory LRU cache
@@ -469,12 +503,6 @@ export function Editor({
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Initialize character count once on mount
-  useEffect(() => {
-    if (editor) {
-      setCharCount(editor.state.doc.textContent.length);
-    }
-  }, [editor]);
 
   // Register lightweight zero-overhead diagnostic metrics for memory profiling
   useEffect(() => {
@@ -732,9 +760,7 @@ export function Editor({
         />
       </div>
       <DocumentTickSlider scrollContainerRef={scrollContainerRef} />
-      <div className="editor-char-count">
-        {charCount.toLocaleString()} {charCount === 1 ? "character" : "characters"}
-      </div>
+      <EditorCharCount editor={editor} noteId={noteId} />
       {/* Bottom frosted glass blend scrim for scrolling text */}
       <div className="app-bottom-blend" aria-hidden="true" />
       <BottomToolbar editor={editor} />

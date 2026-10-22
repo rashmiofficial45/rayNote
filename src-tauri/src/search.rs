@@ -568,4 +568,72 @@ mod tests {
         let snippet = generate_contextual_snippet(&text, "en", None, &text, 110);
         assert!(!snippet.is_empty());
     }
+
+    #[test]
+    fn test_diacritics_matching_bidirectional() {
+        let doc = DocumentCandidate {
+            id: "cafe-1",
+            title: "Café au Lait Recipe",
+            search_text: "Making traditional café au lait with chicory",
+            preview: "Making traditional café au lait...",
+            updated_at: "2026-10-10T00:00:00Z",
+            is_pinned: false,
+            fts_snippet: None,
+        };
+
+        // Query without accent matches title with accent
+        let (score1, match_type1) = score_document("cafe", &doc);
+        assert_eq!(match_type1, "title_prefix");
+        assert!(score1 >= 750.0);
+
+        // Query with accent matches title with accent
+        let (score2, match_type2) = score_document("café", &doc);
+        assert_eq!(match_type2, "title_prefix");
+        assert_eq!(score1, score2);
+
+        // German eszett and ligature normalization
+        assert_eq!(normalize_query("Straße"), "strasse");
+        assert_eq!(normalize_query("Encyclopædia"), "encyclopaedia");
+        assert_eq!(normalize_query("Cœur"), "coeur");
+    }
+
+    #[test]
+    fn test_empty_and_whitespace_query_fallbacks() {
+        let doc = DocumentCandidate {
+            id: "1",
+            title: "Quick Ideas",
+            search_text: "Some random notes",
+            preview: "Some random notes",
+            updated_at: "2026-10-10T00:00:00Z",
+            is_pinned: false,
+            fts_snippet: None,
+        };
+
+        let (score_empty, type_empty) = score_document("", &doc);
+        assert_eq!(type_empty, "recent");
+        assert_eq!(score_empty, 50.0);
+
+        let (score_spaces, type_spaces) = score_document("    \t\n  ", &doc);
+        assert_eq!(type_spaces, "recent");
+        assert_eq!(score_spaces, 50.0);
+
+        let (score_punct, type_punct) = score_document("!@#$%^&*()", &doc);
+        assert_eq!(type_punct, "recent");
+        assert_eq!(score_punct, 50.0);
+    }
+
+    #[test]
+    fn test_snippet_generation_boundary_conditions() {
+        let text = "Short note";
+        let snippet = generate_contextual_snippet(text, "short", None, text, 100);
+        assert_eq!(snippet, "Short note");
+
+        // Query not present in text should fallback to beginning preview
+        let snippet_missing = generate_contextual_snippet("Alpha beta gamma delta", "omega", None, "Alpha preview", 50);
+        assert!(!snippet_missing.is_empty());
+
+        // Empty document text
+        let snippet_empty = generate_contextual_snippet("", "query", None, "", 100);
+        assert_eq!(snippet_empty, "");
+    }
 }

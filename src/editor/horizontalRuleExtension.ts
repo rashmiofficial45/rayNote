@@ -39,9 +39,9 @@ export function insertHorizontalRuleSmart(
   }
 
   // ── 1. Inside a Checklist (taskItem) or List (listItem) or Blockquote ──
-  if (targetDepth > 0 && containerDepth >= 0) {
-    const itemIndex = $from.index(containerDepth);
-    const containerBeforePos = $from.before(containerDepth);
+  if (targetDepth > 0) {
+    const itemIndex = containerDepth > 0 ? $from.index(containerDepth) : $from.index(0);
+    const containerBeforePos = containerDepth > 0 ? $from.before(containerDepth) : $from.before(targetDepth);
     const itemBeforePos = $from.before(targetDepth);
 
     // Delete the '---' text in the current text block
@@ -105,12 +105,14 @@ export function insertHorizontalRuleSmart(
       } else {
         tr.delete($from.start(blockDepth), $from.end(blockDepth));
       }
-      tr.insert(blockAfter, hrNode);
+      const mappedAfter = tr.mapping.map(blockAfter);
+      tr.insert(mappedAfter, hrNode);
       const defaultType = schema.nodes.paragraph || schema.topNodeType.contentMatch.defaultType;
       if (defaultType) {
         const newPara = defaultType.create();
-        tr.insert(blockAfter + hrNode.nodeSize, newPara);
-        const $target = tr.doc.resolve(blockAfter + hrNode.nodeSize + 1);
+        const insertPos = mappedAfter + hrNode.nodeSize;
+        tr.insert(insertPos, newPara);
+        const $target = tr.doc.resolve(insertPos + 1);
         tr.setSelection(TextSelection.near($target));
       }
       if (dispatch) dispatch(tr.scrollIntoView());
@@ -123,7 +125,8 @@ export function insertHorizontalRuleSmart(
     } else {
       tr.delete($from.start(blockDepth), $from.end(blockDepth));
     }
-    tr.insert(blockBefore, hrNode);
+    const mappedBefore = tr.mapping.map(blockBefore);
+    tr.insert(mappedBefore, hrNode);
     const $mapped = tr.doc.resolve(tr.mapping.map($from.start(blockDepth)));
     tr.setSelection(TextSelection.near($mapped));
     if (dispatch) dispatch(tr.scrollIntoView());

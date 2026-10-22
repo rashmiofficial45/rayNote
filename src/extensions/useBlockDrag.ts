@@ -300,6 +300,16 @@ export function useBlockDrag({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerCancel);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        updateSelectedPositionsInView([]);
+        cleanupDrag();
+      }
     };
 
     const updateSelectedPositionsInView = (positions: number[]) => {
@@ -579,6 +589,7 @@ export function useBlockDrag({
       window.addEventListener("pointermove", handlePointerMove, { passive: true });
       window.addEventListener("pointerup", handlePointerUp);
       window.addEventListener("pointercancel", handlePointerCancel);
+      window.addEventListener("keydown", handleKeyDown, true);
     };
 
     const handleWindowBlur = () => {

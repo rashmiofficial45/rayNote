@@ -1,10 +1,15 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Editor } from "@tiptap/core";
 import { getExtensions } from "../extensions";
 import { POPULAR_LANGUAGES } from "../CodeBlockComponent";
 import { getAllBlocks, blockSelectionPluginKey } from "../../extensions/BlockSelection";
 import { smartToggleBlockFormat, smartToggleMark } from "../formatMemory";
+
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue(undefined),
+}));
+
 
 describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
   function createTestEditor(initialContent: string = "") {
@@ -400,4 +405,100 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
       editor.destroy();
     });
   });
+
+  describe("8. Keyboard Shortcuts Mapping in shortcutsExtension", () => {
+    it("binds Voice Dictation shortcuts (Alt-d, Alt-D, Mod-Alt-d, Mod-Alt-D)", () => {
+      const editor = createTestEditor();
+      const shortcutsExt = editor.extensionManager.extensions.find(
+        (ext) => ext.name === "shortcutsExtension"
+      );
+      const shortcuts = (shortcutsExt as any)?.config?.addKeyboardShortcuts?.call({ editor });
+
+      expect(typeof shortcuts["Alt-d"]).toBe("function");
+      expect(typeof shortcuts["Alt-D"]).toBe("function");
+      expect(typeof shortcuts["Mod-Alt-d"]).toBe("function");
+      expect(typeof shortcuts["Mod-Alt-D"]).toBe("function");
+
+      // Execution returns true
+      expect(shortcuts["Alt-d"]()).toBe(true);
+      expect(shortcuts["Alt-D"]()).toBe(true);
+      expect(shortcuts["Mod-Alt-d"]()).toBe(true);
+      expect(shortcuts["Mod-Alt-D"]()).toBe(true);
+      editor.destroy();
+    });
+
+    it("binds Heading shortcuts and toggles heading levels correctly", () => {
+      const editor = createTestEditor("<p>Heading Line</p>");
+      editor.commands.setTextSelection(3);
+      const shortcutsExt = editor.extensionManager.extensions.find(
+        (ext) => ext.name === "shortcutsExtension"
+      );
+      const shortcuts = (shortcutsExt as any)?.config?.addKeyboardShortcuts?.call({ editor });
+
+      // Mod-Alt-1 sets H1
+      shortcuts["Mod-Alt-1"]();
+      expect(editor.isActive("heading", { level: 1 })).toBe(true);
+
+      // Mod-Alt-2 sets H2
+      shortcuts["Mod-Alt-2"]();
+      expect(editor.isActive("heading", { level: 2 })).toBe(true);
+
+      // Mod-Alt-3 sets H3
+      shortcuts["Mod-Alt-3"]();
+      expect(editor.isActive("heading", { level: 3 })).toBe(true);
+
+      // Mod-Alt-0 resets to paragraph
+      shortcuts["Mod-Alt-0"]();
+      expect(editor.isActive("heading")).toBe(false);
+      expect(editor.isActive("paragraph")).toBe(true);
+
+      editor.destroy();
+    });
+
+    it("binds List and Task shortcuts (bulletList, orderedList, taskList)", () => {
+      const editor = createTestEditor("<p>List item</p>");
+      editor.commands.setTextSelection(3);
+      const shortcutsExt = editor.extensionManager.extensions.find(
+        (ext) => ext.name === "shortcutsExtension"
+      );
+      const shortcuts = (shortcutsExt as any)?.config?.addKeyboardShortcuts?.call({ editor });
+
+      // Bullet list
+      shortcuts["Mod-Shift-8"]();
+      expect(editor.isActive("bulletList")).toBe(true);
+
+      // Ordered list
+      shortcuts["Mod-Shift-7"]();
+      expect(editor.isActive("orderedList")).toBe(true);
+
+      // Task list
+      shortcuts["Mod-Shift-9"]();
+      expect(editor.isActive("taskList")).toBe(true);
+
+      shortcuts["Mod-Shift-t"]();
+      // Toggling off taskList
+      expect(editor.isActive("taskList")).toBe(false);
+
+      editor.destroy();
+    });
+
+    it("binds Blockquote and Horizontal Rule shortcuts", () => {
+      const editor = createTestEditor("<p>Quoted line</p>");
+      editor.commands.setTextSelection(3);
+      const shortcutsExt = editor.extensionManager.extensions.find(
+        (ext) => ext.name === "shortcutsExtension"
+      );
+      const shortcuts = (shortcutsExt as any)?.config?.addKeyboardShortcuts?.call({ editor });
+
+      shortcuts["Mod-Shift-b"]();
+      expect(editor.isActive("blockquote")).toBe(true);
+
+      // Horizontal Rule
+      shortcuts["Mod-Alt--"]();
+      expect(editor.state.doc.childCount).toBeGreaterThan(1);
+
+      editor.destroy();
+    });
+  });
 });
+

@@ -1592,6 +1592,7 @@ pre.notefast-code-block:hover {
    ══════════════════════════════════════════════════════════ */
 
 .dictation-corner-btn.is-dictating,
+.dictation-corner-btn.is-dictating.is-active,
 .toolbar-btn.is-dictating {
   position: relative;
   background: linear-gradient(135deg, rgba(236, 72, 153, 0.24) 0%, rgba(139, 92, 246, 0.32) 50%, rgba(56, 189, 248, 0.24) 100%) !important;
@@ -1638,7 +1639,9 @@ pre.notefast-code-block:hover {
 
 /* Light theme glaze with crisp Apple vibrancy */
 .light .dictation-corner-btn.is-dictating,
+.light .dictation-corner-btn.is-dictating.is-active,
 [data-theme="light"] .dictation-corner-btn.is-dictating,
+[data-theme="light"] .dictation-corner-btn.is-dictating.is-active,
 .light .toolbar-btn.is-dictating,
 [data-theme="light"] .toolbar-btn.is-dictating {
   background: linear-gradient(135deg, rgba(244, 114, 182, 0.25) 0%, rgba(167, 139, 250, 0.34) 50%, rgba(96, 165, 250, 0.25) 100%) !important;

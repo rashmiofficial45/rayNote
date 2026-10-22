@@ -7,6 +7,7 @@ import {
   type CachedBlockRect,
 } from '../useBlockDrag';
 import { getAllBlocks } from '../BlockSelection';
+import { calculateAutoScrollSpeed } from '../useAutoScroll';
 import {
   registerClick,
   findVisualLineRange,
@@ -295,5 +296,76 @@ describe('BlockSelection Geometry & Collision Tests', () => {
       expect(hit?.selectedIndices).toEqual([0]);
     });
   });
+
+  describe('Auto-Scroll Velocity & Boundary Tests', () => {
+    function createMockContainer(scrollTop: number, scrollHeight: number, clientHeight: number) {
+      return {
+        scrollTop,
+        scrollHeight,
+        clientHeight,
+        getBoundingClientRect: () => ({
+          top: 100,
+          bottom: 500,
+          left: 0,
+          right: 800,
+          width: 800,
+          height: 400,
+        }),
+      } as unknown as HTMLElement;
+    }
+
+    it('returns 0 speed when cursor is in the neutral center of the viewport', () => {
+      // Container bounds: top 100, bottom 500, height 400. Center is 300.
+      const container = createMockContainer(150, 1000, 400);
+      const speed = calculateAutoScrollSpeed(300, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed).toBe(0);
+    });
+
+    it('returns 0 upward scroll speed if container is already at scrollTop = 0', () => {
+      // In top zone (y = 120 < topEdge 160), but already at top (scrollTop = 0)
+      const container = createMockContainer(0, 1000, 400);
+      const speed = calculateAutoScrollSpeed(120, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed).toBe(0);
+    });
+
+    it('ramps upward scroll speed quadratically as pointer nears the top edge', () => {
+      // Container top is 100, zoneSize is 60 -> topEdge is 160.
+      const container = createMockContainer(200, 1000, 400);
+
+      // Mild penetration: y = 145 (depth 15 / 60 = 0.25 -> 0.0625 * 18 ≈ 1)
+      const speed1 = calculateAutoScrollSpeed(145, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed1).toBeLessThan(0); // Upward
+
+      // Deep penetration: y = 100 (depth 60 / 60 = 1.0 -> 1.0 * 18 = 18)
+      const speed2 = calculateAutoScrollSpeed(100, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed2).toBe(-18);
+
+      expect(Math.abs(speed2)).toBeGreaterThan(Math.abs(speed1));
+    });
+
+    it('returns 0 downward scroll speed if container is already at max scroll', () => {
+      // maxScroll = scrollHeight (1000) - clientHeight (400) = 600
+      const container = createMockContainer(600, 1000, 400);
+      // In bottom zone (y = 480 > bottomEdge 440)
+      const speed = calculateAutoScrollSpeed(480, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed).toBe(0);
+    });
+
+    it('ramps downward scroll speed quadratically as pointer nears the bottom edge', () => {
+      // bottom is 500, zoneSize 60 -> bottomEdge is 440
+      const container = createMockContainer(100, 1000, 400);
+
+      // Mild penetration: y = 455
+      const speed1 = calculateAutoScrollSpeed(455, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed1).toBeGreaterThan(0); // Downward
+
+      // Deep penetration: y = 500 (depth 60 / 60 = 1.0 -> 18)
+      const speed2 = calculateAutoScrollSpeed(500, container, { zoneSize: 60, maxSpeed: 18 });
+      expect(speed2).toBe(18);
+
+      expect(speed2).toBeGreaterThan(speed1);
+    });
+  });
 });
+
 

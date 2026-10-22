@@ -5,11 +5,13 @@ type DictationListener = (isListening: boolean, interimText?: string) => void;
 
 let recognitionInstance: any = null;
 let activeListening = false;
+let nativeFallbackTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<DictationListener>();
 
 export function isSpeechRecognitionAvailable(): boolean {
-  return typeof window !== "undefined" && Boolean(
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+  return (
+    typeof window !== "undefined" &&
+    Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
   );
 }
 
@@ -34,7 +36,7 @@ function notifyDictationState(listening: boolean, interim: string = "") {
  * Inserts recognized speech into the TipTap editor at current cursor.
  * Handles automatic spacing and punctuation formatting.
  */
-export function insertDictatedText(editor: Editor, text: string) {
+export function insertDictatedText(editor?: Editor | null, text?: string) {
   if (!editor || !text) return;
   const trimmed = text.trim();
   if (!trimmed) return;
@@ -42,11 +44,12 @@ export function insertDictatedText(editor: Editor, text: string) {
   const { state } = editor;
   const { $from } = state.selection;
 
-  // Add leading space if preceding character is not whitespace or start of node
+  // Add leading space if preceding character is not whitespace or start of node,
+  // except when the dictated text starts with punctuation marks.
   let prefix = "";
   if ($from.parentOffset > 0) {
     const charBefore = state.doc.textBetween(Math.max(0, $from.pos - 1), $from.pos, "\n");
-    if (charBefore && !/\s/.test(charBefore)) {
+    if (charBefore && !/\s/.test(charBefore) && !/^[,.!?:;)\]}]/.test(trimmed)) {
       prefix = " ";
     }
   }
@@ -69,28 +72,41 @@ export async function startNativeDictation(): Promise<boolean> {
   }
 }
 
+async function triggerNativeFallback(): Promise<boolean> {
+  if (nativeFallbackTimer) {
+    clearTimeout(nativeFallbackTimer);
+    nativeFallbackTimer = null;
+  }
+
+  notifyDictationState(true, "");
+  const ok = await startNativeDictation();
+
+  // Active glow indicator while native dictation initializes
+  nativeFallbackTimer = setTimeout(() => {
+    notifyDictationState(false, "");
+    nativeFallbackTimer = null;
+  }, 3500);
+
+  return ok;
+}
+
 /**
  * Starts in-app speech recognition or triggers macOS native dictation.
  */
-export async function startDictation(editor: Editor): Promise<boolean> {
+export async function startDictation(editor?: Editor | null): Promise<boolean> {
   if (activeListening) return true;
 
-  // First ensure microphone permission is promptable on macOS
-  if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+  // Ensure editor has keyboard focus so macOS dictation / Web Speech targets the active text insertion point
+  if (editor && !editor.isFocused) {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Release test stream immediately
-      stream.getTracks().forEach((track) => track.stop());
-    } catch (err) {
-      console.warn("[rayNote] Microphone permission check:", err);
-      // Fallback directly to native macOS dictation which prompts system microphone access
-      await startNativeDictation();
-      return true;
-    }
+      editor.commands.focus();
+    } catch {}
   }
 
   const SpeechRecognition =
-    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    typeof window !== "undefined"
+      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      : null;
 
   if (SpeechRecognition) {
     try {
@@ -103,7 +119,7 @@ export async function startDictation(editor: Editor): Promise<boolean> {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = navigator.language || "en-US";
+      recognition.lang = typeof navigator !== "undefined" ? navigator.language || "en-US" : "en-US";
 
       recognition.onstart = () => {
         notifyDictationState(true, "");
@@ -124,10 +140,10 @@ export async function startDictation(editor: Editor): Promise<boolean> {
       };
 
       recognition.onerror = (event: any) => {
-        console.warn("[rayNote] Speech recognition error:", event.error);
-        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        console.warn("[rayNote] Speech recognition error:", event?.error);
+        if (event?.error === "not-allowed" || event?.error === "service-not-allowed") {
           stopDictation();
-          startNativeDictation();
+          triggerNativeFallback();
         }
       };
 
@@ -144,19 +160,18 @@ export async function startDictation(editor: Editor): Promise<boolean> {
     }
   }
 
-  // Fallback to macOS native dictation
-  notifyDictationState(true, "");
-  const ok = await startNativeDictation();
-  setTimeout(() => {
-    notifyDictationState(false, "");
-  }, 3000);
-  return ok;
+  // Native macOS dictation: zero-latency, offline, system-integrated
+  return triggerNativeFallback();
 }
 
 /**
  * Stops any active speech recognition session.
  */
 export function stopDictation() {
+  if (nativeFallbackTimer) {
+    clearTimeout(nativeFallbackTimer);
+    nativeFallbackTimer = null;
+  }
   if (recognitionInstance) {
     try {
       recognitionInstance.stop();
@@ -169,7 +184,7 @@ export function stopDictation() {
 /**
  * Toggles speech dictation on or off.
  */
-export async function toggleDictation(editor: Editor): Promise<boolean> {
+export async function toggleDictation(editor?: Editor | null): Promise<boolean> {
   if (activeListening) {
     stopDictation();
     return false;
@@ -177,3 +192,4 @@ export async function toggleDictation(editor: Editor): Promise<boolean> {
     return startDictation(editor);
   }
 }
+

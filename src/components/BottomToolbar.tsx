@@ -48,6 +48,7 @@ interface BottomToolbarProps {
 export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const isHoveredRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
@@ -83,6 +84,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
         if (!focused) {
+          isHoveredRef.current = false;
           setIsHovered(false);
           setIsMenuOpen(false);
           setIsFontPickerOpen(false);
@@ -93,7 +95,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
       })
       .catch(() => {});
 
-    // Active pointer tracking: format button appears when cursor enters page width, disappears when moving away
+    // Active pointer tracking: only dispatches state when crossing window boundaries
     const handlePointerMove = (e: PointerEvent) => {
       const inPage =
         e.clientX >= 0 &&
@@ -101,19 +103,23 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         e.clientY >= 0 &&
         e.clientY <= window.innerHeight;
 
-      if (inPage) {
-        setIsHovered(true);
-      } else {
-        setIsHovered(false);
-        setIsMenuOpen(false);
-        setIsFontPickerOpen(false);
+      if (isHoveredRef.current !== inPage) {
+        isHoveredRef.current = inPage;
+        setIsHovered(inPage);
+        if (!inPage) {
+          setIsMenuOpen(false);
+          setIsFontPickerOpen(false);
+        }
       }
     };
 
     const handleReset = () => {
-      setIsHovered(false);
-      setIsMenuOpen(false);
-      setIsFontPickerOpen(false);
+      if (isHoveredRef.current) {
+        isHoveredRef.current = false;
+        setIsHovered(false);
+        setIsMenuOpen(false);
+        setIsFontPickerOpen(false);
+      }
     };
 
     const handleMouseOut = (e: MouseEvent) => {
@@ -126,6 +132,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     window.addEventListener("mouseout", handleMouseOut);
     window.addEventListener("blur", handleReset);
     document.addEventListener("mouseleave", handleReset);
+
 
     return () => {
       window.removeEventListener("notefast_accent_changed", handleAccent);

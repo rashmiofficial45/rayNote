@@ -94,7 +94,15 @@ export const ShortcutsExtension = Extension.create({
         toggleDictation(this.editor);
         return true;
       },
+      "Alt-D": () => {
+        toggleDictation(this.editor);
+        return true;
+      },
       "Mod-Alt-d": () => {
+        toggleDictation(this.editor);
+        return true;
+      },
+      "Mod-Alt-D": () => {
         toggleDictation(this.editor);
         return true;
       },

@@ -387,7 +387,7 @@ describe('Command + Backspace (Line & Formglatting Deletion) Tests', () => {
       expect(selection.$from.parent.textContent).toBe('Item 1');
     });
 
-    it('joins non-empty line into previous line when cursor is at offset 0', () => {
+    it("joins non-empty line into previous line when cursor is at offset 0", () => {
       const p1 = schema.nodes.paragraph.create(null, [schema.text('Line 1')]);
       const p2 = schema.nodes.paragraph.create(null, [schema.text('Line 2')]);
       const doc = schema.nodes.doc.create(null, [p1, p2]);
@@ -409,4 +409,84 @@ describe('Command + Backspace (Line & Formglatting Deletion) Tests', () => {
       expect(view.state.selection.from).toBe(7);
     });
   });
+
+  describe('handleDeleteLineOrBlock in Blockquotes and Code Blocks', () => {
+    it('clears blockquote content to an empty paragraph', () => {
+      const quote = schema.nodes.blockquote.create(null, [
+        schema.nodes.paragraph.create(null, [schema.text('Quoted text')]),
+      ]);
+      const doc = schema.nodes.doc.create(null, [quote]);
+      let state = EditorState.create({ schema, doc });
+      // Cursor inside quote text (pos 4)
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, 4)));
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleDeleteLineOrBlock(mockEditor);
+      expect(handled).toBe(true);
+
+      // Converted to empty paragraph
+      expect(view.state.doc.childCount).toBe(1);
+      expect(view.state.doc.child(0).type.name).toBe('paragraph');
+      expect(view.state.doc.child(0).textContent).toBe('');
+    });
+
+    it('clears line in multi-line codeBlock keeping cursor on that row', () => {
+      const code = schema.nodes.codeBlock.create(null, [
+        schema.text('const a = 1;\nconst b = 2;\nconst c = 3;'),
+      ]);
+      const doc = schema.nodes.doc.create(null, [code]);
+      let state = EditorState.create({ schema, doc });
+
+      // Cursor on second line "const b = 2;" (offset 18)
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, 18)));
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleDeleteLineOrBlock(mockEditor);
+      expect(handled).toBe(true);
+
+      expect(view.state.doc.child(0).type.name).toBe('codeBlock');
+      expect(view.state.doc.child(0).textContent).toBe('const a = 1;\n\nconst c = 3;');
+    });
+
+    it('clears Title Heading at document start to an empty Heading 1', () => {
+      const heading = schema.nodes.heading.create({ level: 1 }, [schema.text('My Important Title')]);
+      const doc = schema.nodes.doc.create(null, [heading]);
+      let state = EditorState.create({ schema, doc });
+
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, 5)));
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleDeleteLineOrBlock(mockEditor);
+      expect(handled).toBe(true);
+
+      expect(view.state.doc.childCount).toBe(1);
+      expect(view.state.doc.child(0).type.name).toBe('heading');
+      expect(view.state.doc.child(0).attrs.level).toBe(1);
+      expect(view.state.doc.child(0).textContent).toBe('');
+      expect(view.state.selection.from).toBe(1);
+    });
+
+    it('deletes all blocks intersecting active text selection', () => {
+      const p1 = schema.nodes.paragraph.create(null, [schema.text('Paragraph 1')]);
+      const p2 = schema.nodes.paragraph.create(null, [schema.text('Paragraph 2')]);
+      const p3 = schema.nodes.paragraph.create(null, [schema.text('Paragraph 3')]);
+      const doc = schema.nodes.doc.create(null, [p1, p2, p3]);
+
+      let state = EditorState.create({ schema, doc });
+      // Selection spanning from inside p1 (pos 3) to inside p2 (pos 18)
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, 3, 18)));
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleDeleteLineOrBlock(mockEditor);
+      expect(handled).toBe(true);
+
+      // Paragraph 3 remains
+      expect(view.state.doc.textContent).toContain('Paragraph 3');
+    });
+  });
 });
+

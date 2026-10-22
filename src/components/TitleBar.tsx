@@ -109,12 +109,14 @@ export function TitleBar({
 
   const [isCloseHovered, setIsCloseHovered] = useState(false);
   const [isTitleBarHovered, setIsTitleBarHovered] = useState(false);
+  const isHoveredRef = useRef(false);
 
   useEffect(() => {
     let unlistenFocus: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
         if (!focused) {
+          isHoveredRef.current = false;
           setIsTitleBarHovered(false);
           setIsCloseHovered(false);
         }
@@ -124,7 +126,7 @@ export function TitleBar({
       })
       .catch(() => {});
 
-    // Active pointer tracking: appears when cursor is anywhere in page width, disappears when moving away
+    // Active pointer tracking: only dispatches state when crossing window boundaries
     const handlePointerMove = (e: PointerEvent) => {
       const inPage =
         e.clientY >= 0 &&
@@ -132,17 +134,21 @@ export function TitleBar({
         e.clientX >= 0 &&
         e.clientX <= window.innerWidth;
 
-      if (inPage) {
-        setIsTitleBarHovered(true);
-      } else {
-        setIsTitleBarHovered(false);
-        setIsCloseHovered(false);
+      if (isHoveredRef.current !== inPage) {
+        isHoveredRef.current = inPage;
+        setIsTitleBarHovered(inPage);
+        if (!inPage) {
+          setIsCloseHovered(false);
+        }
       }
     };
 
     const handleReset = () => {
-      setIsTitleBarHovered(false);
-      setIsCloseHovered(false);
+      if (isHoveredRef.current) {
+        isHoveredRef.current = false;
+        setIsTitleBarHovered(false);
+        setIsCloseHovered(false);
+      }
     };
 
     const handleMouseOut = (e: MouseEvent) => {
@@ -164,6 +170,7 @@ export function TitleBar({
       document.removeEventListener("mouseleave", handleReset);
     };
   }, []);
+
 
   return (
     <div
