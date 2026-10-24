@@ -77,13 +77,43 @@ export function DocumentTickSlider({
     });
     observer.observe(container);
 
+    const handleVisibilityOrHide = () => {
+      if (document.hidden) {
+        if (rafId.current) {
+          cancelAnimationFrame(rafId.current);
+          rafId.current = null;
+        }
+        if (dragRafId.current) {
+          cancelAnimationFrame(dragRafId.current);
+          dragRafId.current = null;
+        }
+      } else {
+        updateTrackHeight();
+        updateScrollProgress();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrHide);
+    window.addEventListener("panel-will-hide" as any, handleVisibilityOrHide);
+    window.addEventListener("panel-did-show" as any, handleVisibilityOrHide);
+
     updateTrackHeight();
     updateScrollProgress();
 
     return () => {
-      if (rafId.current) cancelAnimationFrame(rafId.current);
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+      if (dragRafId.current) {
+        cancelAnimationFrame(dragRafId.current);
+        dragRafId.current = null;
+      }
       container.removeEventListener("scroll", onScroll);
       observer.disconnect();
+      document.removeEventListener("visibilitychange", handleVisibilityOrHide);
+      window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);
+      window.removeEventListener("panel-did-show" as any, handleVisibilityOrHide);
     };
   }, [scrollContainerRef, updateTrackHeight, updateScrollProgress]);
 

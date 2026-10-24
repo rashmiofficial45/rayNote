@@ -458,8 +458,6 @@ body,
   );
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 .app-bottom-blend {
@@ -498,8 +496,6 @@ body,
   );
   border-bottom-left-radius: 28px;
   border-bottom-right-radius: 28px;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 /* Block all text selection on double-click */
@@ -747,7 +743,6 @@ body,
 }
 
 .tiptap {
-  transform: translateZ(0);
   outline: none;
   min-height: auto;
   padding-top: 58px;
@@ -2017,7 +2012,6 @@ body:has(.command-overlay) .editor-char-count {
   flex-direction: column;
   gap: 2px;
   animation: none !important;
-  will-change: transform, opacity;
   contain: content;
 }
 
@@ -2294,7 +2288,6 @@ body:has(.command-overlay) .editor-char-count {
 [data-scroll-container] {
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  transform: translateZ(0);
 }
 
 /* Hide native text selection when blocks are selected */

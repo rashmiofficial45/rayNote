@@ -11,11 +11,16 @@
  * - Recency-Preserving: Every `get()` promotes the entry to the front of the LRU queue.
  */
 
+import { safeLocalStorageSetItem, safeLocalStorageRemoveItem } from "./storage";
+
 export interface CachedNote {
   id: string;
   content: string;
-  updatedAt: number; // Unix timestamp in ms
+  baseUpdatedAt: string; // The SQLite row's updated_at timestamp (RFC3339 / ISO string)
+  unsaved: boolean;      // True if modified locally and uncommitted to SQLite
+  updatedAt: number;     // Legacy Unix timestamp in ms
   preview?: string;
+  title?: string;
   scrollTop: number;
   byteSize: number;
 }
@@ -51,8 +56,10 @@ export class NoteLRUCache {
     try {
       const activeId = localStorage.getItem("notefast_active_note_id");
       const activeContent = localStorage.getItem("notefast_active_note_content");
+      const baseUpdatedAt = localStorage.getItem("notefast_active_note_base_updated_at") || "";
+      const unsaved = localStorage.getItem("notefast_active_note_unsaved") === "true";
       if (activeId && activeContent) {
-        this.set(activeId, activeContent, Date.now(), undefined, 0);
+        this.set(activeId, activeContent, baseUpdatedAt, undefined, 0, unsaved);
       }
     } catch {
       // Ignore storage errors
@@ -60,19 +67,26 @@ export class NoteLRUCache {
   }
 
   /**
-   * Persists active note ID and content to localStorage for instant hydration on next launch.
+   * Persists active note ID, content, and versioning metadata to localStorage for instant hydration on next launch.
    */
-  persistActiveToLocalStorage(id: string, content: string): void {
+  persistActiveToLocalStorage(
+    id: string,
+    content: string,
+    baseUpdatedAt?: string,
+    unsaved = false
+  ): void {
     if (typeof localStorage === "undefined") return;
-    try {
-      localStorage.setItem("notefast_active_note_id", id);
-      if (content && content.length <= 65536) {
-        localStorage.setItem("notefast_active_note_content", content);
-      } else {
-        localStorage.removeItem("notefast_active_note_content");
+    safeLocalStorageSetItem("notefast_active_note_id", id);
+    if (content && content.length <= 65536) {
+      safeLocalStorageSetItem("notefast_active_note_content", content);
+      if (baseUpdatedAt) {
+        safeLocalStorageSetItem("notefast_active_note_base_updated_at", baseUpdatedAt);
       }
-    } catch {
-      // Ignore quota errors
+      safeLocalStorageSetItem("notefast_active_note_unsaved", unsaved ? "true" : "false");
+    } else {
+      safeLocalStorageRemoveItem("notefast_active_note_content");
+      safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
+      safeLocalStorageRemoveItem("notefast_active_note_unsaved");
     }
   }
 
@@ -85,13 +99,13 @@ export class NoteLRUCache {
   }
 
   /**
-   * Estimates memory footprint of an entry in bytes.
-   * JavaScript strings use UTF-16 (2 bytes per character) + metadata overhead.
+   * Estimates memory footprint of an entry in bytes strictly as length * 2 per string.
+   * In JavaScript engines (V8 / JavaScriptCore), UTF-16 strings take 2 bytes per char.
    */
   private estimateSize(content: string, preview?: string): number {
     const contentBytes = (content?.length || 0) * 2;
     const previewBytes = (preview?.length || 0) * 2;
-    return contentBytes + previewBytes + 160; // 160 bytes for object & field overhead
+    return contentBytes + previewBytes;
   }
 
   /**
@@ -127,14 +141,22 @@ export class NoteLRUCache {
   set(
     id: string,
     content: string,
-    updatedAt?: number | string,
+    baseUpdatedAt?: number | string,
     preview?: string,
-    scrollTop = 0
+    scrollTop = 0,
+    unsaved = false
   ): void {
+    const baseUpdatedStr =
+      typeof baseUpdatedAt === "string"
+        ? baseUpdatedAt
+        : typeof baseUpdatedAt === "number"
+        ? new Date(baseUpdatedAt).toISOString()
+        : new Date().toISOString();
+
     const ts =
-      typeof updatedAt === "string"
-        ? new Date(updatedAt).getTime()
-        : updatedAt || Date.now();
+      typeof baseUpdatedAt === "string"
+        ? new Date(baseUpdatedAt).getTime()
+        : baseUpdatedAt || Date.now();
 
     const byteSize = this.estimateSize(content, preview);
 
@@ -149,22 +171,17 @@ export class NoteLRUCache {
     const entry: CachedNote = {
       id,
       content,
+      baseUpdatedAt: baseUpdatedStr,
+      unsaved,
       updatedAt: ts,
       preview,
+      title: preview,
       scrollTop: existing ? (scrollTop || existing.scrollTop) : scrollTop,
       byteSize,
     };
 
     this.cache.set(id, entry);
     this.currentTotalBytes += byteSize;
-
-    // Persist active note to localStorage if this is the active note
-    if (typeof localStorage !== "undefined") {
-      const activeId = localStorage.getItem("notefast_active_note_id");
-      if (!activeId || activeId === id) {
-        this.persistActiveToLocalStorage(id, content);
-      }
-    }
 
     // Evict oldest entries until both limits are satisfied
     this.evictToBudget(id);
@@ -181,13 +198,15 @@ export class NoteLRUCache {
   }
 
   /**
-   * Updates note content and timestamp during debounced autosave.
+   * Updates note content and marks note as having unsaved local changes.
+   * Preserves original `baseUpdatedAt` so reconciliation on reboot can detect if DB moved on.
    */
   updateContent(id: string, content: string, preview?: string): void {
     const entry = this.cache.get(id);
     const newByteSize = this.estimateSize(content, preview);
     const oldByteSize = entry ? entry.byteSize : 0;
     const currentScroll = entry ? entry.scrollTop : 0;
+    const baseUpdatedAt = entry ? entry.baseUpdatedAt : new Date().toISOString();
 
     this.currentTotalBytes = this.currentTotalBytes - oldByteSize + newByteSize;
 
@@ -198,14 +217,29 @@ export class NoteLRUCache {
     this.cache.set(id, {
       id,
       content,
+      baseUpdatedAt,
+      unsaved: true,
       updatedAt: Date.now(),
       preview: preview !== undefined ? preview : entry?.preview,
+      title: preview !== undefined ? preview : entry?.title,
       scrollTop: currentScroll,
       byteSize: newByteSize,
     });
 
-    this.persistActiveToLocalStorage(id, content);
     this.evictToBudget(id);
+  }
+
+  /**
+   * Sets the authoritative baseUpdatedAt timestamp for a cached note (e.g., after successful SQLite save).
+   * Optionally updates the unsaved flag (defaults to false if omitted).
+   */
+  setBaseUpdatedAt(id: string, baseUpdatedAt: string, unsaved = false): void {
+    const entry = this.cache.get(id);
+    if (entry) {
+      entry.baseUpdatedAt = baseUpdatedAt;
+      entry.unsaved = unsaved;
+      entry.updatedAt = new Date(baseUpdatedAt).getTime();
+    }
   }
 
   /**
@@ -263,20 +297,32 @@ export class NoteLRUCache {
   }
 
   /**
-   * Evicts oldest entries (beginning of Map iterator) until both constraints are met.
-   * `keepId` is preserved from eviction during the current insertion.
+   * Evicts oldest entries (beginning of Map iterator) until both byte budget (8 MB)
+   * and entry count constraints are satisfied.
+   *
+   * Invariant: The Most Recently Used (MRU) entry is NEVER evicted, even if its single size
+   * exceeds the cache byte budget.
    */
-  private evictToBudget(keepId?: string): void {
+  private evictToBudget(activeMruId?: string): void {
+    // Identify the MRU entry (either explicit activeMruId or the last key in insertion order)
+    let mruKey = activeMruId;
+    if (!mruKey && this.cache.size > 0) {
+      for (const k of this.cache.keys()) {
+        mruKey = k;
+      }
+    }
+
     while (
-      this.cache.size > this.maxEntries ||
-      this.currentTotalBytes > this.maxBytes
+      (this.cache.size > this.maxEntries || this.currentTotalBytes > this.maxBytes) &&
+      this.cache.size > 1
     ) {
-      // Get least recently used (first key in insertion order)
       const oldestKey = this.cache.keys().next().value;
       if (!oldestKey) break;
 
-      // If the only candidate is the one we just inserted, break to avoid infinite loop
-      if (oldestKey === keepId && this.cache.size === 1) break;
+      // Never evict the MRU entry
+      if (oldestKey === mruKey) {
+        break;
+      }
 
       const oldest = this.cache.get(oldestKey);
       if (oldest) {
@@ -289,3 +335,75 @@ export class NoteLRUCache {
 
 // Module-level singleton instance shared across the entire application
 export const noteCache = new NoteLRUCache();
+
+/**
+ * Reconciles an active note snapshot (from in-memory cache or localStorage hydration)
+ * against the authoritative row fetched from SQLite on application boot.
+ *
+ * Strict Rules:
+ * 1. Never compare client and server clocks (avoids clock skew / NTP drift).
+ * 2. If snapshot has unsaved local edits (`unsaved: true`):
+ *    Because rayNote is single-instance with zero external database writers (no multi-instance,
+ *    no background sync daemon, no restore daemon), any snapshot marked unsaved represents
+ *    uncommitted user edits that are strictly newer than any in-flight DB write that may have
+ *    advanced fullNote.updated_at. An unsaved snapshot must always win and be marked dirty
+ *    (`keep_snapshot_and_mark_dirty`), never silently dropped.
+ * 3. If snapshot is marked clean (`unsaved: false`):
+ *    - Case 1: If updated_at == baseUpdatedAt and fullNote.content === cached.content:
+ *      Snapshot matches SQLite perfectly -> `noop`, clean.
+ *    - Case 1b: If updated_at == baseUpdatedAt but fullNote.content !== cached.content:
+ *      Authoritative SQLite database content wins -> `apply_db`, clean.
+ *    - Case 1c: If updated_at != baseUpdatedAt:
+ *      SQLite moved on while snapshot was clean -> `apply_db`, clean.
+ */
+export function reconcileSnapshotWithDb(
+  cached: { content: string; baseUpdatedAt: string; unsaved: boolean },
+  fullNote: { content: string; updated_at: string } | null | undefined
+): {
+  action: "recover_orphan_as_new" | "keep_snapshot_and_mark_dirty" | "apply_db" | "noop" | "evict_orphan";
+  content: string;
+  isDirty: boolean;
+} {
+  // If the note row no longer exists in SQLite (deleted or non-existent in DB)
+  if (!fullNote) {
+    if (cached.unsaved) {
+      // User has uncommitted text, but the note row does not exist in SQLite.
+      // Do NOT mark dirty to avoid saving to a dead ID (which returns QueryReturnedNoRows error).
+      // Instead, trigger creation of a new note with this content.
+      return {
+        action: "recover_orphan_as_new",
+        content: cached.content,
+        isDirty: false,
+      };
+    } else {
+      // Snapshot was clean; note was permanently removed from DB; evict orphaned snapshot
+      return {
+        action: "evict_orphan",
+        content: "",
+        isDirty: false,
+      };
+    }
+  }
+
+  if (cached.unsaved) {
+    return {
+      action: "keep_snapshot_and_mark_dirty",
+      content: cached.content,
+      isDirty: true,
+    };
+  }
+
+  if (fullNote.updated_at !== cached.baseUpdatedAt || fullNote.content !== cached.content) {
+    return {
+      action: "apply_db",
+      content: fullNote.content,
+      isDirty: false,
+    };
+  }
+
+  return {
+    action: "noop",
+    content: cached.content,
+    isDirty: false,
+  };
+}

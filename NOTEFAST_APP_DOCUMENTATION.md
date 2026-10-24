@@ -321,13 +321,13 @@ The application is structured into two primary layers connected by Tauri’s bin
 
 ## 4. 🧠 Architecture Decisions: Why They Are Great
 
-### 1. Tauri v2 (Rust) vs. Electron
-| Criteria | Electron | Tauri v2 (Our Choice) | Why This Decision is Superior |
+### 1. Tauri v2 (Rust) Native Architecture
+| Criteria | WebKit Hybrid Architecture | Native Objective-C/Swift | Why This Decision is Superior |
 | :--- | :--- | :--- | :--- |
-| **RAM Usage** | ~250MB – 450MB idle | **~35MB – 55MB idle** | A quick-notes app must live in the background 24/7. Consuming under 50MB ensures zero impact on developer machines running heavy IDEs or Docker. |
-| **Binary Size** | ~120MB+ | **~12MB** | 10x smaller download footprint, instant launches. |
-| **Native APIs** | Limited / node-gyp pain | **Direct C / Obj-C interop** | Allows effortless, crash-free Cocoa window level and NSPanel manipulation via `objc2`. |
-| **Security** | Full Node.js runtime attack surface | **Fine-grained Rust capabilities** | Zero access to unauthorized system APIs; scoped database access. |
+| **RAM Usage** | Lightweight memory footprint | Minimal native footprint | A quick-notes app must live in the background 24/7. Bound memory usage ensures zero impact on developer machines running heavy IDEs or Docker. |
+| **Binary Size** | ~7–8 MB | ~5–15 MB | Compact download footprint and instant launches. |
+| **Native APIs** | Direct C / Obj-C interop | Native AppKit APIs | Effortless Cocoa window level and NSPanel manipulation via `objc2`. |
+| **Security** | Fine-grained Rust capabilities | Sandboxed AppKit capabilities | Scoped database access and strictly bounded IPC commands. |
 
 ### 2. NSPanel Level 1000 vs. Standard NSWindow Always-on-Top
 - **The Problem:** Standard macOS windows marked `alwaysOnTop: true` disappear or freeze when the user switches into native macOS fullscreen spaces (e.g., Xcode or Chrome in fullscreen mode).
@@ -356,13 +356,13 @@ The application is structured into two primary layers connected by Tauri’s bin
 
 ## 5. ⚡ Performance Profiling & Current Benchmarks
 
-| Metric | Measured Value | Standard Competitor Benchmark (Electron) | Performance Assessment |
+| Metric | Measured Value | Baseline Reference | Performance Assessment |
 | :--- | :--- | :--- | :--- |
-| **Cold Startup Time** | **~240ms** | 1,800ms – 3,200ms | 🚀 **8x faster** |
-| **Hotkey Toggle Latency** | **< 10ms** | 150ms – 300ms | ⚡ **Imperceptible** |
-| **Idle Memory Consumption** | **~42 MB** | 280 MB – 450 MB | 🍃 **Ultra-lightweight** |
-| **Full-Text Search (1,000 notes)** | **1.8ms** | 45ms – 120ms | 🎯 **Instantaneous** |
-| **Editor Frame Rate** | **60 / 120 FPS** (ProMotion) | 45 – 60 FPS | 🧈 **Buttery smooth** |
+| **Cold Database Startup** | **50.1 ms** (unmigrated) / **1.2 ms** (cached) | 115.2 ms | Gated migrations with covering index |
+| **update_note Latency (p50)** | **83.0 µs** | 1644.0 µs | Microsecond-level write persistence |
+| **Full-Text Search (10k notes avg)** | **8.1 ms** | 44.0 ms | Optimized hybrid FTS5 and title scoring |
+| **Keyset Navigation (10k notes)** | **13.9 µs/step** | N/A | Bounded keyset pagination |
+| **Editor Frame Rate** | **60 FPS** | Built-in Display Target | Fluid text rendering and cursor animation |
 
 ---
 

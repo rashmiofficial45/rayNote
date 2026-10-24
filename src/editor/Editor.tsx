@@ -27,43 +27,104 @@ import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import { useBlockDrag } from "../extensions/useBlockDrag";
 import { getLastDragEndTime } from "../extensions/BlockSelection";
 import {
-  isMarkdownContent,
   markdownToTipTapHtml,
   sliceToMarkdown,
 } from "./markdownUtils";
-import { noteCache } from "../lib/noteCache";
-import { getNote } from "../lib/db";
+import { noteCache, reconcileSnapshotWithDb } from "../lib/noteCache";
+import { getNote, registerEditorFlush } from "../lib/db";
+import { titleStore } from "../lib/titleStore";
+import { saveStatusStore } from "../lib/saveStatusStore";
+import { SwitchConflictInfo } from "../components/SwitchConflictModal";
+import { safeLocalStorageRemoveItem } from "../lib/storage";
+import { preloadLanguagesForContent, scanCodeBlockLanguages, ensureLanguageLoaded } from "./extensions";
 
 export interface EditorCharCountProps {
   editor: any;
   noteId: string;
 }
 
+/**
+ * Adaptive debounce thresholds based on ProseMirror document size proxy (content.size).
+ * Balances UI frame budget during continuous typing bursts against persistence frequency.
+ */
+export const DEBOUNCE_THRESHOLDS = {
+  SMALL_DOC_MAX_SIZE: 20_000,
+  MEDIUM_DOC_MAX_SIZE: 100_000,
+  DELAY_SMALL_MS: 300,
+  DELAY_MEDIUM_MS: 800,
+  DELAY_LARGE_MS: 1500,
+  MAX_WAIT_MS: 5000,
+} as const;
+
+export function getAdaptiveDebounceDelay(docSize: number): number {
+  if (docSize >= DEBOUNCE_THRESHOLDS.MEDIUM_DOC_MAX_SIZE) {
+    return DEBOUNCE_THRESHOLDS.DELAY_LARGE_MS;
+  }
+  if (docSize >= DEBOUNCE_THRESHOLDS.SMALL_DOC_MAX_SIZE) {
+    return DEBOUNCE_THRESHOLDS.DELAY_MEDIUM_MS;
+  }
+  return DEBOUNCE_THRESHOLDS.DELAY_SMALL_MS;
+}
+
 export const EditorCharCount = memo(function EditorCharCount({
   editor,
   noteId,
 }: EditorCharCountProps) {
-  const [count, setCount] = useState<number>(
-    () => editor?.state?.doc?.textContent?.length ?? 0
-  );
+  /**
+   * Calculates character count incrementally across text nodes without creating or concatenating
+   * intermediate string buffers in JavaScript heap. Debounced by 200ms during typing bursts.
+   */
+  const getDocCharCount = (doc: any): number => {
+    if (!doc) return 0;
+    if (typeof doc.descendants === "function") {
+      let chars = 0;
+      doc.descendants((node: any) => {
+        if (node.isText && node.text) {
+          chars += node.text.length;
+        }
+        return true;
+      });
+      return chars;
+    }
+    return doc.textContent?.length ?? 0;
+  };
+
+  const [count, setCount] = useState<number>(() => {
+    const doc = editor?.state?.doc;
+    return getDocCharCount(doc);
+  });
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!editor) return;
-    const update = () => {
-      const c: number = editor.state?.doc?.textContent?.length ?? 0;
+
+    const computeCount = () => {
+      const doc = editor.state?.doc;
+      const c = getDocCharCount(doc);
       setCount((prev: number) => (prev === c ? prev : c));
     };
 
-    update();
+    // Immediate initial computation on load or note change
+    computeCount();
 
+    // Debounce recalculation by ~200ms during active typing to avoid O(N) traversals per keystroke
     const handleTransaction = ({ transaction }: { transaction: any }) => {
       if (transaction.docChanged) {
-        update();
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+        }
+        debounceTimerRef.current = setTimeout(() => {
+          computeCount();
+        }, 200);
       }
     };
 
     editor.on("transaction", handleTransaction);
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       editor.off("transaction", handleTransaction);
     };
   }, [editor, noteId]);
@@ -81,48 +142,46 @@ interface EditorProps {
   noteId: string;
   noteTitle?: string;
   onSetTitle?: (title: string) => void;
-  onUpdate: (content: string, titleHint?: string) => void;
+  onUpdate: (id: string, content: string, titleHint?: string) => Promise<string | void> | string | void;
+  onRecoverOrphan?: (content: string, sourceId?: string) => void | Promise<void> | any;
+  onSwitchFailed?: (failedId: string, error: unknown) => void;
+  onSwitchConflict?: (info: SwitchConflictInfo) => void;
+  discardedNoteId?: string | null;
   zoomLevel?: number;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
+  onEditorReady?: (editor: any) => void;
 }
 
 /**
- * Extracts note title from the first document node with text (heading, paragraph, or table)
- * to keep note drawer titles continuously up to date as the user types.
+ * Extracts note title from the document if the FIRST node is an explicit H1 heading.
+ * Invariant (Title source rule): The title may come ONLY from child(0) being an H1.
+ * Later H1 headings (typed or pasted) never change the title.
+ * Returns undefined if child(0) is not an H1 so existing titles are never wiped.
  */
-export const extractTitleFromDoc = (doc: any): string => {
-  if (!doc || !doc.childCount) return "";
-  for (let i = 0; i < doc.childCount; i++) {
-    const child = doc.child(i);
-    const text = child.textContent?.trim();
+export const extractTitleFromDoc = (doc: any): string | undefined => {
+  if (!doc || !doc.childCount) return undefined;
+  const firstChild = doc.child(0);
+  if (firstChild.type.name === "heading" && firstChild.attrs?.level === 1) {
+    const text = firstChild.textContent?.trim();
     if (text) {
       return text.replace(/^#+\s*/, "").trim();
     }
   }
-  return "";
+  return undefined;
 };
 
-const extractTitle = (json: any): string => {
+const extractTitle = (json: any): string | undefined => {
   if (json && Array.isArray(json.content) && json.content.length > 0) {
-    for (const node of json.content) {
-      if (Array.isArray(node.content)) {
-        const text = node.content.map((n: any) => n.text || "").join("").trim();
+    const firstNode = json.content[0];
+    if (firstNode && firstNode.type === "heading" && firstNode.attrs?.level === 1) {
+      if (Array.isArray(firstNode.content)) {
+        const text = firstNode.content.map((n: any) => n.text || "").join("").trim();
         if (text) return text.replace(/^#+\s*/, "").trim();
-      }
-      if (node.type === "table" && Array.isArray(node.content)) {
-        const texts: string[] = [];
-        function extractText(sub: any) {
-          if (sub.text) texts.push(sub.text);
-          if (sub.content) sub.content.forEach(extractText);
-        }
-        extractText(node);
-        const joined = texts.join(" ").trim();
-        if (joined) return joined.slice(0, 50);
       }
     }
   }
-  return "";
+  return undefined;
 };
 
 export function ensureHeadingOneForDoc(docData: any): any {
@@ -154,18 +213,38 @@ export function Editor({
   noteTitle,
   onSetTitle,
   onUpdate,
+  onRecoverOrphan,
+  onSwitchFailed,
+  onSwitchConflict,
+  discardedNoteId,
   zoomLevel,
   isFindOpen,
   onCloseFind,
+  onEditorReady,
 }: EditorProps) {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstPendingChangeTimeRef = useRef<number | null>(null);
   const isDirtyRef = useRef(false);
+  const isSavingRef = useRef(false);
+  const saveAgainRef = useRef(false);
+  const consecutiveSaveFailuresRef = useRef<number>(0);
+  const isHalfOpenAttemptRef = useRef<boolean>(false);
+  const halfOpenRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeSavePromiseRef = useRef<Promise<void> | null>(null);
+  const lastSaveErrorRef = useRef<any>(null);
+  const lastSavedDocRef = useRef<any>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<any>(null);
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
   const onSetTitleRef = useRef(onSetTitle);
   onSetTitleRef.current = onSetTitle;
+  const onSwitchFailedRef = useRef(onSwitchFailed);
+  onSwitchFailedRef.current = onSwitchFailed;
+  const onSwitchConflictRef = useRef(onSwitchConflict);
+  onSwitchConflictRef.current = onSwitchConflict;
+  const discardedNoteIdRef = useRef(discardedNoteId);
+  discardedNoteIdRef.current = discardedNoteId;
 
   const currentTitleRef = useRef<string>(noteTitle || "");
   useEffect(() => {
@@ -177,53 +256,209 @@ export function Editor({
 
   /**
    * Synchronously flushes any uncommitted editor changes to the memory cache, parent state, & SQLite.
-   * Clears the `isDirtyRef` flag so redundant writes are avoided.
+   * If a save is already in-flight, queues a follow-up (`saveAgainRef`) and awaits the complete chain.
+   * Updates `lastSavedDocRef` only after the DB write resolves successfully, and marks `isDirtyRef`
+   * based on whether subsequent edits occurred during flight.
    */
-  const saveNow = useCallback(() => {
-    if (!isDirtyRef.current || !editorRef.current) return;
-    try {
-      const currentEditor = editorRef.current;
-      const currentId = currentNoteIdRef.current;
-      if (!currentId) return;
-      const json = currentEditor.getJSON();
-      const title = extractTitle(json) || currentTitleRef.current || "Untitled";
-      currentTitleRef.current = title;
-      const strContent = JSON.stringify(json);
-      isDirtyRef.current = false;
-
-      // Update in-memory LRU cache immediately
-      noteCache.updateContent(currentId, strContent, title);
-      onUpdateRef.current(strContent, title);
-    } catch (err) {
-      console.error("Failed to save editor content:", err);
+  const saveNow = useCallback((): Promise<void> => {
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
     }
+    firstPendingChangeTimeRef.current = null;
+
+    if (isSavingRef.current) {
+      saveAgainRef.current = true;
+      return activeSavePromiseRef.current ?? Promise.resolve();
+    }
+
+    if (!isDirtyRef.current || !editorRef.current) {
+      return Promise.resolve();
+    }
+
+    const currentEditor = editorRef.current;
+    const currentId = currentNoteIdRef.current;
+    if (!currentId) {
+      return Promise.resolve();
+    }
+
+    const currentDoc = currentEditor.state?.doc;
+    if (currentDoc && lastSavedDocRef.current && (lastSavedDocRef.current === currentDoc || lastSavedDocRef.current.eq(currentDoc))) {
+      isDirtyRef.current = false;
+      return Promise.resolve();
+    }
+
+    // Circuit breaker: cap consecutive save failures to prevent infinite retry loops
+    if (consecutiveSaveFailuresRef.current >= 5) {
+      if (!isHalfOpenAttemptRef.current) {
+        console.warn(`[save] Consecutive save failures reached ${consecutiveSaveFailuresRef.current}. Pausing autosave loop.`);
+        saveStatusStore.setBlocked(true, currentId, "Autosave paused after 5 consecutive failures");
+        return Promise.resolve();
+      }
+      // Half-open retry attempt granted: consume the single allowed attempt and proceed
+      isHalfOpenAttemptRef.current = false;
+    }
+
+    isSavingRef.current = true;
+    saveAgainRef.current = false;
+    const docToSave = currentDoc;
+
+    let strContent: string;
+    let title: string;
+    let extractedTitle: string | undefined;
+    try {
+      const json = currentEditor.getJSON();
+      extractedTitle = extractTitle(json);
+      title = (extractedTitle !== undefined && extractedTitle.length > 0)
+        ? extractedTitle
+        : (currentTitleRef.current || "Untitled");
+      currentTitleRef.current = title;
+      titleStore.setTitle(title);
+      strContent = JSON.stringify(json);
+    } catch (err) {
+      console.error("Failed to serialize editor content:", err);
+      isSavingRef.current = false;
+      return Promise.resolve();
+    }
+
+    // Update in-memory LRU cache immediately
+    noteCache.updateContent(currentId, strContent, title);
+
+    const runCycle = async (): Promise<void> => {
+      try {
+        const saveRes = await onUpdateRef.current(currentId, strContent, extractedTitle);
+        consecutiveSaveFailuresRef.current = 0; // Reset counter on success
+        isHalfOpenAttemptRef.current = false;
+        if (halfOpenRetryTimerRef.current) {
+          clearTimeout(halfOpenRetryTimerRef.current);
+          halfOpenRetryTimerRef.current = null;
+        }
+        lastSaveErrorRef.current = null;
+        saveStatusStore.setBlocked(false);
+        if (currentNoteIdRef.current === currentId) {
+          lastSavedDocRef.current = docToSave;
+          const currentDocNow = editorRef.current?.state?.doc;
+          const isStillDirty = Boolean(currentDocNow && lastSavedDocRef.current && !currentDocNow.eq(lastSavedDocRef.current));
+          isDirtyRef.current = isStillDirty;
+          if (typeof saveRes === "string") {
+            noteCache.setBaseUpdatedAt(currentId, saveRes, isStillDirty);
+            noteCache.persistActiveToLocalStorage(currentId, strContent, saveRes, isStillDirty);
+          }
+        }
+      } catch (err) {
+        consecutiveSaveFailuresRef.current += 1;
+        lastSaveErrorRef.current = err;
+        console.error("Failed to save editor content to DB:", err);
+        if (consecutiveSaveFailuresRef.current >= 5) {
+          saveStatusStore.setBlocked(true, currentId, String((err as any)?.message || err || "Save failed"));
+
+          // Half-open retry schedule: 1 attempt after backoff (start 10s, double each failure, cap 60s)
+          if (halfOpenRetryTimerRef.current) {
+            clearTimeout(halfOpenRetryTimerRef.current);
+          }
+          const exponent = Math.max(0, consecutiveSaveFailuresRef.current - 5);
+          const backoffDelay = Math.min(60000, 10000 * Math.pow(2, exponent));
+          halfOpenRetryTimerRef.current = setTimeout(() => {
+            halfOpenRetryTimerRef.current = null;
+            if (consecutiveSaveFailuresRef.current >= 5 && currentNoteIdRef.current === currentId) {
+              isHalfOpenAttemptRef.current = true;
+              saveNow();
+            }
+          }, backoffDelay);
+        }
+        if (currentNoteIdRef.current === currentId) {
+          isDirtyRef.current = true;
+        }
+      } finally {
+        isSavingRef.current = false;
+        if (currentNoteIdRef.current === currentId && editorRef.current) {
+          const docNow = editorRef.current.state?.doc;
+          const hasNewEdits = Boolean(docNow && docToSave && !docNow.eq(docToSave));
+          if ((saveAgainRef.current || hasNewEdits) && consecutiveSaveFailuresRef.current < 5) {
+            saveAgainRef.current = false;
+            try {
+              await saveNow();
+            } catch (err) {
+              console.error("Failed follow-up saveNow:", err);
+            }
+          }
+        }
+      }
+    };
+
+    const cyclePromise = runCycle();
+    cyclePromise.catch(() => {});
+    activeSavePromiseRef.current = cyclePromise;
+    cyclePromise.finally(() => {
+      if (activeSavePromiseRef.current === cyclePromise) {
+        activeSavePromiseRef.current = null;
+      }
+    });
+
+    return cyclePromise;
   }, []);
 
   /**
    * Handles document change events:
    * 1. Sets dirty flag so exit/switch handlers know changes exist.
-   * 2. Extracts title from the first document line instantly so the title bar updates with 0ms delay.
-   * 3. Computes character count in O(1) time without expensive JSON serialization.
-   * 4. Schedules a debounced 300ms save to disk & cache.
+   * 2. Extracts title from the first document line instantly so titleStore updates with 0ms delay (0 React renders of App/Editor).
+   * 3. Adaptive debounce: 300ms (<20k), 800ms (<100k), 1500ms otherwise, with a 5000ms max-wait.
    */
   const handleEditorUpdate = useCallback(
     (editorInstance: any) => {
+      const currentDoc = editorInstance?.state?.doc;
+      if (currentDoc && lastSavedDocRef.current && lastSavedDocRef.current.eq(currentDoc)) {
+        // Structural comparison: transaction did not alter document content (e.g. table normalization, trailing node, selection change)
+        isDirtyRef.current = false;
+        return;
+      }
+
       isDirtyRef.current = true;
 
-      // Instant synchronization of the title bar with the first line
-      const docTitle = extractTitleFromDoc(editorInstance?.state?.doc);
-      if (docTitle !== currentTitleRef.current) {
+      if (consecutiveSaveFailuresRef.current >= 5) {
+        // Fresh edits trigger 1 half-open save attempt
+        isHalfOpenAttemptRef.current = true;
+      }
+
+      // Instant synchronization of the title store with the first line H1 ONLY
+      const docTitle = extractTitleFromDoc(currentDoc);
+      if (docTitle !== undefined && docTitle !== currentTitleRef.current) {
         currentTitleRef.current = docTitle;
+        titleStore.setTitle(docTitle);
         onSetTitleRef.current?.(docTitle);
       }
 
-      // Reset 300ms debounce timer
+      // Pre-fetch any newly typed code block grammar in the background so it highlights on the next keystroke
+      const langs = scanCodeBlockLanguages(editorInstance?.state?.doc);
+      for (const l of langs) {
+        ensureLanguageLoaded(l);
+      }
+
+      const now = Date.now();
+      if (firstPendingChangeTimeRef.current === null) {
+        firstPendingChangeTimeRef.current = now;
+      }
+
+      // O(1) document size proxy via ProseMirror content.size and centralized thresholds
+      const docSize = editorInstance?.state?.doc?.content?.size ?? 0;
+      const delay = getAdaptiveDebounceDelay(docSize);
+
+      // Max-wait bound
+      const elapsed = now - firstPendingChangeTimeRef.current;
+      const remainingMaxWait = Math.max(0, DEBOUNCE_THRESHOLDS.MAX_WAIT_MS - elapsed);
+      const effectiveDelay = Math.min(delay, remainingMaxWait);
+
       if (debounceTimer.current) {
         clearTimeout(debounceTimer.current);
       }
-      debounceTimer.current = setTimeout(() => {
+
+      if (effectiveDelay <= 0) {
         saveNow();
-      }, 300);
+      } else {
+        debounceTimer.current = setTimeout(() => {
+          saveNow();
+        }, effectiveDelay);
+      }
     },
     [saveNow]
   );
@@ -261,6 +496,7 @@ export function Editor({
    */
   const editor = useEditor(
     {
+      shouldRerenderOnTransaction: false,
       extensions,
       content: seedContent,
       onUpdate: ({ editor }) => {
@@ -270,6 +506,12 @@ export function Editor({
         attributes: {
           class: "tiptap",
           spellcheck: "false",
+        },
+        handleDOMEvents: {
+          blur: () => {
+            saveNow();
+            return false;
+          },
         },
         clipboardTextSerializer: (slice) => {
           return sliceToMarkdown(slice, editorRef.current);
@@ -324,42 +566,6 @@ export function Editor({
             }
           }
 
-          // 2. Check if pasted plain text contains Markdown formatting or is pasted into a blank note
-          const plainText = clipboardData.getData("text/plain");
-          if (plainText) {
-            const isBlankNote =
-              editorRef.current?.state.doc.textContent.trim().length === 0;
-            const isAtStart =
-              (editorRef.current?.state.selection.from ?? 0) <= 2;
-
-            if (isMarkdownContent(plainText) || isBlankNote) {
-              event.preventDefault();
-              const shouldEnsureH1 = isBlankNote || isAtStart;
-              const html = markdownToTipTapHtml(plainText, {
-                ensureFirstLineH1: shouldEnsureH1,
-              });
-
-              if (editorRef.current) {
-                if (isBlankNote) {
-                  editorRef.current.commands.setContent(html, { emitUpdate: true });
-                } else if (isAtStart) {
-                  const firstNode = editorRef.current.state.doc.child(0);
-                  if (firstNode.textContent.trim().length === 0) {
-                    editorRef.current.chain()
-                      .deleteRange({ from: 0, to: firstNode.nodeSize })
-                      .insertContentAt(0, html)
-                      .run();
-                  } else {
-                    editorRef.current.commands.insertContent(html);
-                  }
-                } else {
-                  editorRef.current.commands.insertContent(html);
-                }
-              }
-              return true;
-            }
-          }
-
           return false;
         },
       },
@@ -369,124 +575,241 @@ export function Editor({
   );
 
   editorRef.current = editor;
+  if (typeof window !== "undefined") {
+    (window as any).__RAYNOTE_EDITOR__ = editor;
+  }
+
+  useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   /**
    * Note Switching Transition Handler (Zero-Flicker in-place replacement):
    * Runs whenever `noteId` prop changes while maintaining the same mounted editor shell.
+   * Invariant: Awaits the full saveNow() chain (including any in-flight save AND follow-up)
+   * for the departing note BEFORE changing currentNoteIdRef or replacing the editor content.
    */
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     const prevId = currentNoteIdRef.current;
     if (prevId === noteId) return; // Same note, no-op
 
-    // 1. Synchronously flush uncommitted edits from the departing note (if prevId exists)
-    if (prevId && editor && !editor.isDestroyed) {
-      editor.commands.clearBlockSelection?.();
-      if (isDirtyRef.current) {
-        if (debounceTimer.current) {
-          clearTimeout(debounceTimer.current);
-          debounceTimer.current = null;
-        }
-        try {
-          const json = editor.getJSON();
-          const title = extractTitle(json);
-          const strContent = JSON.stringify(json);
-          isDirtyRef.current = false;
-          noteCache.updateContent(prevId, strContent, title);
-          onUpdateRef.current(strContent, title);
-        } catch (err) {
-          console.error("Failed to flush edits before note switch:", err);
-        }
-      }
-      if (scrollContainerRef.current) {
-        noteCache.updateScrollTop(prevId, scrollContainerRef.current.scrollTop);
-      }
-    }
+    let cancelled = false;
 
-    // 2. Update active note reference
-    currentNoteIdRef.current = noteId;
-
-    // High-performance document swap:
-    // Uses EditorState.create to clear prosemirror-history undo stack and detach old document nodes,
-    // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
-    const applyDocumentInPlace = (docData: any) => {
-      editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false });
-      // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
+    const performSwitch = async () => {
+      const switchStart = performance.now();
       try {
-        const histPlugin = editor.state.plugins.find((p: any) => p.key?.startsWith?.("history$"));
-        if (histPlugin && (histPlugin as any).spec?.state?.init) {
-          const emptyHistory = (histPlugin as any).spec.state.init();
-          const tr = editor.state.tr.setMeta((histPlugin as any).key, { historyState: emptyHistory });
-          editor.view.dispatch(tr);
+        // 1. If switching from an existing note, await full save & follow-up chain before switching ID or replacing doc
+        // Make editor read-only during switch wait to prevent any edits from landing in limbo
+        if (prevId && editor && !editor.isDestroyed) {
+          if (discardedNoteIdRef.current === prevId) {
+            isDirtyRef.current = false;
+            consecutiveSaveFailuresRef.current = 0;
+            isHalfOpenAttemptRef.current = false;
+            if (halfOpenRetryTimerRef.current) {
+              clearTimeout(halfOpenRetryTimerRef.current);
+              halfOpenRetryTimerRef.current = null;
+            }
+            saveStatusStore.setBlocked(false);
+            discardedNoteIdRef.current = null;
+          } else {
+            editor.setEditable(false, false);
+            editor.commands.clearBlockSelection?.();
+            if (scrollContainerRef.current) {
+              noteCache.updateScrollTop(prevId, scrollContainerRef.current.scrollTop);
+            }
+            try {
+              await saveNow();
+            } catch (err: any) {
+              console.error("Failed to flush edits before note switch:", err);
+            }
+
+            const saveErr = lastSaveErrorRef.current;
+            const errMsg = String(saveErr?.message || saveErr || "");
+            const isMissingRow =
+              errMsg === "NOTE_NOT_FOUND" ||
+              errMsg.includes("NOTE_NOT_FOUND") ||
+              errMsg.includes("Query returned no rows") ||
+              errMsg.includes("QueryReturnedNoRows");
+
+            if (isMissingRow) {
+              console.warn(`[switch] Note ${prevId} missing from SQLite during note switch. Routing to orphan recovery.`);
+              const currentContent = JSON.stringify(editor.getJSON());
+              let recoverySucceeded = false;
+              if (onRecoverOrphan) {
+                try {
+                  await onRecoverOrphan(currentContent, prevId);
+                  recoverySucceeded = true;
+                } catch (recoveryErr) {
+                  console.error("Orphan recovery failed during note switch:", recoveryErr);
+                }
+              }
+              if (recoverySucceeded) {
+                isDirtyRef.current = false;
+                consecutiveSaveFailuresRef.current = 0;
+                isHalfOpenAttemptRef.current = false;
+                if (halfOpenRetryTimerRef.current) {
+                  clearTimeout(halfOpenRetryTimerRef.current);
+                  halfOpenRetryTimerRef.current = null;
+                }
+                saveStatusStore.setBlocked(false);
+              } else {
+                console.warn(`[switch] Orphan recovery failed for note ${prevId}. Keeping dirty state and opening conflict modal.`);
+                // Keep isDirtyRef.current = true and keep localStorage snapshot intact
+                onSwitchConflictRef.current?.({
+                  failedNoteId: prevId,
+                  targetNoteId: noteId,
+                  content: currentContent,
+                  text: editor.getText(),
+                });
+                return;
+              }
+            } else if (isDirtyRef.current || consecutiveSaveFailuresRef.current >= 5) {
+              console.warn(`[switch] Note switch failed for note ${prevId}. Prompting user conflict options.`);
+              onSwitchFailedRef.current?.(prevId, saveErr || new Error("Failed to save editor content before switch"));
+              onSwitchConflictRef.current?.({
+                failedNoteId: prevId,
+                targetNoteId: noteId,
+                content: JSON.stringify(editor.getJSON()),
+                text: editor.getText(),
+              });
+              return;
+            }
+          }
         }
-      } catch {}
+
+        if (cancelled || editor.isDestroyed) {
+          return;
+        }
+
+        // 2. ONLY AFTER full flush chain resolves, update active note reference
+        currentNoteIdRef.current = noteId;
+        lastSavedDocRef.current = editor.state.doc;
+        isDirtyRef.current = false;
+        saveAgainRef.current = false;
+        activeSavePromiseRef.current = null;
+
+        // 3. High-performance document swap:
+        // Clears prosemirror-history undo stack and detaches old document nodes,
+        // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
+        const applyDocumentInPlace = (docData: any) => {
+          editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false });
+          lastSavedDocRef.current = editor.state.doc;
+          isDirtyRef.current = false;
+          // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
+          try {
+            const histPlugin = editor.state.plugins.find((p: any) => p.key?.startsWith?.("history$"));
+            if (histPlugin && (histPlugin as any).spec?.state?.init) {
+              const emptyHistory = (histPlugin as any).spec.state.init();
+              const tr = editor.state.tr.setMeta((histPlugin as any).key, { historyState: emptyHistory });
+              editor.view.dispatch(tr);
+            }
+          } catch {}
+        };
+
+        const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number) => {
+          // Pre-scan and await all code block languages before setContent so lowlight decorates on first render
+          await preloadLanguagesForContent(rawContent);
+          if (cancelled || currentNoteIdRef.current !== targetId || editor.isDestroyed) {
+            return;
+          }
+
+          let docData: any;
+          try {
+            docData = JSON.parse(rawContent);
+          } catch {
+            docData = markdownToTipTapHtml(rawContent, { ensureFirstLineH1: true });
+          }
+
+          applyDocumentInPlace(docData);
+
+          requestAnimationFrame(() => {
+            if (scrollContainerRef.current && currentNoteIdRef.current === targetId) {
+              scrollContainerRef.current.scrollTop = targetScroll;
+            }
+          });
+        };
+
+        // 4. Retrieve incoming note from in-memory LRU cache
+        const cached = noteCache.get(noteId);
+        if (cached) {
+          await loadAndApplyDoc(cached.content, noteId, cached.scrollTop);
+
+          // Background Stale-While-Revalidate: verify with SQLite without blocking UI
+          getNote(noteId)
+            .then((fullNote) => {
+              if (currentNoteIdRef.current === noteId && !cancelled) {
+                const reconciliation = reconcileSnapshotWithDb(cached, fullNote);
+                if (reconciliation.action === "recover_orphan_as_new") {
+                  noteCache.delete(noteId);
+                  if (onRecoverOrphan) {
+                    Promise.resolve(onRecoverOrphan(reconciliation.content))
+                      .then(() => {
+                        safeLocalStorageRemoveItem("notefast_active_note_content");
+                        safeLocalStorageRemoveItem("notefast_active_note_id");
+                        safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
+                        safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+                      })
+                      .catch((err) => {
+                        console.error("Orphan recovery failed:", err);
+                      });
+                  }
+                } else if (reconciliation.action === "keep_snapshot_and_mark_dirty") {
+                  // User had unsaved edits based on this DB row; re-apply snapshot and mark editor dirty
+                  isDirtyRef.current = true;
+                  saveNow();
+                } else if (reconciliation.action === "apply_db" && fullNote) {
+                  noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, cached.scrollTop, false);
+                  loadAndApplyDoc(fullNote.content, noteId, cached.scrollTop);
+                  isDirtyRef.current = false;
+                } else if (reconciliation.action === "evict_orphan") {
+                  noteCache.delete(noteId);
+                  safeLocalStorageRemoveItem("notefast_active_note_content");
+                  safeLocalStorageRemoveItem("notefast_active_note_id");
+                  safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
+                  safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+                }
+              }
+            })
+            .catch(() => {});
+        } else {
+          // CACHE MISS: fetch from SQLite asynchronously
+          try {
+            const fullNote = await getNote(noteId);
+            if (fullNote && currentNoteIdRef.current === noteId && !cancelled) {
+              noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0, false);
+              await loadAndApplyDoc(fullNote.content, noteId, 0);
+            }
+          } catch (err) {
+            console.error("Failed to load note from SQLite:", err);
+          }
+        }
+      } finally {
+        if (editor && !editor.isDestroyed) {
+          editor.setEditable(true, false);
+        }
+        if ((import.meta as any).env?.DEV) {
+          const switchDuration = performance.now() - switchStart;
+          console.debug(
+            `[performSwitch lock duration] ${switchDuration.toFixed(3)} ms (prevId=${prevId}, nextId=${noteId})`
+          );
+        }
+      }
     };
 
-    // 3. Retrieve incoming note from in-memory LRU cache
-    const cached = noteCache.get(noteId);
-    if (cached) {
-      // CACHE HIT: 0ms Instantaneous in-place document swap
-      // If editor was already seeded on mount with this note's content, avoid redundant re-application
-      const alreadySeeded = prevId === null && editor.state.doc.textContent.length > 0;
-      if (!alreadySeeded) {
-        let docData: any;
-        try {
-          docData = JSON.parse(cached.content);
-        } catch {
-          docData = markdownToTipTapHtml(cached.content, { ensureFirstLineH1: true });
-        }
-        applyDocumentInPlace(docData);
+    performSwitch();
+
+    return () => {
+      cancelled = true;
+      if (halfOpenRetryTimerRef.current) {
+        clearTimeout(halfOpenRetryTimerRef.current);
+        halfOpenRetryTimerRef.current = null;
       }
-
-      // Restore cached scroll position smoothly
-      const targetScroll = cached.scrollTop;
-      requestAnimationFrame(() => {
-        if (scrollContainerRef.current && currentNoteIdRef.current === noteId) {
-          scrollContainerRef.current.scrollTop = targetScroll;
-        }
-      });
-
-      // Background Stale-While-Revalidate: verify with SQLite without blocking UI
-      getNote(noteId)
-        .then((fullNote) => {
-          if (fullNote && currentNoteIdRef.current === noteId) {
-            const dbTime = new Date(fullNote.updated_at).getTime();
-            if (dbTime > cached.updatedAt && fullNote.content !== cached.content) {
-              noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, targetScroll);
-              let freshDoc: any;
-              try {
-                freshDoc = JSON.parse(fullNote.content);
-              } catch {
-                freshDoc = markdownToTipTapHtml(fullNote.content, { ensureFirstLineH1: true });
-              }
-              applyDocumentInPlace(freshDoc);
-            }
-          }
-        })
-        .catch(() => {});
-    } else {
-      // CACHE MISS: Keep editor mounted and fetch from SQLite asynchronously
-      getNote(noteId)
-        .then((fullNote) => {
-          if (fullNote && currentNoteIdRef.current === noteId) {
-            noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0);
-            let freshDoc: any;
-            try {
-              freshDoc = JSON.parse(fullNote.content);
-            } catch {
-              freshDoc = markdownToTipTapHtml(fullNote.content, { ensureFirstLineH1: true });
-            }
-            applyDocumentInPlace(freshDoc);
-            if (scrollContainerRef.current) {
-              scrollContainerRef.current.scrollTop = 0;
-            }
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load note from SQLite:", err);
-        });
-    }
-  }, [noteId, editor]);
+      isHalfOpenAttemptRef.current = false;
+    };
+  }, [noteId, editor, saveNow]);
 
   // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
   useEffect(() => {
@@ -655,30 +978,20 @@ export function Editor({
    */
   useEffect(() => {
     return () => {
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
-      if (isDirtyRef.current && editorRef.current) {
-        try {
-          const currentEditor = editorRef.current;
-          const currentId = currentNoteIdRef.current;
-          if (currentId) {
-            const json = currentEditor.getJSON();
-            const title = extractTitle(json);
-            const strContent = JSON.stringify(json);
-            isDirtyRef.current = false;
-            noteCache.updateContent(currentId, strContent, title);
-            onUpdateRef.current(strContent, title);
-          }
-        } catch (err) {
-          console.error("Failed to flush editor update on unmount:", err);
-        }
-      }
+      saveNow();
       if (scrollContainerRef.current && currentNoteIdRef.current) {
         noteCache.updateScrollTop(currentNoteIdRef.current, scrollContainerRef.current.scrollTop);
       }
     };
   }, []);
+
+  // Register editor flush handler so exit and blur handlers can synchronously commit dirty state
+  useEffect(() => {
+    registerEditorFlush(saveNow);
+    return () => {
+      registerEditorFlush(null);
+    };
+  }, [saveNow]);
 
   // Flush pending update on window blur / defocus
   useEffect(() => {
@@ -691,7 +1004,9 @@ export function Editor({
       }
     };
     window.addEventListener("blur", handleBlur);
-    return () => window.removeEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+    };
   }, [saveNow]);
 
   const handleWrapperClick = useCallback(
@@ -737,6 +1052,7 @@ export function Editor({
             editor={editor}
             zoomLevel={zoomLevel}
             scrollContainerRef={scrollContainerRef}
+            isFindOpen={Boolean(isFindOpen)}
           />
           <EditorContent editor={editor} />
           <FloatingCodeBlockToolbar

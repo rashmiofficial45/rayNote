@@ -250,7 +250,7 @@ async function runSuite(): Promise<void> {
 
   // Test 4.2: Dragging 2cm above block 2 (y: 25 to 105)
   // Block 1 threshold: 100 + 8 = 108. Since drag ends at 105, Block 1 & 2 must NOT be selected!
-  const thresholdDrag = getIntersectingBlockIndices(testBlocks, 25, 105, 10, 10, true);
+  const thresholdDrag = getIntersectingBlockIndices(testBlocks, 25, 105, 10, 100, true);
   const thresholdPassed = thresholdDrag !== null && thresholdDrag.minIdx === 0 && thresholdDrag.maxIdx === 0;
   console.log(`  ✓ Vertical penetration threshold: ${thresholdPassed ? 'PASSED (no below block selection 2cm above)' : 'FAILED'}`);
 

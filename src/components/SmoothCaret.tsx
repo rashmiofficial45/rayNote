@@ -6,6 +6,7 @@ interface SmoothCaretProps {
   editor: Editor | null;
   zoomLevel?: number;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  isFindOpen?: boolean;
 }
 
 /**
@@ -76,7 +77,8 @@ export class SmoothCaretRetryController {
 export function SmoothCaret({
   editor,
   zoomLevel = 1.2,
-  scrollContainerRef,
+  scrollContainerRef: _scrollContainerRef,
+  isFindOpen,
 }: SmoothCaretProps) {
   const caretRef = useRef<HTMLDivElement>(null);
   const lastPosRef = useRef<{ x: number; y: number; height: number } | null>(null);
@@ -84,6 +86,10 @@ export function SmoothCaret({
   const blinkStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseDownRef = useRef(false);
   const retryControllerRef = useRef(new SmoothCaretRetryController());
+  const rafIdRef = useRef<number | null>(null);
+  const isDirtyRef = useRef(false);
+  const pendingImmediateRef = useRef(false);
+
   const [isEnabled, setIsEnabled] = useState(() => {
     const saved = localStorage.getItem("notefast_smooth_caret");
     return saved === null ? true : saved === "true";
@@ -92,7 +98,9 @@ export function SmoothCaret({
   // Sync dataset attribute on document root so CSS can toggle native caret cleanly
   useEffect(() => {
     document.documentElement.dataset.smoothCaret = isEnabled ? "true" : "false";
-    localStorage.setItem("notefast_smooth_caret", String(isEnabled));
+    try {
+      localStorage.setItem("notefast_smooth_caret", String(isEnabled));
+    } catch {}
   }, [isEnabled]);
 
   // Listen to toggle events from Command Palette or shortcuts
@@ -106,116 +114,136 @@ export function SmoothCaret({
     };
   }, []);
 
-  const updatePosition = useCallback(
-    (immediate = false) => {
-      if (!editor || !caretRef.current || !editor.view) return;
+  /**
+   * Executes layout reads (coordsAtPos, getBoundingClientRect) strictly inside
+   * a single requestAnimationFrame after ProseMirror has completed its DOM update.
+   */
+  const renderCaretFrame = useCallback(() => {
+    rafIdRef.current = null;
+    if (!editor || !caretRef.current || !editor.view) return;
 
-      const caret = caretRef.current;
-      const { state, view } = editor;
+    const caret = caretRef.current;
+    const { state, view } = editor;
 
-      // Hide if disabled, editor not focused, text selection is a range, or block selection is active
-      const blockState = blockSelectionPluginKey.getState(state);
-      const hasBlockSelection = Boolean(blockState && blockState.selectedPositions.length > 0);
-      if (!isEnabled || !view.hasFocus() || !state.selection.empty || hasBlockSelection) {
-        if (caret.style.opacity !== "0") {
-          caret.style.opacity = "0";
-        }
-        if (caret.classList.contains("is-blinking")) {
-          caret.classList.remove("is-blinking");
-        }
-        if (caret.classList.contains("is-smooth")) {
-          caret.classList.remove("is-smooth");
-        }
+    // Check visibility states
+    const blockState = blockSelectionPluginKey.getState(state);
+    const hasBlockSelection = Boolean(blockState && blockState.selectedPositions.length > 0);
+    if (!isEnabled || !view.hasFocus() || !state.selection.empty || hasBlockSelection || document.hidden) {
+      if (caret.style.opacity !== "0") {
+        caret.style.opacity = "0";
+      }
+      if (caret.classList.contains("is-blinking")) {
+        caret.classList.remove("is-blinking");
+      }
+      if (caret.classList.contains("is-smooth")) {
+        caret.classList.remove("is-smooth");
+      }
+      isDirtyRef.current = false;
+      return;
+    }
+
+    try {
+      const from = state.selection.from;
+      const coords = view.coordsAtPos(from);
+      const parent = caret.parentElement;
+      if (!parent || !coords) return;
+
+      // In WebKit, if DOM isn't laid out yet upon mounting, coords may be all zeros.
+      // Cap retries to 3 frames (~25ms) to prevent infinite 100% CPU spinning.
+      if (isInvalidCoords(coords)) {
+        retryControllerRef.current.handleCoords(coords, () => {
+          if (rafIdRef.current === null) {
+            rafIdRef.current = requestAnimationFrame(renderCaretFrame);
+          }
+        });
         return;
       }
+      retryControllerRef.current.reset();
 
-      try {
-        const from = state.selection.from;
-        const coords = view.coordsAtPos(from);
-        const parent = caret.parentElement;
-        if (!parent || !coords) return;
+      const parentRect = parent.getBoundingClientRect();
+      const zoom = zoomLevel || 1;
 
-        // In WebKit, if DOM isn't laid out yet upon mounting, coords may be all zeros.
-        // Cap retries to 3 frames (~25ms) to prevent infinite 100% CPU spinning.
-        if (isInvalidCoords(coords)) {
-          retryControllerRef.current.handleCoords(coords, () => {
-            requestAnimationFrame(() => updatePosition(true));
-          });
-          return;
-        }
-        retryControllerRef.current.reset();
+      // Sub-pixel precision coordinates relative to the zoomed parent container
+      const rawX = (coords.left - parentRect.left) / zoom;
+      // Snap to Retina half-pixel grid to prevent sub-pixel jitter
+      const x = Math.round(rawX * 2) / 2;
 
-        const parentRect = parent.getBoundingClientRect();
-        const zoom = zoomLevel || 1;
+      // Format-based deterministic height (Apple Notes / Bear / VS Code)
+      const targetHeight = getFormatCursorHeight(state);
 
-        // Sub-pixel precision coordinates relative to the zoomed parent container
-        const rawX = (coords.left - parentRect.left) / zoom;
-        // Snap to Retina half-pixel grid to prevent sub-pixel jitter
-        const x = Math.round(rawX * 2) / 2;
+      // Invariant center-line Y position
+      const centerY = (coords.top + coords.bottom) / 2;
+      const rawY = (centerY - parentRect.top) / zoom - targetHeight / 2;
+      const y = Math.round(rawY * 2) / 2;
 
-        // Format-based deterministic height (Apple Notes / Bear / VS Code)
-        const targetHeight = getFormatCursorHeight(state);
+      const prev = lastPosRef.current;
+      const isMouse = isMouseDownRef.current;
+      const immediate = pendingImmediateRef.current;
+      pendingImmediateRef.current = false;
 
-        // Calculate invariant center-line Y position:
-        // (coords.top + coords.bottom) / 2 represents the exact baseline center of the line box or glyph.
-        // It stays 100% constant whether on an empty line (<p><br></p>) or typing text!
-        const centerY = (coords.top + coords.bottom) / 2;
-        const rawY = (centerY - parentRect.top) / zoom - targetHeight / 2;
-        const y = Math.round(rawY * 2) / 2;
+      // Snap instantly if jump is large (mouse click, note switch, distant line or page leap)
+      const isFarJump = prev
+        ? Math.abs(x - prev.x) > 200 || Math.abs(y - prev.y) > 40
+        : false;
 
-        const prev = lastPosRef.current;
-        const isMouse = isMouseDownRef.current;
-        // Snap instantly if jump is large (mouse click, note switch, distant line or page leap)
-        const isFarJump = prev
-          ? Math.abs(x - prev.x) > 200 || Math.abs(y - prev.y) > 40
-          : false;
-
-        if (immediate || isMouse || isFarJump || !prev) {
-          // Instant snap without flight animation
-          caret.classList.remove("is-smooth");
-          caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-          caret.style.height = `${targetHeight}px`;
-          isMouseDownRef.current = false;
-        } else {
-          // VS Code smooth gliding animation: character-by-character fluid motion
-          caret.classList.add("is-smooth");
-          caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-          caret.style.height = `${targetHeight}px`;
-        }
-
-        lastPosRef.current = { x, y, height: targetHeight };
-
-        // Keep caret 100% solidly visible while actively typing (no blinking while typing)
-        caret.style.opacity = "1";
-        caret.classList.remove("is-blinking");
-
-        // After 500ms of inactivity, resume gentle breathing pulse
-        if (blinkTimeoutRef.current) {
-          clearTimeout(blinkTimeoutRef.current);
-        }
-        if (blinkStopTimeoutRef.current) {
-          clearTimeout(blinkStopTimeoutRef.current);
-        }
-        blinkTimeoutRef.current = setTimeout(() => {
-          if (view.hasFocus() && editor.state.selection.empty) {
-            caret.classList.add("is-blinking");
-          }
-        }, 500);
-
-        // Cap infinite blinking animation after 4.5s of inactivity (Apple Notes / Bear standard)
-        // Prevents WebKit compositor thread from consuming 80%-90% CPU while idle
-        blinkStopTimeoutRef.current = setTimeout(() => {
-          caret.classList.remove("is-blinking");
-          if (view.hasFocus() && editor.state.selection.empty) {
-            caret.style.opacity = "1";
-          }
-        }, 4500);
-      } catch {
-        // Coords might be unavailable during rapid unmounts
+      if (immediate || isMouse || isFarJump || !prev) {
+        // Instant snap without flight animation
+        caret.classList.remove("is-smooth");
+        caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        caret.style.height = `${targetHeight}px`;
+        isMouseDownRef.current = false;
+      } else {
+        // VS Code smooth gliding animation: character-by-character fluid motion
+        caret.classList.add("is-smooth");
+        caret.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        caret.style.height = `${targetHeight}px`;
       }
-    },
-    [editor, zoomLevel, isEnabled]
-  );
+
+      lastPosRef.current = { x, y, height: targetHeight };
+      isDirtyRef.current = false;
+
+      // Keep caret 100% solidly visible while actively typing
+      caret.style.opacity = "1";
+      caret.classList.remove("is-blinking");
+
+      // After 500ms of inactivity, resume gentle breathing pulse
+      if (blinkTimeoutRef.current) {
+        clearTimeout(blinkTimeoutRef.current);
+      }
+      if (blinkStopTimeoutRef.current) {
+        clearTimeout(blinkStopTimeoutRef.current);
+      }
+      blinkTimeoutRef.current = setTimeout(() => {
+        if (view.hasFocus() && editor.state.selection.empty && !document.hidden) {
+          caret.classList.add("is-blinking");
+        }
+      }, 500);
+
+      // Cap infinite blinking animation after 4.5s of inactivity (Apple Notes / Bear standard)
+      // Prevents WebKit compositor thread from consuming CPU while idle
+      blinkStopTimeoutRef.current = setTimeout(() => {
+        caret.classList.remove("is-blinking");
+        if (view.hasFocus() && editor.state.selection.empty) {
+          caret.style.opacity = "1";
+        }
+      }, 4500);
+    } catch {
+      // Coords might be unavailable during rapid unmounts
+    }
+  }, [editor, zoomLevel, isEnabled]);
+
+  /**
+   * Schedules a single rAF pass without reading layout inside transaction handlers.
+   */
+  const scheduleCaretUpdate = useCallback((immediate = false) => {
+    isDirtyRef.current = true;
+    if (immediate) {
+      pendingImmediateRef.current = true;
+    }
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(renderCaretFrame);
+    }
+  }, [renderCaretFrame]);
 
   useEffect(() => {
     if (!editor || !isEnabled) {
@@ -227,7 +255,6 @@ export function SmoothCaret({
 
     const dom = editor.view?.dom;
 
-    // Detect mouse clicks so cursor jumps immediately without sliding across the note
     const handleMouseDown = () => {
       isMouseDownRef.current = true;
       if (caretRef.current) {
@@ -235,39 +262,36 @@ export function SmoothCaret({
       }
     };
 
-    if (dom) {
-      dom.addEventListener("mousedown", handleMouseDown, { capture: true });
+    const handleComposition = () => {
+      scheduleCaretUpdate(true);
+    };
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && dom) {
+      try {
+        resizeObserver = new ResizeObserver(() => {
+          scheduleCaretUpdate(true);
+        });
+        resizeObserver.observe(dom);
+      } catch {}
     }
 
-    // Coalesce rapid transaction and selectionUpdate emissions into a single microtask per tick.
-    // This eliminates double reflows and ensures 0ms latency typing.
-    let microtaskPending = false;
-    let pendingImmediate = false;
+    if (dom) {
+      dom.addEventListener("mousedown", handleMouseDown, { capture: true });
+      dom.addEventListener("compositionstart", handleComposition);
+      dom.addEventListener("compositionupdate", handleComposition);
+      dom.addEventListener("compositionend", handleComposition);
+      dom.addEventListener("load", handleComposition, { capture: true });
+    }
 
-    const scheduleUpdate = (immediate: boolean) => {
-      if (immediate) pendingImmediate = true;
-      if (microtaskPending) return;
-      microtaskPending = true;
-      queueMicrotask(() => {
-        microtaskPending = false;
-        const imm = pendingImmediate;
-        pendingImmediate = false;
-        updatePosition(imm);
-      });
+    // Zero layout reads inside transaction handlers: only mark dirty & schedule 1 rAF
+    const handleTransaction = () => {
+      scheduleCaretUpdate(false);
     };
 
-    const handleImmediateUpdate = () => {
-      scheduleUpdate(false);
-    };
-
-    const handleSnapUpdate = () => {
-      // If editor has active range selection (e.g. Mod-A) or is not focused, caret is already hidden.
-      // Skipping prevents running microtasks and dirtying layout during scrolling!
-      if (!editor || !editor.view || !editor.state.selection.empty || !editor.view.hasFocus()) {
-        return;
-      }
+    const handleFocus = () => {
       retryControllerRef.current.reset();
-      scheduleUpdate(true);
+      scheduleCaretUpdate(true);
     };
 
     const handleBlur = () => {
@@ -275,40 +299,88 @@ export function SmoothCaret({
         caretRef.current.style.opacity = "0";
         caretRef.current.classList.remove("is-blinking");
       }
-      handleSnapUpdate();
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      isDirtyRef.current = false;
     };
 
-    editor.on("transaction", handleImmediateUpdate);
-    editor.on("selectionUpdate", handleImmediateUpdate);
-    editor.on("focus", handleSnapUpdate);
+    // Cancellation and restart handlers on visibilitychange and panel-will-hide
+    const handleCancelOnHide = () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      if (blinkTimeoutRef.current) {
+        clearTimeout(blinkTimeoutRef.current);
+        blinkTimeoutRef.current = null;
+      }
+      if (blinkStopTimeoutRef.current) {
+        clearTimeout(blinkStopTimeoutRef.current);
+        blinkStopTimeoutRef.current = null;
+      }
+      if (caretRef.current) {
+        caretRef.current.style.opacity = "0";
+        caretRef.current.classList.remove("is-blinking");
+      }
+      isDirtyRef.current = false;
+    };
+
+    const handleRestartOnShow = () => {
+      if (!document.hidden && editor && editor.view?.hasFocus()) {
+        scheduleCaretUpdate(true);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleCancelOnHide();
+      } else {
+        handleRestartOnShow();
+      }
+    };
+
+    editor.on("transaction", handleTransaction);
+    editor.on("selectionUpdate", handleTransaction);
+    editor.on("focus", handleFocus);
     editor.on("blur", handleBlur);
     window.addEventListener("blur", handleBlur);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("panel-will-hide" as any, handleCancelOnHide);
+    window.addEventListener("panel-did-show" as any, handleRestartOnShow);
+    window.addEventListener("resize", handleFocus);
 
-    const scrollEl = scrollContainerRef?.current;
-    if (scrollEl) {
-      // On scroll, snap immediately so caret stays glued to the text
-      scrollEl.addEventListener("scroll", handleSnapUpdate, { passive: true });
-    }
-    window.addEventListener("resize", handleSnapUpdate);
-
-    // Initial position on note load: snap instantly
-    scheduleUpdate(true);
+    // Initial position on mount
+    scheduleCaretUpdate(true);
 
     return () => {
+      if (resizeObserver) {
+        try {
+          resizeObserver.disconnect();
+        } catch {}
+      }
       if (dom) {
         dom.removeEventListener("mousedown", handleMouseDown, { capture: true });
+        dom.removeEventListener("compositionstart", handleComposition);
+        dom.removeEventListener("compositionupdate", handleComposition);
+        dom.removeEventListener("compositionend", handleComposition);
+        dom.removeEventListener("load", handleComposition, { capture: true });
       }
-      editor.off("transaction", handleImmediateUpdate);
-      editor.off("selectionUpdate", handleImmediateUpdate);
-      editor.off("focus", handleSnapUpdate);
+      editor.off("transaction", handleTransaction);
+      editor.off("selectionUpdate", handleTransaction);
+      editor.off("focus", handleFocus);
       editor.off("blur", handleBlur);
       window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("panel-will-hide" as any, handleCancelOnHide);
+      window.removeEventListener("panel-did-show" as any, handleRestartOnShow);
+      window.removeEventListener("resize", handleFocus);
 
-      if (scrollEl) {
-        scrollEl.removeEventListener("scroll", handleSnapUpdate);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
       }
-      window.removeEventListener("resize", handleSnapUpdate);
-
       if (blinkTimeoutRef.current) {
         clearTimeout(blinkTimeoutRef.current);
       }
@@ -316,13 +388,39 @@ export function SmoothCaret({
         clearTimeout(blinkStopTimeoutRef.current);
       }
     };
-  }, [editor, updatePosition, scrollContainerRef, isEnabled]);
+  }, [editor, scheduleCaretUpdate, isEnabled]);
 
   // Update on zoom change
   useEffect(() => {
     lastPosRef.current = null;
-    updatePosition(true);
-  }, [zoomLevel, updatePosition]);
+    scheduleCaretUpdate(true);
+  }, [zoomLevel, scheduleCaretUpdate]);
+
+  // Re-measure on find bar open/close
+  useEffect(() => {
+    scheduleCaretUpdate(true);
+  }, [isFindOpen, scheduleCaretUpdate]);
+
+  // Re-measure caret directly on font-family or font-size change
+  useEffect(() => {
+    const handleFontChange = () => {
+      lastPosRef.current = null;
+      scheduleCaretUpdate(true);
+    };
+
+    window.addEventListener("notefast_font_changed", handleFontChange);
+    if (typeof document !== "undefined" && (document as any).fonts) {
+      (document as any).fonts.ready?.then(handleFontChange).catch(() => {});
+      (document as any).fonts.addEventListener?.("loadingdone", handleFontChange);
+    }
+
+    return () => {
+      window.removeEventListener("notefast_font_changed", handleFontChange);
+      if (typeof document !== "undefined" && (document as any).fonts) {
+        (document as any).fonts.removeEventListener?.("loadingdone", handleFontChange);
+      }
+    };
+  }, [scheduleCaretUpdate]);
 
   return <div ref={caretRef} className="notefast-smooth-caret" />;
 }

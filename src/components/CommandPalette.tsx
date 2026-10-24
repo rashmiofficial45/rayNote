@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { NoteSummary, hideWindow, quitApp, openSettingsWindow, searchNotes } from "../lib/db";
-import { getNoteTitle, formatDate } from "../lib/utils";
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { NoteSummary, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
+
+const PaletteSubViews = lazy(() => import("./PaletteSubViews"));
 import {
   Plus,
   Copy,
@@ -32,7 +33,6 @@ import {
   Upload,
   Eye,
   Sliders,
-  Check,
   AlertTriangle,
 } from "lucide-react";
 import {
@@ -62,7 +62,7 @@ export interface CommandPaletteProps {
   onClose: () => void;
   notes: NoteSummary[];
   activeNoteId: string | null;
-  initialView?: "actions" | "browse" | "settings";
+  initialView?: "actions" | "settings";
   zoomLevel: number;
   onNewNote: () => void;
   onDuplicateNote: () => void;
@@ -91,7 +91,7 @@ export interface CommandPaletteProps {
   onOpenSmartSearch?: () => void;
 }
 
-type PaletteView = "actions" | "browse" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom";
+type PaletteView = "actions" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom";
 
 export interface ActionItem {
   id: string;
@@ -115,7 +115,7 @@ export function CommandPalette({
   zoomLevel,
   onNewNote,
   onDuplicateNote,
-  onSelectNote,
+  onSelectNote: _onSelectNote,
   onDeleteNote,
   onTogglePin,
   onGoBack,
@@ -142,29 +142,7 @@ export function CommandPalette({
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [view, setView] = useState<PaletteView>(initialView);
-  const [ftsResults, setFtsResults] = useState<NoteSummary[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // Trigger background SQLite FTS5 search when in browse view
-  useEffect(() => {
-    const q = search.trim();
-    if (!q || view !== "browse") {
-      setFtsResults(null);
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      searchNotes(q)
-        .then((results) => {
-          setFtsResults(results);
-        })
-        .catch((err) => {
-          console.error("FTS5 search error:", err);
-        });
-    }, 120);
-
-    return () => clearTimeout(timer);
-  }, [search, view]);
 
   // Live settings state for immediate badge/toggle feedback
   const [currentTheme, setCurrentTheme] = useState<ThemeMode>(getStoredThemeMode);
@@ -834,35 +812,8 @@ export function CommandPalette({
   const filteredFonts = filterList(fontSubActions);
   const filteredZoom = filterList(zoomSubActions);
 
-  // 1. Instant local metadata search (0ms)
-  const localFilteredNotes = notes.filter((n) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    const title = getNoteTitle(n.title, n.preview).toLowerCase();
-    const preview = (n.preview || "").toLowerCase();
-    return title.includes(q) || preview.includes(q);
-  });
-
-  // 2. Seamlessly merge with deep SQLite FTS5 search results
-  const filteredNotes = (() => {
-    if (!ftsResults || ftsResults.length === 0) {
-      return localFilteredNotes;
-    }
-    const seen = new Set(localFilteredNotes.map((n) => n.id));
-    const merged = [...localFilteredNotes];
-    for (const r of ftsResults) {
-      if (!seen.has(r.id)) {
-        seen.add(r.id);
-        merged.push(r);
-      }
-    }
-    return merged;
-  })();
-
   const getActiveItems = () => {
     switch (view) {
-      case "browse":
-        return filteredNotes;
       case "sub_appearance":
         return filteredAppearance;
       case "sub_accents":
@@ -896,6 +847,14 @@ export function CommandPalette({
     view === "sub_zoom";
 
   const currentItems = getActiveItems();
+
+  // Prefetch CommandPalette sub-views chunk after 1500ms idle timer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import("./PaletteSubViews");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -963,27 +922,19 @@ export function CommandPalette({
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        if (view === "browse") {
-          const note = filteredNotes[selectedIndex];
-          if (note) {
-            onSelectNote(note.id);
-            onClose();
-          }
-        } else {
-          const list =
-            view === "sub_appearance"
-              ? filteredAppearance
-              : view === "sub_accents"
-                ? filteredAccents
-                : view === "sub_fonts"
-                  ? filteredFonts
-                  : view === "sub_zoom"
-                    ? filteredZoom
-                    : filteredActions;
+        const list =
+          view === "sub_appearance"
+            ? filteredAppearance
+            : view === "sub_accents"
+              ? filteredAccents
+              : view === "sub_fonts"
+                ? filteredFonts
+                : view === "sub_zoom"
+                  ? filteredZoom
+                  : filteredActions;
 
-          const action = list[selectedIndex];
-          if (action && !action.disabled) action.action();
-        }
+        const action = list[selectedIndex];
+        if (action && !action.disabled) action.action();
         return;
       }
     },
@@ -999,9 +950,7 @@ export function CommandPalette({
       filteredAccents,
       filteredFonts,
       filteredZoom,
-      filteredNotes,
       onClose,
-      onSelectNote,
     ]
   );
 
@@ -1039,15 +988,13 @@ export function CommandPalette({
             placeholder={
               view === "actions"
                 ? "Search commands & settings…"
-                : view === "browse"
-                  ? "Search notes by title or content…"
-                  : view === "sub_appearance"
-                    ? "Choose appearance (Dark, Light, System)…"
-                    : view === "sub_accents"
-                      ? "Search accent themes…"
-                      : view === "sub_fonts"
-                        ? "Search typography…"
-                        : "Search zoom levels…"
+                : view === "sub_appearance"
+                  ? "Choose appearance (Dark, Light, System)…"
+                  : view === "sub_accents"
+                    ? "Search accent themes…"
+                    : view === "sub_fonts"
+                      ? "Search typography…"
+                      : "Search zoom levels…"
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1137,125 +1084,26 @@ export function CommandPalette({
               );
             })}
 
-          {/* Sub-View: Appearance (Dark / Light / System) */}
-          {view === "sub_appearance" && (
-            <div>
-              <div className="command-category-header">Select Appearance Mode</div>
-              {filteredAppearance.map((item, idx) => (
-                <button
-                  key={item.id}
-                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
-                  onClick={() => item.action()}
-                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
-                >
-                  <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex items-center min-w-0 flex-1">
-                    <span className="command-item-label truncate">{item.label}</span>
-                  </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
-                </button>
-              ))}
-            </div>
+          {/* Sub-Views: Appearance / Accents / Fonts / Zoom (Code-split with React.lazy) */}
+          {isSubView && (
+            <Suspense fallback={null}>
+              <PaletteSubViews
+                view={view as "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom"}
+                filteredAppearance={filteredAppearance}
+                filteredAccents={filteredAccents}
+                filteredFonts={filteredFonts}
+                filteredZoom={filteredZoom}
+                selectedIndex={selectedIndex}
+                handleItemMouseMove={handleItemMouseMove}
+              />
+            </Suspense>
           )}
-
-          {/* Sub-View: Accents */}
-          {view === "sub_accents" && (
-            <div>
-              <div className="command-category-header">Select Accent Theme</div>
-              {filteredAccents.map((item, idx) => (
-                <button
-                  key={item.id}
-                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
-                  onClick={() => item.action()}
-                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
-                >
-                  <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex items-center min-w-0 flex-1">
-                    <span className="command-item-label truncate">{item.label}</span>
-                  </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Sub-View: Fonts */}
-          {view === "sub_fonts" && (
-            <div>
-              <div className="command-category-header">Select Editor Font</div>
-              {filteredFonts.map((item, idx) => (
-                <button
-                  key={item.id}
-                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
-                  onClick={() => item.action()}
-                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
-                >
-                  <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex items-center min-w-0 flex-1">
-                    <span className="command-item-label truncate">{item.label}</span>
-                  </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Sub-View: Zoom */}
-          {view === "sub_zoom" && (
-            <div>
-              <div className="command-category-header">Select Zoom Level</div>
-              {filteredZoom.map((item, idx) => (
-                <button
-                  key={item.id}
-                  className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
-                  onClick={() => item.action()}
-                  onMouseMove={(e) => handleItemMouseMove(idx, e)}
-                >
-                  <div className="command-item-icon">{item.icon}</div>
-                  <div className="command-item-text flex items-center min-w-0 flex-1">
-                    <span className="command-item-label truncate">{item.label}</span>
-                  </div>
-                  {item.badge && <Check size={14} className="text-emerald-400 ml-auto flex-shrink-0" />}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Browse Notes View */}
-          {view === "browse" &&
-            filteredNotes.map((note, idx) => (
-              <button
-                key={note.id}
-                className={`browse-note-item ${idx === selectedIndex ? "is-selected" : ""} ${note.id === activeNoteId ? "is-active" : ""
-                  }`}
-                onClick={() => {
-                  onSelectNote(note.id);
-                  onClose();
-                }}
-                onMouseMove={(e) => handleItemMouseMove(idx, e)}
-              >
-                {note.is_pinned && (
-                  <Pin
-                    size={10}
-                    style={{ color: "var(--color-accent)", flexShrink: 0, fill: "currentColor" }}
-                  />
-                )}
-                <span className="browse-note-title">
-                  {getNoteTitle(note.title, note.preview)}
-                </span>
-                <span className="browse-note-date">
-                  {formatDate(note.updated_at)}
-                </span>
-              </button>
-            ))}
 
           {currentItems.length === 0 && (
             <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
               {view === "actions"
                 ? `No matching settings or actions for "${search}"`
-                : view === "browse"
-                  ? `No notes matching "${search}"`
-                  : "No matching options"}
+                : "No matching options"}
             </div>
           )}
         </div>

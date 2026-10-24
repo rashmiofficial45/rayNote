@@ -264,6 +264,106 @@ export function useBlockDrag({
 
     const scrollContainer = scrollContainerRef.current;
 
+    const refreshCachedBlocks = () => {
+      const state = dragRef.current;
+      if (!state.isDragging || !editor || editor.isDestroyed) return;
+      const view = editor.view;
+      const container = scrollContainerRef.current;
+      if (!container || !view) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const scrollTop = container.scrollTop;
+      const blocks: BlockInfo[] = getAllBlocks(view.state.doc);
+      const cachedBlocks: CachedBlockRect[] = [];
+
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const dom = getBlockDom(view, b.pos);
+        if (dom) {
+          const r = dom.getBoundingClientRect();
+          const contentRects = getBlockContentRects(dom, containerRect, scrollTop);
+          cachedBlocks.push({
+            index: i,
+            pos: b.pos,
+            nodeSize: b.nodeSize,
+            docTop: r.top - containerRect.top + scrollTop,
+            docBottom: r.bottom - containerRect.top + scrollTop,
+            docLeft: r.left - containerRect.left,
+            docRight: r.right - containerRect.left,
+            contentRects,
+          });
+        }
+      }
+      if (cachedBlocks.length > 0) {
+        state.cachedBlocks = cachedBlocks;
+      }
+
+      // Re-run hit testing with the last pointer position so the selection / drop target updates during scroll
+      if (state.hasMoved && state.cachedBlocks.length > 0) {
+        const currentDocY = state.currentPointerY - containerRect.top + container.scrollTop;
+        const minDocY = Math.min(state.startDocY, currentDocY);
+        const maxDocY = Math.max(state.startDocY, currentDocY);
+
+        const curRelX = state.currentPointerX - containerRect.left;
+        const minDocX = Math.min(state.startRelX, curRelX);
+        const maxDocX = Math.max(state.startRelX, curRelX);
+
+        const hit = getIntersectingBlockIndices(
+          state.cachedBlocks,
+          minDocY,
+          maxDocY,
+          minDocX,
+          maxDocX
+        );
+
+        const newPositions = hit ? hit.selectedIndices.map((idx) => state.cachedBlocks[idx].pos) : [];
+
+        const isDifferent =
+          newPositions.length !== state.selectedPositions.length ||
+          newPositions.some((pos, i) => pos !== state.selectedPositions[i]);
+
+        if (isDifferent) {
+          state.selectedPositions = newPositions;
+          updateSelectedPositionsInView(newPositions);
+        }
+      }
+    };
+
+    const handleScrollDuringDrag = () => {
+      const state = dragRef.current;
+      if (!state.isDragging || !editor || editor.isDestroyed || !state.hasMoved) return;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const currentDocY = state.currentPointerY - containerRect.top + container.scrollTop;
+      const minDocY = Math.min(state.startDocY, currentDocY);
+      const maxDocY = Math.max(state.startDocY, currentDocY);
+
+      const curRelX = state.currentPointerX - containerRect.left;
+      const minDocX = Math.min(state.startRelX, curRelX);
+      const maxDocX = Math.max(state.startRelX, curRelX);
+
+      const hit = getIntersectingBlockIndices(
+        state.cachedBlocks,
+        minDocY,
+        maxDocY,
+        minDocX,
+        maxDocX
+      );
+
+      const newPositions = hit ? hit.selectedIndices.map((idx) => state.cachedBlocks[idx].pos) : [];
+
+      const isDifferent =
+        newPositions.length !== state.selectedPositions.length ||
+        newPositions.some((pos, i) => pos !== state.selectedPositions[i]);
+
+      if (isDifferent) {
+        state.selectedPositions = newPositions;
+        updateSelectedPositionsInView(newPositions);
+      }
+    };
+
     const cleanupDrag = () => {
       const state = dragRef.current;
       if (!state.isDragging) return;
@@ -297,6 +397,8 @@ export function useBlockDrag({
       document.body.style.removeProperty("-webkit-user-select");
       document.body.style.removeProperty("user-select");
 
+      scrollContainer.removeEventListener("scroll", handleScrollDuringDrag);
+      window.removeEventListener("resize", refreshCachedBlocks);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerCancel);
@@ -586,6 +688,8 @@ export function useBlockDrag({
 
       state.rafId = requestAnimationFrame(runDragLoop);
 
+      scrollContainer.addEventListener("scroll", handleScrollDuringDrag, { passive: true });
+      window.addEventListener("resize", refreshCachedBlocks, { passive: true });
       window.addEventListener("pointermove", handlePointerMove, { passive: true });
       window.addEventListener("pointerup", handlePointerUp);
       window.addEventListener("pointercancel", handlePointerCancel);
@@ -596,12 +700,20 @@ export function useBlockDrag({
       cleanupDrag();
     };
 
+    const handleVisibilityOrHide = () => {
+      cleanupDrag();
+    };
+
     scrollContainer.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("visibilitychange", handleVisibilityOrHide);
+    window.addEventListener("panel-will-hide" as any, handleVisibilityOrHide);
 
     return () => {
       scrollContainer.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityOrHide);
+      window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);
       cleanupDrag();
     };
   }, [editor, scrollContainerRef, rubberBandRef]);

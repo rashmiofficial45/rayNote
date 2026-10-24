@@ -182,4 +182,54 @@ describe('Markdown Serialization & Clipboard Utilities (Test C)', () => {
       expect(md).toContain('| Val 1 | Val 2 |');
     });
   });
+
+  describe('Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8)', () => {
+    it('serializes realistic 100 KB fixture with headings, marks, code, emoji, and Devanagari (5 runs)', async () => {
+      const { buildRealisticMarkdown } = await import('./realisticFixtures');
+      const realistic100k = buildRealisticMarkdown(100 * 1024);
+      const byteSize = new TextEncoder().encode(realistic100k).length;
+      expect(byteSize).toBeGreaterThanOrEqual(100 * 1024);
+
+      const runs: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = performance.now();
+        const html = markdownToTipTapHtml(realistic100k);
+        const elapsed = performance.now() - start;
+        runs.push(elapsed);
+        expect(html).toContain('<h1>');
+      }
+
+      // Discard run 1 as warmup
+      const measured = runs.slice(1).sort((a, b) => a - b);
+      const median = (measured[1] + measured[2]) / 2;
+      const min = measured[0];
+      const max = measured[measured.length - 1];
+
+      console.log(`[MEASURED: Node/V8 performance.now(), 100 KB Realistic Doc (5 runs, run 1 discarded)]: median=${median.toFixed(3)} ms (min=${min.toFixed(3)} ms, max=${max.toFixed(3)} ms) | raw runs: ${runs.map(r => r.toFixed(3)).join(', ')} ms`);
+    });
+
+    it('serializes realistic 1 MB fixture with headings, marks, code, emoji, and Devanagari (5 runs)', async () => {
+      const { buildRealisticMarkdown } = await import('./realisticFixtures');
+      const realistic1Mb = buildRealisticMarkdown(1024 * 1024);
+      const byteSize = new TextEncoder().encode(realistic1Mb).length;
+      expect(byteSize).toBeGreaterThanOrEqual(1024 * 1024);
+
+      const runs: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = performance.now();
+        const html = markdownToTipTapHtml(realistic1Mb);
+        const elapsed = performance.now() - start;
+        runs.push(elapsed);
+        expect(html).toContain('<h1>');
+      }
+
+      // Discard run 1 as warmup
+      const measured = runs.slice(1).sort((a, b) => a - b);
+      const median = (measured[1] + measured[2]) / 2;
+      const min = measured[0];
+      const max = measured[measured.length - 1];
+
+      console.log(`[MEASURED: Node/V8 performance.now(), 1 MB Realistic Doc (5 runs, run 1 discarded)]: median=${median.toFixed(3)} ms (min=${min.toFixed(3)} ms, max=${max.toFixed(3)} ms) | raw runs: ${runs.map(r => r.toFixed(3)).join(', ')} ms`);
+    }, 20000);
+  });
 });

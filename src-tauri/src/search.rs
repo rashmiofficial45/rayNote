@@ -90,6 +90,7 @@ pub fn tokenize(s: &str) -> Vec<String> {
 }
 
 /// Calculates Damerau-Levenshtein distance between two short strings for typo tolerance.
+/// Uses fixed stack buffers to perform 0 heap allocations.
 pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
     let len1 = s1.chars().count();
     let len2 = s2.chars().count();
@@ -101,10 +102,24 @@ pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
         return len1;
     }
 
-    let chars1: Vec<char> = s1.chars().collect();
-    let chars2: Vec<char> = s2.chars().collect();
+    if (len1 as isize - len2 as isize).abs() > 2 {
+        return 99;
+    }
 
-    let mut d = vec![vec![0usize; len2 + 1]; len1 + 1];
+    if len1 > 48 || len2 > 48 {
+        return 99;
+    }
+
+    let mut chars1 = ['\0'; 48];
+    let mut chars2 = ['\0'; 48];
+    for (i, c) in s1.chars().enumerate() {
+        chars1[i] = c;
+    }
+    for (j, c) in s2.chars().enumerate() {
+        chars2[j] = c;
+    }
+
+    let mut d = [[0usize; 49]; 49];
 
     for i in 0..=len1 {
         d[i][0] = i;
@@ -145,6 +160,132 @@ pub fn token_similarity(s1: &str, s2: &str) -> f64 {
     1.0 - (dist as f64 / max_len as f64)
 }
 
+/// Fast non-fuzzy title relevance scoring (exact, prefix, substring, all-words, partial tokens).
+/// Performs zero heap allocations and returns borrowed static string for match_type.
+pub fn score_title_match(
+    norm_query: &str,
+    query_tokens: &[String],
+    norm_title: &str,
+    allow_fuzzy: bool,
+) -> (f64, &'static str) {
+    if norm_title.is_empty() || norm_query.is_empty() {
+        return (0.0, "unmatched");
+    }
+
+    // 1. Exact Title Match (Highest Score)
+    if norm_title == norm_query {
+        return (1000.0, "exact_title");
+    }
+
+    // 2. Title Starts With Query (Prefix)
+    if norm_title.starts_with(norm_query) {
+        let length_penalty = ((norm_title.len() - norm_query.len()) as f64).min(50.0) * 0.5;
+        return (800.0 - length_penalty, "title_prefix");
+    }
+
+    // 3. Title Contains Complete Query Substring
+    if norm_title.contains(norm_query) {
+        let length_penalty = ((norm_title.len() - norm_query.len()) as f64).min(50.0) * 0.3;
+        return (650.0 - length_penalty, "title_substring");
+    }
+
+    // 4. All Query Words Match Title (Order-Independent)
+    if !query_tokens.is_empty()
+        && query_tokens.iter().all(|q_tok| {
+            norm_title
+                .split_whitespace()
+                .any(|t_tok| t_tok == q_tok.as_str() || t_tok.starts_with(q_tok.as_str()))
+        })
+    {
+        let matched_chars: usize = query_tokens.iter().map(|w| w.len()).sum();
+        let total_chars = norm_title.len().max(1);
+        let coverage = (matched_chars as f64 / total_chars as f64).min(1.0);
+        return (500.0 + coverage * 50.0, "title_words");
+    }
+
+    if allow_fuzzy {
+        let (f_score, f_type) = score_title_fuzzy(norm_query, query_tokens, norm_title);
+        if f_score >= 50.0 {
+            return (f_score, f_type);
+        }
+    }
+
+    // 5. Partial Query Tokens in Title
+    if !query_tokens.is_empty() {
+        let title_matches = query_tokens
+            .iter()
+            .filter(|q_tok| norm_title.contains(q_tok.as_str()))
+            .count();
+        if title_matches > 0 {
+            let ratio = title_matches as f64 / query_tokens.len() as f64;
+            let score = 120.0 * ratio;
+            if score >= 50.0 {
+                return (score, "partial_title");
+            }
+        }
+    }
+
+    (0.0, "unmatched")
+}
+
+/// Computes typo-tolerant title match using stack-allocated Damerau-Levenshtein.
+pub fn score_title_fuzzy(
+    _norm_query: &str,
+    query_tokens: &[String],
+    norm_title: &str,
+) -> (f64, &'static str) {
+    if query_tokens.is_empty() || norm_title.is_empty() {
+        return (0.0, "unmatched");
+    }
+
+    let mut total_sim = 0.0;
+    let mut matched_count = 0;
+
+    for q_tok in query_tokens {
+        let max_allowed_dist = if q_tok.len() <= 3 {
+            0
+        } else if q_tok.len() <= 6 {
+            1
+        } else {
+            2
+        };
+
+        let mut best_word_sim = 0.0;
+        let mut min_dist = 99;
+
+        for t_tok in norm_title.split_whitespace() {
+            if (q_tok.len() as isize - t_tok.len() as isize).abs() > 2 {
+                continue;
+            }
+            let dist = damerau_levenshtein(q_tok, t_tok);
+            if dist < min_dist {
+                min_dist = dist;
+            }
+            let max_len = q_tok.len().max(t_tok.len());
+            let sim = if max_len > 0 {
+                1.0 - (dist as f64 / max_len as f64)
+            } else {
+                1.0
+            };
+            if sim > best_word_sim {
+                best_word_sim = sim;
+            }
+        }
+
+        if min_dist <= max_allowed_dist || best_word_sim >= 0.80 {
+            matched_count += 1;
+            total_sim += best_word_sim;
+        }
+    }
+
+    if matched_count == query_tokens.len() {
+        let avg_sim = total_sim / query_tokens.len() as f64;
+        (350.0 + avg_sim * 100.0, "fuzzy_title")
+    } else {
+        (0.0, "unmatched")
+    }
+}
+
 /// Internal document candidate representation for scoring.
 #[allow(dead_code)]
 pub struct DocumentCandidate<'a> {
@@ -159,6 +300,7 @@ pub struct DocumentCandidate<'a> {
 
 /// Calculates the relevance score of a document against a search query.
 /// Returns (score, match_type).
+#[allow(dead_code)]
 pub fn score_document(
     query_raw: &str,
     candidate: &DocumentCandidate,
@@ -297,7 +439,7 @@ pub fn score_document(
     (final_score, match_type)
 }
 
-fn calculate_recency_bonus(updated_at_str: &str) -> f64 {
+pub fn calculate_recency_bonus(updated_at_str: &str) -> f64 {
     if let Ok(updated) = chrono::DateTime::parse_from_rfc3339(updated_at_str) {
         let now = chrono::Utc::now();
         let age_hours = (now - updated.with_timezone(&chrono::Utc)).num_hours();
@@ -316,6 +458,7 @@ fn calculate_recency_bonus(updated_at_str: &str) -> f64 {
 }
 
 /// Generates a human-readable contextual snippet centered around the matching query terms.
+#[allow(dead_code)]
 pub fn generate_contextual_snippet(
     search_text: &str,
     query_raw: &str,
@@ -403,6 +546,7 @@ pub fn generate_contextual_snippet(
     truncate_text(preview, max_len)
 }
 
+#[allow(dead_code)]
 fn truncate_text(s: &str, max_len: usize) -> String {
     let trimmed = s.trim();
     if trimmed.chars().count() <= max_len {

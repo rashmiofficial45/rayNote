@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { SearchResult, searchDocuments } from "../lib/db";
+import {
+  SearchResult,
+  NoteSummary,
+  searchDocuments,
+  getRecentSearchResults,
+  flushEditorNow,
+  flushSaveQueue,
+} from "../lib/db";
 import { getHighlightedSegments } from "../lib/searchRanking";
 import { Search, FileText, Pin, X } from "lucide-react";
 import { listenToSettingsSync } from "../lib/settingsSync";
@@ -12,12 +19,16 @@ import {
 export interface SmartSearchProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectNote: (id: string) => void;
+  onSelectNote: (id: string, summaryHint?: NoteSummary) => void;
   activeNoteId?: string | null;
 }
 
 // In-memory module cache for instant (0ms) recent notes presentation
 let cachedRecentNotes: SearchResult[] = [];
+
+export function clearCachedRecentSearchResults(): void {
+  cachedRecentNotes = [];
+}
 
 export const SmartSearch: React.FC<SmartSearchProps> = ({
   isOpen,
@@ -49,47 +60,53 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     if (isOpen) {
       setQuery("");
       setSelectedIndex(0);
-      if (cachedRecentNotes.length > 0) {
-        setResults(cachedRecentNotes);
-      }
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       });
+    } else {
+      // Cancel/ignore in-flight searches when palette closes
+      requestIdRef.current++;
     }
   }, [isOpen]);
 
-  // Real-time query execution (15ms ultra-low latency debounce)
+  // Real-time query execution (30ms debounce with monotonic request-id guard)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      requestIdRef.current++;
+      return;
+    }
 
     const trimmed = query.trim();
     const reqId = ++requestIdRef.current;
 
-    // Empty query -> show recent documents immediately
+    // Empty query -> show cached recent documents immediately, then refresh once flush drains
     if (!trimmed) {
       if (cachedRecentNotes.length > 0) {
         setResults(cachedRecentNotes);
         setSelectedIndex(0);
       }
-      searchDocuments("")
-        .then((recentNotes) => {
-          cachedRecentNotes = recentNotes;
-          if (requestIdRef.current === reqId) {
-            setResults(recentNotes);
-            setSelectedIndex(0);
-          }
-        })
-        .catch(console.error);
+      flushEditorNow();
+      flushSaveQueue().then(() => {
+        getRecentSearchResults(30)
+          .then((recentNotes) => {
+            cachedRecentNotes = recentNotes;
+            if (requestIdRef.current === reqId) {
+              setResults(recentNotes);
+              setSelectedIndex(0);
+            }
+          })
+          .catch(console.error);
+      });
       return;
     }
 
-    // 15ms frame debounce: blazing fast responsiveness with stale request guard
+    // 30ms frame debounce: blazing fast responsiveness with stale request guard
     const timer = setTimeout(() => {
-      searchDocuments(trimmed)
+      searchDocuments(trimmed, 30)
         .then((res) => {
           if (requestIdRef.current === reqId) {
-            setResults(res);
+            setResults(res.slice(0, 30));
             setSelectedIndex(0);
           }
         })
@@ -100,7 +117,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             setSelectedIndex(0);
           }
         });
-    }, 15);
+    }, 30);
 
     return () => clearTimeout(timer);
   }, [query, isOpen]);
@@ -121,7 +138,15 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     (index: number) => {
       const item = results[index];
       if (item) {
-        onSelectNote(item.id);
+        const summary: NoteSummary = {
+          id: item.id,
+          title: item.title,
+          preview: item.snippet || "",
+          created_at: item.updated_at,
+          updated_at: item.updated_at,
+          is_pinned: item.is_pinned,
+        };
+        onSelectNote(item.id, summary);
         onClose();
       }
     },
@@ -229,7 +254,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
 
         {/* Minimalist Results List (Strict single-item highlight) */}
         <div className="smart-search-list" ref={listRef} role="listbox">
-          {results.length > 0 ? (
+          {results && results.length > 0 ? (
             results.map((item, index) => {
               const isSelected = index === selectedIndex;
 

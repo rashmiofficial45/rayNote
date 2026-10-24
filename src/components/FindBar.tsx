@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Editor } from "@tiptap/react";
+import { useState, useEffect, useRef } from "react";
+import { Editor, useEditorState } from "@tiptap/react";
 import { Search, ChevronUp, ChevronDown, X, Replace, ArrowRight } from "lucide-react";
 import type { SearchStorage } from "../editor/searchExtension";
 
@@ -13,20 +13,25 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
   const [showReplace, setShowReplace] = useState(false);
-  const [matchCount, setMatchCount] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
 
-  const updateStats = useCallback(() => {
-    if (!editor) return;
-    const searchStorage = (editor.storage as { search?: SearchStorage })?.search;
-    if (searchStorage) {
-      setMatchCount(searchStorage.results?.length || 0);
-      setCurrentIndex(searchStorage.currentIndex || 0);
-    }
-  }, [editor]);
+  // Subscribed via useEditorState so match count and current index update automatically on doc edits & rescans
+  const searchState = useEditorState({
+    editor,
+    selector: (ctx) => {
+      const ed = ctx.editor;
+      const searchStorage = (ed?.storage as { search?: SearchStorage })?.search;
+      return {
+        matchCount: searchStorage?.results?.length || 0,
+        currentIndex: searchStorage?.currentIndex || 0,
+      };
+    },
+  });
+
+  const matchCount = searchState?.matchCount ?? 0;
+  const currentIndex = searchState?.currentIndex ?? 0;
 
   // Handle opening
   useEffect(() => {
@@ -37,7 +42,6 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
         if (text && text.length < 60 && !text.includes("\n")) {
           setQuery(text);
           editor.commands.setSearchTerm(text);
-          setTimeout(() => updateStats(), 20);
         }
       }
       setTimeout(() => {
@@ -47,37 +51,32 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
     } else if (!isOpen && editor) {
       editor.commands.clearSearch();
     }
-  }, [isOpen, editor, updateStats]);
+  }, [isOpen, editor]);
 
   const handleSearchChange = (val: string) => {
     setQuery(val);
     if (!editor) return;
     editor.commands.setSearchTerm(val);
-    updateStats();
   };
 
   const handleNext = () => {
     if (!editor || matchCount === 0) return;
     editor.commands.nextSearchResult();
-    updateStats();
   };
 
   const handlePrevious = () => {
     if (!editor || matchCount === 0) return;
     editor.commands.previousSearchResult();
-    updateStats();
   };
 
   const handleReplaceCurrent = () => {
     if (!editor || matchCount === 0) return;
     editor.commands.replaceCurrentResult(replacement);
-    updateStats();
   };
 
   const handleReplaceAll = () => {
     if (!editor || matchCount === 0) return;
     editor.commands.replaceAllResults(replacement);
-    updateStats();
   };
 
   const handleClose = () => {

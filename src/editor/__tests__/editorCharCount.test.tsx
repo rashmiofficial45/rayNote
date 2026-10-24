@@ -11,6 +11,7 @@ describe("EditorCharCount Component", () => {
   let root: Root;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -21,6 +22,8 @@ describe("EditorCharCount Component", () => {
       root.unmount();
     });
     container.remove();
+    vi.clearAllTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -33,6 +36,12 @@ describe("EditorCharCount Component", () => {
         doc: {
           get textContent() {
             return currentText;
+          },
+          get content() {
+            return { size: currentText.length };
+          },
+          textBetween(from: number, to: number) {
+            return currentText.slice(from, to);
           },
         },
       },
@@ -106,6 +115,9 @@ describe("EditorCharCount Component", () => {
 
     act(() => {
       mockEditor.emitTransaction(true, "Hello, world!");
+    });
+    act(() => {
+      vi.advanceTimersByTime(200);
     });
 
     el = container.querySelector(".editor-char-count");
