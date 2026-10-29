@@ -1,0 +1,92 @@
+Process:         raynote [24599]
+Path:            /Applications/rayNote.app/Contents/MacOS/raynote
+Load Address:    0x10063c000
+Identifier:      raynote
+Version:         0.1.0 (0)
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  launchd [1]
+Target Type:     live task
+
+Date/Time:       2026-10-29 22:44:36.718 +0530
+Launch Time:     2026-10-29 22:43:36.738 +0530
+OS Version:      macOS 27.2 (26B123)
+Report Version:  7
+Analysis Tool:   /usr/bin/vmmap
+
+Physical footprint:         32.3M
+Physical footprint (peak):  46.0M
+Idle exit:                  untracked
+----
+
+ReadOnly portion of Libraries: Total=3.0G resident=215.7M(7%) swapped_out_or_unallocated=2.8G(93%)
+Writable regions: Total=4.6G written=26.0M(1%) resident=3569K(0%) swapped_out=24.8M(1%) unallocated=4.5G(99%)
+
+                                VIRTUAL RESIDENT    DIRTY  SWAPPED VOLATILE   NONVOL    EMPTY   REGION 
+REGION TYPE                        SIZE     SIZE     SIZE     SIZE     SIZE     SIZE     SIZE    COUNT (non-coalesced) 
+===========                     ======= ========    =====  ======= ========   ======    =====  ======= 
+Accelerate Framework               128K     128K       0K     128K       0K     128K       0K        1 
+Activity Tracing                   256K      48K      16K      32K       0K      48K       0K        1 
+CG Image                          8208K       0K       0K    8208K       0K       0K       0K        1 
+ColorSync                           32K       0K       0K      32K       0K       0K       0K        2 
+CoreGraphics                        48K      32K      32K      16K       0K       0K       0K        3 
+Deferred Reclaim                  64.0M      16K      16K       0K       0K       0K       0K        1 
+Foundation                        1056K       0K       0K    1056K       0K       0K       0K        2 
+Guard                            385.0G       0K       0K       0K       0K       0K       0K        1 
+IOAccelerator                       64K      64K      64K       0K       0K       0K       0K        2 
+IOAccelerator (graphics)            80K      16K       0K      16K       0K      16K       0K        2 
+IOKit                              112K      48K      48K       0K       0K      16K       0K        7 
+IOSurface                         28.7M       0K       0K       0K       0K       0K    21.5M       10 
+Image IO                          4112K       0K       0K       0K       0K       0K    4112K        2 
+JS VM Reservations (reserved)      4.0G       0K       0K       0K       0K       0K       0K        1         reserved VM address space (unallocated)
+Malloc Guard Page                 3152K       0K       0K       0K       0K       0K       0K        4         see MALLOC ZONE table below
+Malloc Large                      8224K       0K       0K       0K       0K       0K    8224K        1         see MALLOC ZONE table below
+Malloc Metadata                    672K      16K      16K     656K       0K       0K       0K        7         see MALLOC ZONE table below
+Malloc Metadata metadata          1168K     176K     176K     208K       0K       0K       0K        4         see MALLOC ZONE table below
+Malloc Nano metadata                64K      48K      48K       0K       0K       0K       0K        2         see MALLOC ZONE table below
+Malloc Small                      33.5M    1488K    1488K    11.8M       0K       0K     528K       43         see MALLOC ZONE table below
+Malloc Small (empty)              10.5M       0K       0K     336K       0K       0K       0K       13         see MALLOC ZONE table below
+Malloc Tiny                       4096K     128K     128K     176K       0K       0K       0K        1         see MALLOC ZONE table below
+OS Alloc Once                       32K       0K       0K      16K       0K       0K       0K        1 
+SQLite Page Cache                  128K      32K       0K      32K       0K      32K       0K        1 
+Stack                             28.9M     288K     288K      64K       0K       0K       0K       16 
+Stack (reserved)                   544K       0K       0K       0K       0K       0K       0K        1         reserved VM address space (unallocated)
+Stack Guard                       56.2M       0K       0K       0K       0K       0K       0K       16 
+Untagged                          1376K       0K       0K     560K       0K       0K       0K       16 
+Untagged (reserved)               1280K       0K       0K       0K       0K       0K       0K       10         reserved VM address space (unallocated)
+WebKit Malloc                     32.0M     208K     208K    1712K       0K       0K       0K        2 
+WebKit Malloc (reserved)          32.0M       0K       0K       0K       0K       0K       0K        1         reserved VM address space (unallocated)
+WebKit Malloc metadata           320.0M     160K     160K      96K       0K       0K       0K        4 
+__AUTH                            5696K     608K       0K     430K       0K       0K       0K      544 
+__AUTH_CONST                     100.5M    14.1M       0K       0K       0K       0K       0K     1072 
+__CTF                               824      824       0K       0K       0K       0K       0K        1 
+__DATA                            38.9M    1586K     130K     894K       0K       0K       0K     1034 
+__DATA_CONST                      38.3M    11.2M      64K      96K       0K       0K       0K     1080 
+__DATA_DIRTY                      16.7M     559K     457K    1468K       0K       0K       0K     1018 
+__FONT_DATA                        2352     2352       0K       0K       0K       0K       0K        1 
+__GLSLBUILTINS                    5176K       0K       0K       0K       0K       0K       0K        1 
+__LINKEDIT                         1.6G    10.0M       0K       0K       0K       0K       0K        4 
+__OBJC_RO                        118.5M    21.1M       0K       0K       0K       0K       0K        1 
+__OBJC_RW                         2740K     660K      20K      16K       0K       0K       0K        1 
+__TEXT                             1.4G   205.6M       0K       0K       0K       0K       0K     1169 
+__TPRO_CONST                       132K      36K      32K      80K       0K       0K       0K        4 
+mapped file                      259.3M    1136K       0K       0K       0K       0K       0K       43 
+page table in kernel               785K     785K     785K       0K       0K       0K       0K        1 
+shared memory                      896K     192K     192K      80K       0K       0K       0K       16 
+unused but dirty shlib __DATA     1553K     649K      81K     264K       0K       0K       0K      250 
+===========                     ======= ========    =====  ======= ========   ======    =====  ======= 
+TOTAL                            393.2G   271.0M    4449K    28.1M       0K     240K    34.1M     6419 
+TOTAL, minus reserved VM space   389.1G   271.0M    4449K    28.1M       0K     240K    34.1M     6419 
+
+                                          VIRTUAL   RESIDENT      DIRTY    SWAPPED ALLOCATION      BYTES DIRTY+SWAP          REGION
+MALLOC ZONE                                  SIZE       SIZE       SIZE       SIZE      COUNT  ALLOCATED  FRAG SIZE  % FRAG   COUNT
+===========                               =======  =========  =========  =========  =========  =========  =========  ======  ======
+WebKit Malloc_0x1147a6230                  352.0M       368K       368K      1792K       1415       194K      1966K     92%       5
+DefaultMallocZone_0x10115c000               47.8M      1776K      1776K      11.7M      51333      7930K      5862K     43%      37
+DefaultPurgeableMallocZone_0x12c984000      8768K         0K         0K        16K          2      8752K         0K      0%       3
+QuartzCore_0x10122c000                       592K         0K         0K       480K        425        41K       439K     92%      16
+LSBindingEvaluator_0x1088a4000               224K         0K         0K       224K          0         0K       224K    100%       3
+objc-class_rw_t_0x101204000                  112K        64K        64K        48K       2872        67K        45K     40%       5
+WebKit Using System Malloc_0x114778000         0K         0K         0K         0K          0         0K         0K      0%       0
+===========                               =======  =========  =========  =========  =========  =========  =========  ======  ======
+TOTAL                                      409.3M      2208K      2208K      14.2M      56047      16.6M         0K      0%      69

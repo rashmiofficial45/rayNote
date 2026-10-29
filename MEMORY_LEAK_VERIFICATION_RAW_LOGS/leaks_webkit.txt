@@ -1,0 +1,9 @@
+Process 24604 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+Process 24604: 22826 nodes malloced for 2688 KB
+Process 24604: 4 leaks for 1664 total leaked bytes.
+
+    4 (1.62K) ROOT LEAK: <NSMutableDictionary 0x758328c360> [32]
+       3 (1.59K) <NSMutableDictionary (Storage) 0x758318ca00> [1280]
+          1 (224 bytes) <CFString 0x7582f5c000> [224]
+          1 (128 bytes) <CFString 0x75831e8080> [128]

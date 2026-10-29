@@ -1,0 +1,4 @@
+Process 24599 is not debuggable. Due to security restrictions, leaks can only show or save contents of readonly memory of restricted processes.
+
+Process 24599: 56047 nodes malloced for 16984 KB
+Process 24599: 0 leaks for 0 total leaked bytes.

@@ -1,0 +1,14 @@
+Processes: 578 total, 2 running, 576 sleeping, 3364 threads 
+2026/10/29 22:44:42
+Load Avg: 2.87, 3.03, 3.07 
+CPU usage: 11.11% user, 17.92% sys, 70.96% idle 
+SharedLibs: 326M resident, 46M data, 45M linkedit.
+MemRegions: 473619 total, 1444M resident, 69M private, 817M shared.
+PhysMem: 7368M used (2135M wired, 2425M compressor), 239M unused.
+VM: 296T vsize, 57G framework vsize, 2966785(0) swapins, 3778190(0) swapouts.
+Networks: packets: 20381248/24G in, 5799365/3998M out.
+Disks: 23577543/755G read, 6167004/146G written.
+
+PID    COMMAND          MEM RPRVT PURG VSIZE
+24604  com.apple.WebKit 17M N/A   0B   N/A  
+24599  raynote          32M N/A   0B   N/A
