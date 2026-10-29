@@ -1,26 +1,26 @@
 {
-  "timestamp": "2026-10-24T05:37:57.609Z",
+  "timestamp": "2026-10-29T15:49:42.401Z",
   "coldBoot": {
-    "launchLatencyMs": 2056,
-    "tauriFootprintMb": 27,
-    "webKitFootprintMb": 85,
-    "totalFootprintMb": 112
+    "launchLatencyMs": 10081,
+    "tauriFootprintMb": 0,
+    "webKitFootprintMb": 0,
+    "totalFootprintMb": 0
   },
   "cacheBenchmark": {
-    "setLatencyPerOpUs": 32.727918,
-    "getLatencyPerOpUs": 0.147167,
+    "setLatencyPerOpUs": 14.017584,
+    "getLatencyPerOpUs": 0.157791,
     "cacheHitRatePct": 83.5,
     "evictionUnderMaxEntries": true,
     "evictionUnderMaxBytes": true,
-    "sqliteReadLatencyMs": 206,
-    "sqliteVsCacheSpeedup": "1399770x"
+    "sqliteReadLatencyMs": 16,
+    "sqliteVsCacheSpeedup": "101400x"
   },
   "stressEndurance": {
-    "initialTotalMb": 112,
-    "after50SwitchesMb": 670,
-    "after100SwitchesMb": 888,
-    "settledPostCooldownMb": 424,
-    "memoryDeltaMb": 312,
+    "initialTotalMb": 0,
+    "after50SwitchesMb": 0,
+    "after100SwitchesMb": 0,
+    "settledPostCooldownMb": 0,
+    "memoryDeltaMb": 0,
     "leakDetected": false,
     "idleCpuPct": 0
   },
@@ -40,6 +40,6 @@
     "commandPaletteOpen": true,
     "smartSearchOpen": true,
     "findBarOpen": true,
-    "recentNotePersistence": true
+    "recentNotePersistence": false
   }
 }
