@@ -126,4 +126,37 @@ describe('NoteLRUCache Regression & Boundedness Tests', () => {
     const duration = performance.now() - t0;
     expect(duration).toBeLessThan(100);
   });
+
+  it('9. Computes byte size strictly as length * 2 per string and never evicts the MRU entry', () => {
+    // 8 MB cache limit
+    const limitBytes = 8 * 1024 * 1024;
+    const cache = new NoteLRUCache(10, limitBytes);
+
+    const chunk2MB = 'x'.repeat(1024 * 1024); // 1,048,576 chars * 2 = 2,097,152 bytes (2 MB)
+    cache.set('n1', chunk2MB);
+    expect(cache.totalBytes).toBe(chunk2MB.length * 2);
+
+    cache.set('n2', chunk2MB);
+    cache.set('n3', chunk2MB);
+    cache.set('n4', chunk2MB); // Total = 8 MB (4 x 2 MB)
+
+    expect(cache.size).toBe(4);
+    expect(cache.totalBytes).toBe(8 * 1024 * 1024);
+
+    // Promote n1 to MRU by reading it
+    cache.get('n1'); // n1 is now MRU!
+
+    // Insert n5 (2 MB): total would exceed 8 MB. Oldest unaccessed entry (n2) must be evicted!
+    cache.set('n5', chunk2MB);
+
+    expect(cache.has('n1')).toBe(true); // MRU entry n1 preserved!
+    expect(cache.has('n2')).toBe(false); // LRU entry n2 evicted!
+    expect(cache.has('n5')).toBe(true); // newly inserted MRU preserved!
+
+    // Even if an entry larger than the total 8 MB budget is inserted, the MRU is never evicted
+    const massiveDoc = 'm'.repeat(5 * 1024 * 1024); // 10 MB > 8 MB
+    cache.set('mru-giant', massiveDoc);
+    expect(cache.has('mru-giant')).toBe(true);
+    expect(cache.size).toBe(1);
+  });
 });

@@ -12,7 +12,7 @@ export function DocumentTickSlider({
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
   const [isCompact, setIsCompact] = useState(() => {
-    return typeof window !== "undefined" ? window.innerWidth < 260 || window.innerHeight < 200 : false;
+    return typeof window !== "undefined" ? window.innerWidth < 180 || window.innerHeight < 140 : false;
   });
   const [isDragging, setIsDragging] = useState(false);
   const [trackHeight, setTrackHeight] = useState(300);
@@ -21,10 +21,10 @@ export function DocumentTickSlider({
   const rafId = useRef<number | null>(null);
   const dragRafId = useRef<number | null>(null);
 
-  // Responsive: only hide on extremely cramped window size (< 260px or < 200px height)
+  // Responsive: only hide on microscopic window size (< 180px width or < 140px height)
   useEffect(() => {
     const handleResize = () => {
-      setIsCompact(window.innerWidth < 260 || window.innerHeight < 200);
+      setIsCompact(window.innerWidth < 180 || window.innerHeight < 140);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
@@ -46,7 +46,7 @@ export function DocumentTickSlider({
 
     const { scrollTop, scrollHeight, clientHeight } = container;
     const maxScroll = scrollHeight - clientHeight;
-    const scrollable = maxScroll > 25;
+    const scrollable = maxScroll > 20;
     setIsScrollable(scrollable);
 
     if (maxScroll > 0) {
@@ -57,10 +57,23 @@ export function DocumentTickSlider({
     }
   }, [scrollContainerRef]);
 
-  // Attach scroll & resize observers
+  // Track element observer
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+    const track = trackRef.current;
+    if (!track) return;
+    const observer = new ResizeObserver(() => {
+      updateTrackHeight();
+    });
+    observer.observe(track);
+    updateTrackHeight();
+    return () => observer.disconnect();
+  }, [updateTrackHeight]);
+
+  // Attach scroll & resize observers with mounting retry to ensure immediate startup presence
+  useEffect(() => {
+    let cancelled = false;
+    let observer: ResizeObserver | null = null;
+    let activeContainer: HTMLElement | null = null;
 
     const onScroll = () => {
       if (rafId.current) cancelAnimationFrame(rafId.current);
@@ -69,21 +82,67 @@ export function DocumentTickSlider({
       });
     };
 
-    container.addEventListener("scroll", onScroll, { passive: true });
+    const attach = () => {
+      if (cancelled) return;
+      const container = scrollContainerRef.current;
+      if (!container) {
+        requestAnimationFrame(attach);
+        return;
+      }
+      activeContainer = container;
+      container.addEventListener("scroll", onScroll, { passive: true });
 
-    const observer = new ResizeObserver(() => {
+      observer = new ResizeObserver(() => {
+        updateTrackHeight();
+        updateScrollProgress();
+      });
+      observer.observe(container);
+
       updateTrackHeight();
       updateScrollProgress();
-    });
-    observer.observe(container);
+    };
 
-    updateTrackHeight();
-    updateScrollProgress();
+    attach();
+
+    const handleVisibilityOrHide = () => {
+      if (document.hidden) {
+        if (rafId.current) {
+          cancelAnimationFrame(rafId.current);
+          rafId.current = null;
+        }
+        if (dragRafId.current) {
+          cancelAnimationFrame(dragRafId.current);
+          dragRafId.current = null;
+        }
+      } else {
+        updateTrackHeight();
+        updateScrollProgress();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrHide);
+    window.addEventListener("panel-will-hide" as any, handleVisibilityOrHide);
+    window.addEventListener("panel-did-show" as any, handleVisibilityOrHide);
 
     return () => {
-      if (rafId.current) cancelAnimationFrame(rafId.current);
-      container.removeEventListener("scroll", onScroll);
-      observer.disconnect();
+      cancelled = true;
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = null;
+      }
+      if (dragRafId.current) {
+        cancelAnimationFrame(dragRafId.current);
+        dragRafId.current = null;
+      }
+      if (activeContainer) {
+        activeContainer.removeEventListener("scroll", onScroll);
+      }
+      if (observer) {
+        observer.disconnect();
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityOrHide);
+      window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);
+      window.removeEventListener("panel-did-show" as any, handleVisibilityOrHide);
     };
   }, [scrollContainerRef, updateTrackHeight, updateScrollProgress]);
 
@@ -177,14 +236,14 @@ export function DocumentTickSlider({
     scrollToRatio(ratio, true);
   };
 
-  // Do not render on compact window or when not scrollable
-  if (isCompact || !isScrollable) {
+  // Only hide on microscopic window size where UI cannot fit
+  if (isCompact) {
     return null;
   }
 
   return (
     <div
-      className={`doc-tick-slider-wrapper ${isDragging ? "is-dragging" : ""} ${className}`}
+      className={`doc-tick-slider-wrapper ${isDragging ? "is-dragging" : ""} ${isScrollable ? "is-scrollable" : "is-static"} ${className}`}
       title="Document parts indicator (drag or click bars to scroll)"
     >
       <div

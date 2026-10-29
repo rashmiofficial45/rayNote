@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { SearchResult, searchDocuments } from "../lib/db";
+import {
+  SearchResult,
+  NoteSummary,
+  searchDocuments,
+  getRecentSearchResults,
+  flushEditorNow,
+  flushSaveQueue,
+} from "../lib/db";
 import { getHighlightedSegments } from "../lib/searchRanking";
 import { Search, FileText, Pin, X } from "lucide-react";
 import { listenToSettingsSync } from "../lib/settingsSync";
@@ -12,17 +19,33 @@ import {
 export interface SmartSearchProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectNote: (id: string) => void;
+  onSelectNote: (id: string, summaryHint?: NoteSummary) => void;
   activeNoteId?: string | null;
+  notes?: NoteSummary[];
 }
 
 // In-memory module cache for instant (0ms) recent notes presentation
 let cachedRecentNotes: SearchResult[] = [];
 
+export function clearCachedRecentSearchResults(): void {
+  cachedRecentNotes = [];
+}
+
+const noteToSearchResult = (n: NoteSummary): SearchResult => ({
+  id: n.id,
+  title: n.title,
+  snippet: n.preview || "",
+  score: 1000,
+  match_type: "recent",
+  updated_at: n.updated_at,
+  is_pinned: n.is_pinned,
+});
+
 export const SmartSearch: React.FC<SmartSearchProps> = ({
   isOpen,
   onClose,
   onSelectNote,
+  notes,
 }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>(cachedRecentNotes);
@@ -44,66 +67,107 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const requestIdRef = useRef<number>(0);
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Focus input and reset query on modal open
+  // Focus input and reset query on modal open with instant 0ms note list
   useEffect(() => {
     if (isOpen) {
       setQuery("");
       setSelectedIndex(0);
-      if (cachedRecentNotes.length > 0) {
+      if (notes && notes.length > 0) {
+        setResults(notes.slice(0, 30).map(noteToSearchResult));
+      } else if (cachedRecentNotes.length > 0) {
         setResults(cachedRecentNotes);
       }
       requestAnimationFrame(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       });
+    } else {
+      // Cancel/ignore in-flight searches when palette closes
+      requestIdRef.current++;
     }
-  }, [isOpen]);
+  }, [isOpen, notes]);
 
-  // Real-time query execution (15ms ultra-low latency debounce)
+  // Real-time query execution with 0ms instant local match + fast FTS5 backend
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      requestIdRef.current++;
+      return;
+    }
 
     const trimmed = query.trim();
     const reqId = ++requestIdRef.current;
 
-    // Empty query -> show recent documents immediately
+    // Empty query -> show notes or cached recent documents immediately
     if (!trimmed) {
-      if (cachedRecentNotes.length > 0) {
+      if (notes && notes.length > 0) {
+        const mapped = notes.slice(0, 30).map(noteToSearchResult);
+        setResults(mapped);
+        cachedRecentNotes = mapped;
+        setSelectedIndex(0);
+      } else if (cachedRecentNotes.length > 0) {
         setResults(cachedRecentNotes);
         setSelectedIndex(0);
       }
-      searchDocuments("")
-        .then((recentNotes) => {
-          cachedRecentNotes = recentNotes;
-          if (requestIdRef.current === reqId) {
-            setResults(recentNotes);
-            setSelectedIndex(0);
-          }
-        })
-        .catch(console.error);
+      flushEditorNow();
+      flushSaveQueue().then(() => {
+        getRecentSearchResults(30)
+          .then((recentNotes) => {
+            if (recentNotes && recentNotes.length > 0) {
+              cachedRecentNotes = recentNotes;
+              if (requestIdRef.current === reqId) {
+                setResults(recentNotes);
+              }
+            }
+          })
+          .catch(console.error);
+      });
       return;
     }
 
-    // 15ms frame debounce: blazing fast responsiveness with stale request guard
+    // 0ms instant local in-memory filter: immediate keystroke responsiveness
+    const norm = trimmed.toLowerCase();
+    if (notes && notes.length > 0) {
+      const instantMatches = notes
+        .filter((n) => {
+          const t = (n.title || "").toLowerCase();
+          const p = (n.preview || "").toLowerCase();
+          return t.includes(norm) || p.includes(norm);
+        })
+        .slice(0, 30)
+        .map((n) => ({
+          id: n.id,
+          title: n.title,
+          snippet: n.preview || "",
+          score: 800,
+          match_type: "title_substring",
+          updated_at: n.updated_at,
+          is_pinned: n.is_pinned,
+        }));
+
+      if (instantMatches.length > 0) {
+        setResults(instantMatches);
+      }
+    }
+
+    // 20ms debounce: fast backend query across deep SQLite full-text content
     const timer = setTimeout(() => {
-      searchDocuments(trimmed)
+      searchDocuments(trimmed, 30)
         .then((res) => {
           if (requestIdRef.current === reqId) {
-            setResults(res);
+            setResults(res.slice(0, 30));
             setSelectedIndex(0);
           }
         })
         .catch((err) => {
           console.error("Search error:", err);
           if (requestIdRef.current === reqId) {
-            setResults([]);
             setSelectedIndex(0);
           }
         });
-    }, 15);
+    }, 20);
 
     return () => clearTimeout(timer);
-  }, [query, isOpen]);
+  }, [query, isOpen, notes]);
 
   // Keep selected item visible in list
   useEffect(() => {
@@ -121,7 +185,15 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     (index: number) => {
       const item = results[index];
       if (item) {
-        onSelectNote(item.id);
+        const summary: NoteSummary = {
+          id: item.id,
+          title: item.title,
+          preview: item.snippet || "",
+          created_at: item.updated_at,
+          updated_at: item.updated_at,
+          is_pinned: item.is_pinned,
+        };
+        onSelectNote(item.id, summary);
         onClose();
       }
     },
@@ -229,7 +301,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
 
         {/* Minimalist Results List (Strict single-item highlight) */}
         <div className="smart-search-list" ref={listRef} role="listbox">
-          {results.length > 0 ? (
+          {results && results.length > 0 ? (
             results.map((item, index) => {
               const isSelected = index === selectedIndex;
 

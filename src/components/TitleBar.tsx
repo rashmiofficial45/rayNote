@@ -1,9 +1,11 @@
-import { Command, Trash2, FileText } from "lucide-react";
+import { Command, Trash2, FileText, AlertTriangle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
 import { listenToSettingsSync } from "../lib/settingsSync";
 import { getStoredCommandsConfig, getCommandHotkey, CommandRow } from "../lib/commandsConfig";
+import { useNoteTitle } from "../lib/titleStore";
+import { useSaveStatus } from "../lib/saveStatusStore";
 
 interface TitleBarProps {
   title: string;
@@ -15,16 +17,28 @@ interface TitleBarProps {
   onCopyMarkdown: () => void;
   onTriggerImportFile?: () => void;
   onTriggerViewFile?: () => void;
+  onOpenSaveConflict?: () => void;
 }
 
 export function TitleBar({
   title,
   onOpenCommandPalette,
+  onOpenSmartSearch: _onOpenSmartSearch,
   onDeleteNote,
   onCopyMarkdown,
+  onOpenSaveConflict,
 }: TitleBarProps) {
   const titleBarRef = useRef<HTMLDivElement>(null);
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
+  const storeTitle = useNoteTitle();
+  const saveStatus = useSaveStatus();
+  const rawTitle = storeTitle !== null ? storeTitle : title;
+  const displayTitle =
+    rawTitle !== undefined && rawTitle.trim() !== ""
+      ? rawTitle
+      : rawTitle === ""
+        ? "Untitled"
+        : "rayNote";
 
   // Auto-reflect shortcut updates across the entire app
   useEffect(() => {
@@ -124,7 +138,7 @@ export function TitleBar({
       .then((fn) => {
         unlistenFocus = fn;
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Active pointer tracking: only dispatches state when crossing window boundaries
     const handlePointerMove = (e: PointerEvent) => {
@@ -227,7 +241,23 @@ export function TitleBar({
       </div>
 
       {/* Center: Note title */}
-      <div className="title-text">{title || "Untitled"}</div>
+      <div className="title-text flex items-center justify-center gap-2 min-w-0">
+        <span className="title-text-content">{displayTitle || "Untitled"}</span>
+        {saveStatus.isSaveBlocked && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenSaveConflict?.();
+            }}
+            className="not-saved-pill flex-shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition-colors cursor-pointer"
+            title="Autosave paused due to save errors. Click to resolve."
+            aria-label="Autosave paused - Not saved"
+          >
+            <AlertTriangle size={11} className="text-amber-400" />
+            <span>Not saved</span>
+          </button>
+        )}
+      </div>
 
       {/* Right: Copy Markdown + Delete + Command Palette (Direct Action) */}
       <div className="title-bar-right">

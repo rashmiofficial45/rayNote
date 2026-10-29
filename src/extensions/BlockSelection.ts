@@ -46,6 +46,21 @@ export function getLastDragEndTime(): number {
   return lastDragEndTime;
 }
 
+const blockCache = new WeakMap<ProseMirrorNode, BlockInfo[]>();
+
+/**
+ * Cached block structure traversal by document node reference identity.
+ * Uses a WeakMap so outdated document nodes are automatically garbage collected.
+ */
+export function getCachedAllBlocks(doc: ProseMirrorNode): BlockInfo[] {
+  let cached = blockCache.get(doc);
+  if (!cached) {
+    cached = getAllBlocks(doc);
+    blockCache.set(doc, cached);
+  }
+  return cached;
+}
+
 /**
  * Returns all selectable blocks in the document in document order:
  * Headings, paragraphs, code blocks, tables, horizontal rules,
@@ -232,7 +247,7 @@ export function deleteSelectedBlocks(view: EditorView, explicitPositions?: numbe
       : pluginState?.selectedPositions ?? [];
   if (targetPositions.length === 0) return false;
 
-  const allBlocks = getAllBlocks(state.doc);
+  const allBlocks = getCachedAllBlocks(state.doc);
   const isAllSelected =
     allBlocks.length > 0 &&
     allBlocks.every((b) => targetPositions.includes(b.pos));
@@ -559,7 +574,7 @@ export const BlockSelection = Extension.create({
       selectAllBlocks:
         () =>
         ({ tr, state, dispatch }) => {
-          const all = getAllBlocks(state.doc);
+          const all = getCachedAllBlocks(state.doc);
           if (all.length === 0) return false;
           if (dispatch) {
             tr.setMeta(blockSelectionPluginKey, {
@@ -639,7 +654,7 @@ export const BlockSelection = Extension.create({
             }
 
             const doc = state.doc;
-            const allBlocks = getAllBlocks(doc);
+            const allBlocks = getCachedAllBlocks(doc);
             const blockIndexMap = new Map<number, number>();
             allBlocks.forEach((b, idx) => blockIndexMap.set(b.pos, idx));
 
@@ -712,7 +727,7 @@ export const BlockSelection = Extension.create({
                   if (block) {
                     event.preventDefault();
                     event.stopPropagation();
-                    const allBlocks = getAllBlocks(view.state.doc);
+                    const allBlocks = getCachedAllBlocks(view.state.doc);
                     const targetIdx = allBlocks.findIndex((b) => b.pos === block.pos);
                     const anchorPos = pluginState?.anchor ?? block.pos;
                     const anchorIdx = Math.max(
@@ -882,7 +897,7 @@ export const BlockSelection = Extension.create({
 
             // ── Progressive ⌘A ──────────────────────────────────────────────
             if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
-              const allBlocks = getAllBlocks(state.doc);
+              const allBlocks = getCachedAllBlocks(state.doc);
               if (allBlocks.length === 0) return false;
 
               // Step 3: if in block mode and 1 block or subset selected -> select ALL blocks
@@ -990,7 +1005,7 @@ export const BlockSelection = Extension.create({
               event.preventDefault();
               event.stopPropagation();
 
-              const allBlocks = getAllBlocks(state.doc);
+              const allBlocks = getCachedAllBlocks(state.doc);
               if (allBlocks.length === 0) return true;
 
               const headPos = pluginState.head ?? allBlocks[0].pos;

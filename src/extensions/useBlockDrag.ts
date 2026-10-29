@@ -51,49 +51,14 @@ export function getBlockContentRects(
     dom.tagName === "IFRAME" ||
     Boolean(dom.querySelector("pre, table, hr, iframe"));
 
-  if (isNonText) {
-    const targetEl = dom.tagName === "PRE" ? dom : dom.querySelector("pre") || dom;
-    const r = targetEl.getBoundingClientRect();
-    return [
-      {
-        left: r.left - containerRect.left,
-        right: r.right - containerRect.left,
-        top: r.top - containerRect.top + scrollTop,
-        bottom: r.bottom - containerRect.top + scrollTop,
-      },
-    ];
-  }
+  const targetEl = isNonText
+    ? dom.tagName === "PRE"
+      ? dom
+      : dom.querySelector("pre, table") || dom
+    : dom;
 
-  // Text blocks and list items: measure actual text content
-  try {
-    const textTarget = dom.querySelector("p, [data-node-view-content]") || dom;
-    const range = document.createRange();
-    range.selectNodeContents(textTarget);
-    const clientRects = range.getClientRects();
-
-    if (clientRects.length > 0) {
-      const rects: ContentRect[] = [];
-      for (let i = 0; i < clientRects.length; i++) {
-        const cr = clientRects[i];
-        if (cr.width > 0 && cr.height > 0) {
-          rects.push({
-            left: cr.left - containerRect.left,
-            right: cr.right - containerRect.left,
-            top: cr.top - containerRect.top + scrollTop,
-            bottom: cr.bottom - containerRect.top + scrollTop,
-          });
-        }
-      }
-      if (rects.length > 0) {
-        return rects;
-      }
-    }
-  } catch {
-    // fallback below
-  }
-
-  // Fallback for empty blocks or nodes without measurable range
-  const r = dom.getBoundingClientRect();
+  // Block-level elements take the full block bounds so touching anywhere selects the block
+  const r = targetEl.getBoundingClientRect();
   return [
     {
       left: r.left - containerRect.left,
@@ -186,7 +151,7 @@ export function getIntersectingBlockIndices(
       yHits = minDocY >= b.docTop && minDocY <= b.docBottom;
     } else {
       const vThreshold = Math.min(8, Math.max(2, bHeight * 0.25));
-      yHits = maxDocY >= b.docTop + vThreshold && minDocY <= b.docBottom - vThreshold;
+      yHits = maxDocY >= b.docTop + vThreshold && minDocY <= b.docBottom;
     }
 
     if (!yHits) continue;
@@ -256,6 +221,8 @@ export function useBlockDrag({
     selectedPositions: [] as number[],
     hasMoved: false,
     isBelowLastBlock: false,
+    isEmptyBlock: false,
+    isBeyondText: false,
     rafId: null as number | null,
   });
 
@@ -263,6 +230,106 @@ export function useBlockDrag({
     if (!editor || !scrollContainerRef.current) return;
 
     const scrollContainer = scrollContainerRef.current;
+
+    const refreshCachedBlocks = () => {
+      const state = dragRef.current;
+      if (!state.isDragging || !editor || editor.isDestroyed) return;
+      const view = editor.view;
+      const container = scrollContainerRef.current;
+      if (!container || !view) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const scrollTop = container.scrollTop;
+      const blocks: BlockInfo[] = getAllBlocks(view.state.doc);
+      const cachedBlocks: CachedBlockRect[] = [];
+
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const dom = getBlockDom(view, b.pos);
+        if (dom) {
+          const r = dom.getBoundingClientRect();
+          const contentRects = getBlockContentRects(dom, containerRect, scrollTop);
+          cachedBlocks.push({
+            index: i,
+            pos: b.pos,
+            nodeSize: b.nodeSize,
+            docTop: r.top - containerRect.top + scrollTop,
+            docBottom: r.bottom - containerRect.top + scrollTop,
+            docLeft: r.left - containerRect.left,
+            docRight: r.right - containerRect.left,
+            contentRects,
+          });
+        }
+      }
+      if (cachedBlocks.length > 0) {
+        state.cachedBlocks = cachedBlocks;
+      }
+
+      // Re-run hit testing with the last pointer position so the selection / drop target updates during scroll
+      if (state.hasMoved && state.cachedBlocks.length > 0) {
+        const currentDocY = state.currentPointerY - containerRect.top + container.scrollTop;
+        const minDocY = Math.min(state.startDocY, currentDocY);
+        const maxDocY = Math.max(state.startDocY, currentDocY);
+
+        const curRelX = state.currentPointerX - containerRect.left;
+        const minDocX = Math.min(state.startRelX, curRelX);
+        const maxDocX = Math.max(state.startRelX, curRelX);
+
+        const hit = getIntersectingBlockIndices(
+          state.cachedBlocks,
+          minDocY,
+          maxDocY,
+          minDocX,
+          maxDocX
+        );
+
+        const newPositions = hit ? hit.selectedIndices.map((idx) => state.cachedBlocks[idx].pos) : [];
+
+        const isDifferent =
+          newPositions.length !== state.selectedPositions.length ||
+          newPositions.some((pos, i) => pos !== state.selectedPositions[i]);
+
+        if (isDifferent) {
+          state.selectedPositions = newPositions;
+          updateSelectedPositionsInView(newPositions);
+        }
+      }
+    };
+
+    const handleScrollDuringDrag = () => {
+      const state = dragRef.current;
+      if (!state.isDragging || !editor || editor.isDestroyed || !state.hasMoved) return;
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const currentDocY = state.currentPointerY - containerRect.top + container.scrollTop;
+      const minDocY = Math.min(state.startDocY, currentDocY);
+      const maxDocY = Math.max(state.startDocY, currentDocY);
+
+      const curRelX = state.currentPointerX - containerRect.left;
+      const minDocX = Math.min(state.startRelX, curRelX);
+      const maxDocX = Math.max(state.startRelX, curRelX);
+
+      const hit = getIntersectingBlockIndices(
+        state.cachedBlocks,
+        minDocY,
+        maxDocY,
+        minDocX,
+        maxDocX
+      );
+
+      const newPositions = hit ? hit.selectedIndices.map((idx) => state.cachedBlocks[idx].pos) : [];
+
+      const isDifferent =
+        newPositions.length !== state.selectedPositions.length ||
+        newPositions.some((pos, i) => pos !== state.selectedPositions[i]);
+
+      if (isDifferent) {
+        state.selectedPositions = newPositions;
+        updateSelectedPositionsInView(newPositions);
+      }
+    };
 
     const cleanupDrag = () => {
       const state = dragRef.current;
@@ -297,6 +364,8 @@ export function useBlockDrag({
       document.body.style.removeProperty("-webkit-user-select");
       document.body.style.removeProperty("user-select");
 
+      scrollContainer.removeEventListener("scroll", handleScrollDuringDrag);
+      window.removeEventListener("resize", refreshCachedBlocks);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
       window.removeEventListener("pointercancel", handlePointerCancel);
@@ -428,9 +497,18 @@ export function useBlockDrag({
       if (state.isDragging) {
         if (!state.hasMoved) {
           // Click in empty space without dragging
-          if (state.isBelowLastBlock) {
-            // Click below the last line -> put caret at the end of the note!
+          if (state.isBelowLastBlock || state.isEmptyBlock) {
+            // Click below the last line or on empty block at end of note -> put caret at the end of the note!
             editor.chain().focus("end").run();
+          } else if (state.isBeyondText) {
+            const clickPos = editor.view.posAtCoords({
+              left: state.currentPointerX,
+              top: state.currentPointerY,
+            });
+            if (clickPos) {
+              editor.commands.setTextSelection(clickPos.pos);
+            }
+            editor.view.focus();
           } else {
             updateSelectedPositionsInView([]);
           }
@@ -516,9 +594,43 @@ export function useBlockDrag({
       const isAboveFirstBlock = e.clientY < firstBlockTop;
       const isBelowLastBlock = e.clientY > lastBlockBottom;
 
-      const isInEmptyArea = isLeftMargin || isRightMargin || isAboveFirstBlock || isBelowLastBlock;
+      const blockEl = target.closest("p, li, h1, h2, h3, blockquote, pre");
+      const isEmptyBlock = Boolean(
+        target === tiptapDom ||
+        target.classList.contains("is-empty") ||
+        target.closest(".is-empty") ||
+        (blockEl && (!blockEl.textContent || blockEl.textContent.trim() === ""))
+      );
 
-      // Pointer starts inside text column -> default ProseMirror selection.
+      let isBeyondText = false;
+      if (!isEmptyBlock && blockEl) {
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(blockEl);
+          const rects = range.getClientRects();
+          let textRight = -1;
+          for (let i = 0; i < rects.length; i++) {
+            if (rects[i].right > textRight) {
+              textRight = rects[i].right;
+            }
+          }
+          if (textRight > 0 && e.clientX > textRight + 8) {
+            isBeyondText = true;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      const isInEmptyArea =
+        isLeftMargin ||
+        isRightMargin ||
+        isAboveFirstBlock ||
+        isBelowLastBlock ||
+        isEmptyBlock ||
+        isBeyondText;
+
+      // Pointer starts inside text column on actual text -> default ProseMirror selection.
       // Do NOT start block selection, do NOT call preventDefault!
       if (!isInEmptyArea) {
         return;
@@ -583,9 +695,13 @@ export function useBlockDrag({
       state.selectedPositions = [];
       state.hasMoved = false;
       state.isBelowLastBlock = isBelowLastBlock;
+      state.isEmptyBlock = isEmptyBlock;
+      state.isBeyondText = isBeyondText;
 
       state.rafId = requestAnimationFrame(runDragLoop);
 
+      scrollContainer.addEventListener("scroll", handleScrollDuringDrag, { passive: true });
+      window.addEventListener("resize", refreshCachedBlocks, { passive: true });
       window.addEventListener("pointermove", handlePointerMove, { passive: true });
       window.addEventListener("pointerup", handlePointerUp);
       window.addEventListener("pointercancel", handlePointerCancel);
@@ -596,12 +712,20 @@ export function useBlockDrag({
       cleanupDrag();
     };
 
+    const handleVisibilityOrHide = () => {
+      cleanupDrag();
+    };
+
     scrollContainer.addEventListener("pointerdown", handlePointerDown);
     window.addEventListener("blur", handleWindowBlur);
+    document.addEventListener("visibilitychange", handleVisibilityOrHide);
+    window.addEventListener("panel-will-hide" as any, handleVisibilityOrHide);
 
     return () => {
       scrollContainer.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("blur", handleWindowBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityOrHide);
+      window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);
       cleanupDrag();
     };
   }, [editor, scrollContainerRef, rubberBandRef]);

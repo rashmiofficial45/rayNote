@@ -109,6 +109,37 @@ describe('BlockSelection Geometry & Collision Tests', () => {
     expect(rectsIntersect(0, 100, 0, 50, 0, 100, 60, 100, 0)).toBe(false);
   });
 
+  it('9. Drag from end of note upward selects block immediately upon touching docBottom', () => {
+    // Start drag at y = 300 (below note), drag up to y = 220 (touching Block 2 bottom at 220)
+    const hit = getIntersectingBlockIndices(sampleBlocks, 220, 300, 50, 150);
+    expect(hit).not.toBeNull();
+    expect(hit?.minIdx).toBe(2);
+    expect(hit?.maxIdx).toBe(2);
+    expect(hit?.selectedIndices).toEqual([2]);
+  });
+
+  it('10. Block-level element with full block bounds selects when touched anywhere horizontally', () => {
+    const wholeBlock = {
+      index: 0,
+      pos: 0,
+      nodeSize: 10,
+      docTop: 10,
+      docBottom: 40,
+      docLeft: 40,
+      docRight: 600,
+      contentRects: [{ left: 40, right: 600, top: 10, bottom: 40 }],
+    };
+    // Touches at the far right of the block (x: 550..580)
+    const hitRight = getIntersectingBlockIndices([wholeBlock], 15, 35, 550, 580);
+    expect(hitRight).not.toBeNull();
+    expect(hitRight?.selectedIndices).toEqual([0]);
+
+    // Touches at the left of the block (x: 40..60)
+    const hitLeft = getIntersectingBlockIndices([wholeBlock], 15, 35, 40, 60);
+    expect(hitLeft).not.toBeNull();
+    expect(hitLeft?.selectedIndices).toEqual([0]);
+  });
+
   describe('getAllBlocks document structure traversal', () => {
     it('traverses document tree and extracts selectable blocks in order', () => {
       const mockHeading = {

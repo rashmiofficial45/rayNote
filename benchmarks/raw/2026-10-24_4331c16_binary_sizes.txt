@@ -1,0 +1,4 @@
+-rwxr-xr-x@ 1 rashmipersonal  wheel  7460320 Oct 23 23:07 /tmp/rayNote-baseline/src-tauri/target/release/raynote
+-rwxr-xr-x@ 1 rashmipersonal  staff  7675712 Oct 23 23:00 src-tauri/target/release/raynote
+8528	src-tauri/target/release/bundle/macos/rayNote.app
+8320	/tmp/rayNote-baseline/src-tauri/target/release/bundle/macos/rayNote.app

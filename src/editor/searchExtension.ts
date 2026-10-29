@@ -167,36 +167,83 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
           init() {
             return DecorationSet.empty;
           },
-          apply(tr, _oldSet, _oldState, newState) {
+          apply(tr, oldSet, _oldState, newState) {
             const { searchTerm, currentIndex } = extension.storage;
+            // Inactive search: return DecorationSet.empty in O(1)
             if (!searchTerm || !searchTerm.trim()) {
               return DecorationSet.empty;
             }
 
+            const meta = tr.getMeta(searchPluginKey);
+
+            // Document changed while search is active: pure O(1) decoration mapping
             if (tr.docChanged) {
-              extension.storage.results = findMatches(newState.doc, searchTerm);
-              if (extension.storage.currentIndex >= extension.storage.results.length) {
-                extension.storage.currentIndex = 0;
+              return oldSet.map(tr.mapping, tr.doc);
+            }
+
+            // Explicit search update (query change, next/prev navigation, or debounced rescan dispatch)
+            if (meta?.update) {
+              const results = extension.storage.results;
+              if (results.length === 0) {
+                return DecorationSet.empty;
               }
+
+              const decorations: Decoration[] = [];
+              results.forEach((match: SearchMatch, idx: number) => {
+                const isCurrent = idx === currentIndex;
+                decorations.push(
+                  Decoration.inline(match.from, match.to, {
+                    class: isCurrent ? "search-match search-match-active" : "search-match",
+                  })
+                );
+              });
+
+              return DecorationSet.create(newState.doc, decorations);
             }
 
-            const results = extension.storage.results;
-            if (results.length === 0) {
-              return DecorationSet.empty;
-            }
-
-            const decorations: Decoration[] = [];
-            results.forEach((match: SearchMatch, idx: number) => {
-              const isCurrent = idx === currentIndex;
-              decorations.push(
-                Decoration.inline(match.from, match.to, {
-                  class: isCurrent ? "search-match search-match-active" : "search-match",
-                })
-              );
-            });
-
-            return DecorationSet.create(newState.doc, decorations);
+            return oldSet;
           },
+        },
+        view() {
+          let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+          return {
+            update(view, prevState) {
+              const term = extension.storage.searchTerm;
+              if (!term || !term.trim()) {
+                if (debounceTimer) {
+                  clearTimeout(debounceTimer);
+                  debounceTimer = null;
+                }
+                return;
+              }
+
+              // When document changes during active search, debounce full match re-scan by ~150ms in plugin view
+              if (view.state.doc !== prevState.doc) {
+                if (debounceTimer) {
+                  clearTimeout(debounceTimer);
+                }
+                debounceTimer = setTimeout(() => {
+                  if (!view.isDestroyed) {
+                    const currentTerm = extension.storage.searchTerm;
+                    if (currentTerm && currentTerm.trim()) {
+                      extension.storage.results = findMatches(view.state.doc, currentTerm);
+                      if (extension.storage.currentIndex >= extension.storage.results.length) {
+                        extension.storage.currentIndex = 0;
+                      }
+                      view.dispatch(view.state.tr.setMeta(searchPluginKey, { update: true }));
+                    }
+                  }
+                }, 150);
+              }
+            },
+            destroy() {
+              if (debounceTimer) {
+                clearTimeout(debounceTimer);
+                debounceTimer = null;
+              }
+            },
+          };
         },
         props: {
           decorations(state) {

@@ -284,4 +284,182 @@ describe("useBlockDrag Hook & Event Behavior", () => {
 
     expect(document.body.classList.contains("is-block-dragging")).toBe(false);
   });
+
+  it("invalidates cachedBlocks on scroll mid-drag and updates hit testing", () => {
+    const block0 = createMockBlockElement();
+    const block1 = document.createElement("p");
+    block1.textContent = "Second paragraph";
+    block1.getBoundingClientRect = () => ({
+      top: 150,
+      bottom: 190,
+      left: 60,
+      right: 500,
+      width: 440,
+      height: 40,
+      x: 60,
+      y: 150,
+      toJSON: () => {},
+    });
+    Object.defineProperty(block1, "offsetHeight", { value: 40, configurable: true });
+
+    const tiptapDom = document.createElement("div");
+    tiptapDom.className = "tiptap";
+    tiptapDom.appendChild(block0);
+    tiptapDom.appendChild(block1);
+    tiptapDom.getBoundingClientRect = () => ({
+      top: 20,
+      bottom: 500,
+      left: 40,
+      right: 760,
+      width: 720,
+      height: 480,
+      x: 40,
+      y: 20,
+      toJSON: () => {},
+    });
+
+    const mockDispatch = vi.fn();
+    const mockEditor = {
+      isDestroyed: false,
+      view: {
+        dom: tiptapDom,
+        nodeDOM: vi.fn((pos: number) => (pos === 0 ? block0 : block1)),
+        domAtPos: vi.fn((pos: number) => ({ node: pos === 0 ? block0 : block1, offset: 0 })),
+        state: {
+          tr: {
+            setMeta: vi.fn().mockReturnThis(),
+          },
+          doc: {
+            childCount: 2,
+            child: (_i: number) => ({ isBlock: true, nodeSize: 20, type: { name: "paragraph" } }),
+          },
+        },
+        dispatch: mockDispatch,
+      },
+      chain: () => ({ focus: () => ({ run: vi.fn() }) }),
+    };
+
+    let scrollEl!: HTMLDivElement;
+    act(() => {
+      root.render(
+        <TestHarness
+          mockEditor={mockEditor}
+          onMount={(s) => {
+            scrollEl = s;
+          }}
+        />
+      );
+    });
+
+    scrollEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 800,
+      width: 800,
+      height: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Start drag at left margin: clientX 20, clientY 30
+    const pointerDownEvent = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 20,
+      clientY: 30,
+      button: 0,
+    }) as any;
+    pointerDownEvent.pointerId = 1;
+
+    act(() => {
+      scrollEl.dispatchEvent(pointerDownEvent);
+    });
+
+    expect(document.body.classList.contains("is-block-dragging")).toBe(true);
+
+    // Simulate scroll container scrolling by 100px mid-drag
+    scrollEl.scrollTop = 100;
+    act(() => {
+      scrollEl.dispatchEvent(new Event("scroll"));
+    });
+
+    // Pointer move at new position after scrolling
+    act(() => {
+      window.dispatchEvent(
+        new MouseEvent("pointermove", {
+          clientX: 200,
+          clientY: 170,
+          buttons: 1,
+        })
+      );
+    });
+
+    // Clean up drag
+    act(() => {
+      window.dispatchEvent(new MouseEvent("pointerup"));
+    });
+    expect(document.body.classList.contains("is-block-dragging")).toBe(false);
+  });
+
+  it("computes hit testing on scroll mid-drag with ZERO block DOM reads (uses document-relative offsets)", () => {
+    const blockEl = createMockBlockElement();
+    const getBoundingClientRectSpy = vi.spyOn(blockEl, "getBoundingClientRect");
+    const mockEditor = createMockEditor(blockEl);
+
+    let scrollEl!: HTMLDivElement;
+    act(() => {
+      root.render(
+        <TestHarness
+          mockEditor={mockEditor}
+          onMount={(s) => {
+            scrollEl = s;
+          }}
+        />
+      );
+    });
+
+    scrollEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 800,
+      width: 800,
+      height: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Start drag
+    const pointerDownEvent = new MouseEvent("pointerdown", {
+      clientX: 200,
+      clientY: 30,
+      button: 0,
+    }) as any;
+    pointerDownEvent.pointerId = 1;
+
+    act(() => {
+      scrollEl.dispatchEvent(pointerDownEvent);
+    });
+
+    // At drag start, getBoundingClientRect was called once to measure document offsets
+    const callsAtStart = getBoundingClientRectSpy.mock.calls.length;
+    expect(callsAtStart).toBeGreaterThan(0);
+
+    // Mid-drag scroll occurs:
+    scrollEl.scrollTop = 150;
+    act(() => {
+      scrollEl.dispatchEvent(new Event("scroll"));
+    });
+
+    // Zero additional DOM reads on block elements during scroll!
+    expect(getBoundingClientRectSpy.mock.calls.length).toBe(callsAtStart);
+
+    // Clean up drag
+    act(() => {
+      window.dispatchEvent(new MouseEvent("pointerup"));
+    });
+  });
 });

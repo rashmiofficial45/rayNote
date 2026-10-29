@@ -1,0 +1,19 @@
+
+ RUN  v5.0.3 /Users/rashmipersonal/Desktop/MAC Apps/rayNote
+
+stdout | src/editor/__tests__/markdownSerialization.test.ts > Markdown Serialization & Clipboard Utilities (Test C) > Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) > serializes realistic 100 KB fixture with headings, marks, code, emoji, and Devanagari (5 runs)
+[MEASURED: Node/V8 performance.now(), 100 KB Realistic Doc (5 runs, run 1 discarded)]: median=5.881 ms (min=5.261 ms, max=7.791 ms) | raw runs: 13.433, 7.791, 6.413, 5.350, 5.261 ms
+
+stdout | src/editor/__tests__/markdownSerialization.test.ts > Markdown Serialization & Clipboard Utilities (Test C) > Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) > serializes realistic 1 MB fixture with headings, marks, code, emoji, and Devanagari (5 runs)
+[MEASURED: Node/V8 performance.now(), 1 MB Realistic Doc (5 runs, run 1 discarded)]: median=42.047 ms (min=41.568 ms, max=42.613 ms) | raw runs: 46.857, 42.613, 42.391, 41.568, 41.704 ms
+
+ ✓ src/editor/__tests__/markdownSerialization.test.ts (16 tests) 2062ms
+   ✓ Markdown Serialization & Clipboard Utilities (Test C) (16)
+     ✓ Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) (2)
+       ✓ serializes realistic 1 MB fixture with headings, marks, code, emoji, and Devanagari (5 runs) 1980ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  10:44:03
+   Duration  2.21s (tests 97%, transform 2%, import 1%)
+

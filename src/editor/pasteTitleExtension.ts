@@ -32,6 +32,8 @@ export interface PasteTitleOptions {
  * ProseMirror's transaction and history undo/redo stack.
  */
 export class TitleStep extends Step {
+  readonly stepType = "titleStep";
+
   constructor(
     public prevTitle: string,
     public newTitle: string
@@ -200,18 +202,9 @@ export const PasteTitleExtension = Extension.create<PasteTitleOptions>({
 
             const tr = view.state.tr;
 
-            // First line becomes an H1 heading (level: 1) in the note body
-            const headingNode = view.state.schema.nodes.heading
-              ? view.state.schema.nodes.heading.create(
-                  { level: 1 },
-                  newTitle ? [view.state.schema.text(newTitle)] : []
-                )
-              : view.state.schema.nodes.paragraph.create(
-                  {},
-                  newTitle ? [view.state.schema.text(newTitle)] : []
-                );
-
-            const nodesToInsert: any[] = [headingNode];
+            // Move first line to title bar ONLY: it is NOT inserted into the body and does NOT become an H1.
+            // Only bodyMarkdown is inserted into the body.
+            const nodesToInsert: any[] = [];
 
             if (bodyMarkdown.trim().length > 0) {
               const html = markdownToTipTapHtml(bodyMarkdown);
@@ -223,6 +216,11 @@ export const PasteTitleExtension = Extension.create<PasteTitleOptions>({
               }
             }
 
+            // Ensure document always has at least one valid block node
+            if (nodesToInsert.length === 0) {
+              nodesToInsert.push(view.state.schema.nodes.paragraph.create());
+            }
+
             tr.replaceWith(0, view.state.doc.content.size, nodesToInsert);
 
             // Record title transition step in ProseMirror history
@@ -230,23 +228,39 @@ export const PasteTitleExtension = Extension.create<PasteTitleOptions>({
             tr.setSelection(Selection.atEnd(tr.doc));
             view.dispatch(tr);
 
-            // Notify title change to synchronize state, cache, db, and TitleBar immediately
-            options.onSetTitle?.(newTitle);
-
             return true;
           },
         },
 
-        appendTransaction(transactions, _oldState, _newState) {
-          // Listen for TitleStep across all transactions (including Undo and Redo)
-          for (const tr of transactions) {
+        state: {
+          init() {
+            return { title: options.getCurrentTitle?.() || null, version: 0 };
+          },
+          apply(tr, value) {
+            let title = value?.title ?? null;
+            let version = value?.version ?? 0;
             for (const step of tr.steps) {
-              if (step instanceof TitleStep) {
-                options.onSetTitle?.(step.newTitle);
+              if (step instanceof TitleStep || (step as any).stepType === "titleStep") {
+                title = (step as any).newTitle;
+                version++;
               }
             }
-          }
-          return null;
+            return { title, version };
+          },
+        },
+
+        view() {
+          return {
+            update(view, prevState) {
+              if (view.state === prevState) return;
+              const prev = pasteTitlePluginKey.getState(prevState);
+              const curr = pasteTitlePluginKey.getState(view.state);
+              if (curr && curr.version !== prev?.version && typeof curr.title === "string") {
+                options.onSetTitle?.(curr.title);
+              }
+            },
+            destroy() {},
+          };
         },
       }),
     ];

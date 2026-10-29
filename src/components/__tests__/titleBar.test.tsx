@@ -210,4 +210,33 @@ describe("TitleBar UI Component", () => {
     });
     expect(invoke).not.toHaveBeenCalled();
   });
+
+  it("renders exactly 3 action buttons (copy, delete, command palette) and single-line title container", () => {
+    act(() => {
+      root.render(
+        <TitleBar
+          title="Test Note with Long Title That Should Not Wrap"
+          onNewNote={vi.fn()}
+          onOpenCommandPalette={vi.fn()}
+          onDuplicateNote={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onCopyMarkdown={vi.fn()}
+        />
+      );
+    });
+
+    const copyBtn = container.querySelector(".copy-md-btn");
+    const deleteBtn = container.querySelector(".delete-btn");
+    const cmdBtn = container.querySelector(".command-palette-btn");
+    const searchBtn = container.querySelector(".search-btn");
+
+    expect(copyBtn).not.toBeNull();
+    expect(deleteBtn).not.toBeNull();
+    expect(cmdBtn).not.toBeNull();
+    expect(searchBtn).toBeNull();
+
+    const titleContent = container.querySelector(".title-text-content");
+    expect(titleContent).not.toBeNull();
+    expect(titleContent?.textContent).toBe("Test Note with Long Title That Should Not Wrap");
+  });
 });
