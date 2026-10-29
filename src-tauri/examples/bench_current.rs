@@ -1,11 +1,6 @@
-#[path = "../src/database.rs"]
-mod database;
-#[path = "../src/search.rs"]
-mod search;
-
 use std::path::PathBuf;
 use std::time::Instant;
-use database::Database;
+use raynote_lib::database::Database;
 
 fn main() {
     let db_dir = PathBuf::from("/tmp/current_bench_dir");

@@ -1,10 +1,5 @@
-#[path = "../src/database.rs"]
-mod database;
-#[path = "../src/search.rs"]
-mod search;
-
 use std::path::PathBuf;
-use database::Database;
+use raynote_lib::database::Database;
 
 fn main() {
     let dir = PathBuf::from("/tmp/app_db_current_dir");

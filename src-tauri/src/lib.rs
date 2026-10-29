@@ -1,6 +1,6 @@
-mod database;
-mod search;
-mod commands;
+pub mod database;
+pub mod search;
+pub mod commands;
 
 use database::Database;
 use commands::*;

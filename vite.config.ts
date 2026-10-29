@@ -20,6 +20,9 @@ export default defineConfig(() => ({
       "highlight.js": highlightJsPath,
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1500,
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

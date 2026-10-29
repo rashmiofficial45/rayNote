@@ -94,7 +94,7 @@ hdiutil detach "/Volumes/rayNote" 2>/dev/null || true
 # 5. Build DMG using dmgbuild
 echo "💿 Building stylized DMG with native layout (dmgbuild)..."
 cd "${ROOT_DIR}"
-dmgbuild -s "${SCRIPT_DIR}/dmg_settings.py" "rayNote" "${PRIMARY_DMG}"
+dmgbuild -s "${SCRIPT_DIR}/dmg_settings.py" "rayNote" "${PRIMARY_DMG}" 2> >(grep -v "hdiutil: WARNING:" >&2)
 
 # Duplicate to target/release/bundle/dmg for standard Tauri paths
 cp -f "${PRIMARY_DMG}" "${DMG_RELEASE_DIR}/rayNote_0.1.0_aarch64.dmg"

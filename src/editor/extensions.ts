@@ -119,7 +119,6 @@ export const LOWLIGHT_LANGUAGE_LOADERS: Record<string, () => Promise<any>> = {
   go: () => import("highlight.js/lib/languages/go"),
   java: () => import("highlight.js/lib/languages/java"),
   diff: () => import("highlight.js/lib/languages/diff"),
-  bash: () => import("highlight.js/lib/languages/bash"),
 };
 
 export async function ensureLanguageLoaded(lang: string): Promise<boolean> {

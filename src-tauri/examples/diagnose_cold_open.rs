@@ -1,8 +1,3 @@
-#[path = "../src/database.rs"]
-mod database;
-#[path = "../src/search.rs"]
-mod search;
-
 use std::path::PathBuf;
 use std::time::Instant;
 use rusqlite::{Connection, OpenFlags};
@@ -19,7 +14,7 @@ fn main() {
     let t_total = Instant::now();
 
     let t0 = Instant::now();
-    let mut writer = Connection::open(&db_path).unwrap();
+    let writer = Connection::open(&db_path).unwrap();
     println!("1. Connection::open: {:.3} ms", t0.elapsed().as_secs_f64() * 1000.0);
 
     let t1 = Instant::now();
