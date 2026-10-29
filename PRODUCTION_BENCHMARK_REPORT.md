@@ -42,7 +42,9 @@ To avoid synthetic skew from tiny 1-line notes, `raynote.db` was seeded with 25 
 
 ---
 
-## 4. Production Benchmark Results Table
+## 4. Production Benchmark Results Table [OWNER-REPORTED]
+
+> **Note on Measurement Provenance:** The numbers below were recorded during testing on macOS using `footprint` and `top`. In the current environment, system profilers are blocked, so these numbers are designated **[OWNER-REPORTED]** and have not been independently re-measured in this round.
 
 Measurements captured across consecutive lifecycle phases of the running application:
 
@@ -83,31 +85,31 @@ Memory Footprint (MB)
 
 ---
 
-## 6. Architecture Comparison: Pure On-Demand vs Speculative Prefetch
+## 6. Architecture Comparison: Pure On-Demand vs Speculative Prefetch [OWNER-REPORTED]
 
 During testing, we evaluated two architectural modes:
-- **Mode A (Pure On-Demand LRU)**: Only loads the note requested by the user. If cached, 0ms instant display. If missed, SQLite loads in ~1ms.
-- **Mode B (Cache + Idle Prefetch)**: Scheduled a 1.2s inactivity timer to speculatively fetch the previous and next notes from SQLite over IPC.
+- **Mode A (Pure On-Demand LRU)**: Only loads the note requested by the user. If cached, renders in-memory in < 4 ms. If missed, SQLite loads asynchronously over IPC.
+- **Mode B (Cache + Idle Prefetch)**: Scheduled an inactivity timer to speculatively fetch the previous and next notes from SQLite over IPC.
 
-### Comparison Matrix:
+### Comparison Matrix [OWNER-REPORTED]:
 
 | Metric | Mode A (Pure On-Demand) | Mode B (With 2-Note Prefetch) | Winner |
 | :--- | :---: | :---: | :--- |
-| **Idle CPU Activity** | **0.2% (True idle)** | 0.8% – 1.8% periodic wakeups | 🏆 Mode A |
-| **Spurious Disk Reads** | **0 bytes** | Reads ~2 MB adjacent data on idle | 🏆 Mode A |
-| **Background Timers** | **0 active timers** | Active `setTimeout` on every switch | 🏆 Mode A |
-| **Perceived Switch Speed**| **0ms (instant)** | 0ms (instant) | ⚖️ Identical |
+| **Idle CPU Activity** | **0.2% – 0.4%** [OWNER-REPORTED] | 0.8% – 1.8% periodic wakeups [OWNER-REPORTED] | 🏆 Mode A |
+| **Spurious Disk Reads** | **0 bytes** | Reads ~2 MB adjacent data on idle [OWNER-REPORTED] | 🏆 Mode A |
+| **Background Timers** | **0 active timers** | Active `setTimeout` on every switch [CONFIG] | 🏆 Mode A |
+| **Perceived Switch Speed**| [NOT MEASURED] | [NOT MEASURED] | ⚖️ Map lookup in `noteCache.test.ts` is 95 ns; full WebKit switch [NOT MEASURED] |
 | **Implementation Complexity** | Minimal, robust | Extra state synchronization | 🏆 Mode A |
 
 ### Verdict:
 **Mode A (Pure On-Demand LRU) is vastly superior for rayNote.**
-Because local SQLite reads on NVMe take only 1 millisecond and cached notes load in 0ms, speculative background prefetching consumed unnecessary CPU cycles and generated spurious disk I/O for notes the user might never view. Removing the prefetch timer fulfilled the core requirement: **"When idle, rayNote does nothing."**
+Because local SQLite reads on NVMe take sub-millisecond durations and cached notes load in < 4 ms, speculative background prefetching consumed unnecessary CPU cycles and generated spurious disk I/O for notes the user might never view. Removing the prefetch timer fulfilled the core requirement: **"When idle, rayNote does nothing."**
 
 ---
 
 ---
 
-## 7. Ultra-High Endurance & Autosave Stress Benchmark (1,000 Switches)
+## 7. Ultra-High Endurance & Autosave Stress Benchmark (1,000 Switches) [OWNER-REPORTED]
 
 To rigorously push the architecture to its absolute extremes, we executed a sustained stress test consisting of:
 1. **Fresh Launch Baseline & Idle Cooldown**
@@ -121,7 +123,7 @@ To rigorously push the architecture to its absolute extremes, we executed a sust
 9. **Return Navigation to Giant Note (Integrity & Scroll Verification)**
 10. **Final Idle Stabilization & Garbage Collection**
 
-### Ultra-Endurance Results:
+### Ultra-Endurance Results [OWNER-REPORTED]:
 
 | Phase / Scenario | Tauri Native RAM | WebKit Renderer RAM | Total App Footprint | Total CPU % | Thread Count | Observations |
 | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
@@ -189,9 +191,9 @@ We migrated from per-node React NodeViews to a clean structural separation:
  (0 React Portals)       Positions dynamically on hover/focus
 ```
 
-### 9.3 Comparative Benchmark Results
+### 9.3 Comparative Benchmark Results [OWNER-REPORTED]
 
-#### A. Document-Size Switching (100 Switches)
+#### A. Document-Size Switching (100 Switches) [OWNER-REPORTED]
 | Document Scale | Metric | React NodeView Architecture | Native `<pre><code>` Architecture | Net Improvement |
 | :--- | :--- | :---: | :---: | :--- |
 | **20 KB Notes** | WebKit Baseline | 181 MB | **76 MB** | -105 MB (-58.0%) |
@@ -202,7 +204,7 @@ We migrated from per-node React NodeViews to a clean structural separation:
 | | Peak WebKit RAM | 873 MB – 1,002 MB | **502 MB** | **-42.5% to -49.9% Peak** |
 | | Total at 100 Switches | 885 MB | **372 MB** | **-513 MB (-58.0%)** |
 
-#### B. 1,000-Switch Endurance Benchmark Comparison
+#### B. 1,000-Switch Endurance Benchmark Comparison [OWNER-REPORTED]
 | Lifecycle Phase | Original Total Footprint | New Native Total Footprint | Difference |
 | :--- | :---: | :---: | :--- |
 | **Fresh Launch / Boot** | 156 MB | **126 MB** | -30 MB (-19.2%) |

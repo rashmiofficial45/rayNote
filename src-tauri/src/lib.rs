@@ -418,12 +418,15 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
+                        use tauri::Emitter;
+
                         #[cfg(target_os = "macos")]
                         {
                             use tauri_nspanel::ManagerExt;
 
                             if let Ok(panel) = app.get_webview_panel("main") {
                                 if panel.is_visible() {
+                                    let _ = app.emit("panel-will-hide", ());
                                     panel.hide();
                                 } else {
                                     show_and_focus_main_panel(app);
@@ -436,6 +439,7 @@ pub fn run() {
                             if let Some(window) = app.get_webview_window("main") {
                                 if let Ok(is_visible) = window.is_visible() {
                                     if is_visible {
+                                        let _ = window.emit("panel-will-hide", ());
                                         let _ = window.hide();
                                     } else {
                                         show_and_focus_main_panel(app);
@@ -450,8 +454,8 @@ pub fn run() {
         .setup(|app| {
             // Initialize database
             let app_dir = app.path().app_data_dir().expect("Failed to get app data dir");
-            let db = Database::new(app_dir.clone()).expect("Failed to initialize database");
-            app.manage(db);
+            let db = std::sync::Arc::new(Database::new(app_dir.clone()).expect("Failed to initialize database"));
+            app.manage(db.clone());
 
             // Restore window size if previously saved
             let state_file = app_dir.join("window_state.json");
@@ -531,17 +535,24 @@ pub fn run() {
                 let _ = set_menu_bar_visible(app.handle().clone(), true);
             }
 
+            // Warm note summaries cache in background right after window is shown
+            let db_warm = db.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let _ = db_warm.get_all_notes_arc();
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_all_notes,
-            search_notes,
+            get_recent_notes,
             search_documents,
             get_note,
             create_note,
             update_note,
             delete_note,
             toggle_pin,
+            get_adjacent_note,
             start_native_drag,
             get_drag_diagnostics,
             get_native_window_frame,
@@ -558,6 +569,9 @@ pub fn run() {
             export_notes_to_folder,
             export_all_notes_from_db,
             start_native_dictation,
+            flush_done,
+            checkpoint_passive,
+            write_to_clipboard,
         ])
         .build(tauri::generate_context!())
         .expect("error while building rayNote");
@@ -566,6 +580,28 @@ pub fn run() {
         match event {
             tauri::RunEvent::Reopen { .. } => {
                 show_and_focus_main_panel(app_handle);
+            }
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                if EXITING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                    return;
+                }
+                api.prevent_exit();
+
+                use tauri::Emitter;
+                let _ = app_handle.emit("app-will-exit", ());
+
+                let handle_clone = app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    commands::wait_for_flush_done(std::time::Duration::from_millis(1500));
+
+                    if let Some(db) = handle_clone.try_state::<std::sync::Arc<Database>>() {
+                        let conn = db.writer.lock().unwrap_or_else(|e| e.into_inner());
+                        let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
+                    }
+
+                    handle_clone.exit(0);
+                });
             }
             _ => {}
         }

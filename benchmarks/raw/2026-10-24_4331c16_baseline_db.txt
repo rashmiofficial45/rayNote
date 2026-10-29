@@ -1,0 +1,8 @@
+=========================================================
+  BASELINE (HEAD 4331c16) RUST DATABASE BENCHMARK
+=========================================================
+RUN 1: ColdOpen=118.900 ms | update_note p50=1629.0 µs, p95=1868.0 µs (min=1500.0, max=10974.0) | Search 10q_avg=44.871 ms | KeysetNav=N/A
+RUN 2: ColdOpen=113.792 ms | update_note p50=1645.0 µs, p95=1836.0 µs (min=1495.0, max=10417.0) | Search 10q_avg=46.470 ms | KeysetNav=N/A
+RUN 3: ColdOpen=114.677 ms | update_note p50=1641.0 µs, p95=1995.0 µs (min=1514.0, max=10351.0) | Search 10q_avg=44.013 ms | KeysetNav=N/A
+RUN 4: ColdOpen=112.955 ms | update_note p50=1643.0 µs, p95=2664.0 µs (min=1497.0, max=10493.0) | Search 10q_avg=44.027 ms | KeysetNav=N/A
+RUN 5: ColdOpen=116.389 ms | update_note p50=1668.0 µs, p95=2435.0 µs (min=1544.0, max=11055.0) | Search 10q_avg=43.859 ms | KeysetNav=N/A

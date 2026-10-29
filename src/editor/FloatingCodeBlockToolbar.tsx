@@ -3,6 +3,7 @@ import { Editor } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 import { POPULAR_LANGUAGES } from "./CodeBlockComponent";
 import { blockSelectionPluginKey } from "../extensions/BlockSelection";
+import { ensureLanguageLoaded } from "./extensions";
 
 interface FloatingCodeBlockToolbarProps {
   editor: Editor | null;
@@ -368,12 +369,15 @@ export function FloatingCodeBlockToolbar({
   );
 
   const handleSelectLanguage = useCallback(
-    (langValue: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+    async (langValue: string, e?: React.MouseEvent | React.KeyboardEvent) => {
       if (e) {
         e.preventDefault();
         e.stopPropagation();
       }
       if (!editor || !activeBlock?.dom) return;
+
+      // Ensure language grammar is loaded and registered in lowlight before applying node markup
+      await ensureLanguageLoaded(langValue);
 
       try {
         const pos = editor.view.posAtDOM(activeBlock.dom, 0);

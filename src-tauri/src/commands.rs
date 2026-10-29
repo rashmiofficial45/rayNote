@@ -1,64 +1,162 @@
 use crate::database::{Database, Note, NoteSummary};
 use crate::search::SearchResult;
+use std::sync::Arc;
 use tauri::State;
 use uuid::Uuid;
 use chrono::Utc;
 
+static FLUSH_CONDVAR: std::sync::Condvar = std::sync::Condvar::new();
+static FLUSH_DONE: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
+
 #[tauri::command]
-pub fn get_all_notes(db: State<'_, Database>) -> Result<Vec<NoteSummary>, String> {
-    db.get_all_notes().map_err(|e| e.to_string())
+pub fn flush_done() {
+    let mut done = FLUSH_DONE.lock().unwrap_or_else(|e| e.into_inner());
+    *done = true;
+    FLUSH_CONDVAR.notify_all();
+}
+
+pub fn wait_for_flush_done(timeout: std::time::Duration) {
+    let done = FLUSH_DONE.lock().unwrap_or_else(|e| e.into_inner());
+    if !*done {
+        let _ = FLUSH_CONDVAR.wait_timeout(done, timeout);
+    }
 }
 
 #[tauri::command]
-pub fn search_notes(db: State<'_, Database>, query: String) -> Result<Vec<NoteSummary>, String> {
-    db.search_notes(&query).map_err(|e| e.to_string())
+pub async fn get_all_notes(
+    db: State<'_, Arc<Database>>,
+    limit: Option<usize>,
+) -> Result<Vec<NoteSummary>, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        match limit {
+            Some(lim) => db.get_recent_summaries(lim).map_err(|e| e.to_string()),
+            None => {
+                let all = db.get_all_notes_arc().map_err(|e| e.to_string())?;
+                Ok((*all).clone())
+            }
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn search_documents(db: State<'_, Database>, query: String) -> Result<Vec<SearchResult>, String> {
-    db.search_documents(&query).map_err(|e| e.to_string())
+pub async fn search_documents(
+    db: State<'_, Arc<Database>>,
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<SearchResult>, String> {
+    let db = db.inner().clone();
+    let limit = limit.unwrap_or(30);
+    tauri::async_runtime::spawn_blocking(move || {
+        db.search_documents(&query, limit).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn get_note(db: State<'_, Database>, id: String) -> Result<Option<Note>, String> {
-    db.get_note(&id).map_err(|e| e.to_string())
+pub async fn get_recent_notes(
+    db: State<'_, Arc<Database>>,
+    limit: Option<usize>,
+) -> Result<Vec<SearchResult>, String> {
+    let db = db.inner().clone();
+    let limit = limit.unwrap_or(30);
+    tauri::async_runtime::spawn_blocking(move || {
+        db.get_recent_notes(limit).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn create_note(db: State<'_, Database>) -> Result<Note, String> {
-    let now = Utc::now().to_rfc3339();
-    let note = Note {
-        id: Uuid::new_v4().to_string(),
-        title: String::new(),
-        content: "{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"level\":1},\"content\":[]}]}".to_string(),
-        preview: String::new(),
-        created_at: now.clone(),
-        updated_at: now,
-        is_pinned: false,
-    };
-    db.create_note(&note).map_err(|e| e.to_string())?;
-    Ok(note)
+pub async fn get_adjacent_note(
+    db: State<'_, Arc<Database>>,
+    id: String,
+    direction: String,
+) -> Result<Option<String>, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.get_adjacent_note(&id, &direction).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn update_note(
-    db: State<'_, Database>,
+pub async fn get_note(db: State<'_, Arc<Database>>, id: String) -> Result<Option<Note>, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.get_note(&id).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn create_note(db: State<'_, Arc<Database>>) -> Result<Note, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let now = Utc::now().to_rfc3339();
+        let note = Note {
+            id: Uuid::new_v4().to_string(),
+            title: String::new(),
+            content: "{\"type\":\"doc\",\"content\":[{\"type\":\"heading\",\"attrs\":{\"level\":1},\"content\":[]}]}".to_string(),
+            preview: String::new(),
+            created_at: now.clone(),
+            updated_at: now,
+            is_pinned: false,
+        };
+        db.create_note(&note).map_err(|e| e.to_string())?;
+        Ok(note)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+pub fn map_update_note_error(e: rusqlite::Error) -> String {
+    if matches!(e, rusqlite::Error::QueryReturnedNoRows) {
+        "NOTE_NOT_FOUND".to_string()
+    } else {
+        e.to_string()
+    }
+}
+
+#[tauri::command]
+pub async fn update_note(
+    db: State<'_, Arc<Database>>,
     id: String,
     title: String,
     content: String,
-) -> Result<(), String> {
-    db.update_note(&id, &title, &content)
-        .map_err(|e| e.to_string())
+) -> Result<String, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.update_note(&id, &title, &content)
+            .map_err(map_update_note_error)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn delete_note(db: State<'_, Database>, id: String) -> Result<(), String> {
-    db.delete_note(&id).map_err(|e| e.to_string())
+pub async fn delete_note(db: State<'_, Arc<Database>>, id: String) -> Result<(), String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.delete_note(&id).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn toggle_pin(db: State<'_, Database>, id: String) -> Result<bool, String> {
-    db.toggle_pin(&id).map_err(|e| e.to_string())
+pub async fn toggle_pin(db: State<'_, Arc<Database>>, id: String) -> Result<bool, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.toggle_pin(&id).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -247,6 +345,9 @@ pub fn set_native_window_frame(
 
 #[tauri::command]
 pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
+    use tauri::Emitter;
+    let _ = window.emit("panel-will-hide", ());
+
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::WebviewWindowExt;
@@ -545,46 +646,51 @@ pub fn export_notes_to_folder(
 }
 
 #[tauri::command]
-pub fn export_all_notes_from_db(
+pub async fn export_all_notes_from_db(
     app: tauri::AppHandle,
-    db: State<'_, Database>,
+    db: State<'_, Arc<Database>>,
 ) -> Result<String, String> {
-    use tauri::Manager;
-    let download_dir = app
-        .path()
-        .download_dir()
-        .or_else(|_| app.path().app_data_dir())
-        .map_err(|e| e.to_string())?;
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let download_dir = app
+            .path()
+            .download_dir()
+            .or_else(|_| app.path().app_data_dir())
+            .map_err(|e| e.to_string())?;
 
-    let export_dir = download_dir.join("rayNote_Exports");
-    std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
+        let export_dir = download_dir.join("rayNote_Exports");
+        std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
 
-    let all_notes = db.get_all_notes_with_content().map_err(|e| e.to_string())?;
-    for (idx, note) in all_notes.into_iter().enumerate() {
-        let raw_title = if note.title.trim().is_empty() {
-            format!("Untitled_{}", idx + 1)
-        } else {
-            note.title.trim().to_string()
-        };
-        let safe_name: String = raw_title
-            .chars()
-            .map(|c| match c {
-                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
-                _ => c,
-            })
-            .collect();
-        let file_path = export_dir.join(format!("{}.md", safe_name));
-        let md = note_content_to_markdown_clean(&note.content, &note.title);
-        std::fs::write(&file_path, md).map_err(|e| e.to_string())?;
-    }
+        let all_notes = db.get_all_notes_with_content().map_err(|e| e.to_string())?;
+        for (idx, note) in all_notes.into_iter().enumerate() {
+            let raw_title = if note.title.trim().is_empty() {
+                format!("Untitled_{}", idx + 1)
+            } else {
+                note.title.trim().to_string()
+            };
+            let safe_name: String = raw_title
+                .chars()
+                .map(|c| match c {
+                    '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+                    _ => c,
+                })
+                .collect();
+            let file_path = export_dir.join(format!("{}.md", safe_name));
+            let md = note_content_to_markdown_clean(&note.content, &note.title);
+            std::fs::write(&file_path, md).map_err(|e| e.to_string())?;
+        }
 
-    #[cfg(target_os = "macos")]
-    {
-        let path_str = export_dir.to_string_lossy().to_string();
-        let _ = std::process::Command::new("open").arg(&path_str).spawn();
-    }
+        #[cfg(target_os = "macos")]
+        {
+            let path_str = export_dir.to_string_lossy().to_string();
+            let _ = std::process::Command::new("open").arg(&path_str).spawn();
+        }
 
-    Ok(export_dir.to_string_lossy().to_string())
+        Ok(export_dir.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn collect_text_only(node: &serde_json::Value, out: &mut String) {
@@ -924,6 +1030,8 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
                             use tauri_nspanel::ManagerExt;
                             if let Ok(panel) = app.get_webview_panel("main") {
                                 if panel.is_visible() {
+                                    use tauri::Emitter;
+                                    let _ = app.emit("panel-will-hide", ());
                                     panel.hide();
                                 } else {
                                     crate::show_and_focus_main_panel(app);
@@ -959,29 +1067,33 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
 }
 
 #[tauri::command]
-pub fn get_storage_stats(
+pub async fn get_storage_stats(
     app: tauri::AppHandle,
-    db: State<'_, Database>,
+    db: State<'_, Arc<Database>>,
 ) -> Result<serde_json::Value, String> {
-    use tauri::Manager;
-    let notes = db.get_all_notes().map_err(|e| e.to_string())?;
-    let count = notes.len();
-    let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let db_path = if app_dir.join("raynote.db").exists() {
-        app_dir.join("raynote.db")
-    } else {
-        app_dir.join("notefast.db")
-    };
-    let size_bytes = if let Ok(meta) = std::fs::metadata(&db_path) {
-        meta.len()
-    } else {
-        0
-    };
-    Ok(serde_json::json!({
-        "notes_count": count,
-        "db_path": db_path.to_string_lossy(),
-        "size_bytes": size_bytes,
-    }))
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let count = db.get_note_count().map_err(|e| e.to_string())?;
+        let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+        let db_path = if app_dir.join("raynote.db").exists() {
+            app_dir.join("raynote.db")
+        } else {
+            app_dir.join("notefast.db")
+        };
+        let size_bytes = if let Ok(meta) = std::fs::metadata(&db_path) {
+            meta.len()
+        } else {
+            0
+        };
+        Ok(serde_json::json!({
+            "notes_count": count,
+            "db_path": db_path.to_string_lossy(),
+            "size_bytes": size_bytes,
+        }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1001,4 +1113,114 @@ pub fn start_native_dictation() -> Result<(), String> {
         ];
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn checkpoint_passive(db: tauri::State<'_, std::sync::Arc<Database>>) -> Result<(), String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let guard = match db.writer.try_lock() {
+            Ok(g) => g,
+            Err(std::sync::TryLockError::Poisoned(p)) => p.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => return Ok(()),
+        };
+        let _ = guard.query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |_| Ok(()));
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn write_to_clipboard(text: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let mut child = Command::new("pbcopy")
+            .env_remove("LANG")
+            .env_remove("LC_ALL")
+            .env("LC_CTYPE", "UTF-8")
+            .stdin(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to spawn pbcopy: {}", e))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(text.as_bytes())
+                .map_err(|e| format!("Failed to write to pbcopy stdin: {}", e))?;
+            drop(stdin);
+        }
+        let status = child
+            .wait()
+            .map_err(|e| format!("Failed to wait for pbcopy: {}", e))?;
+        if !status.success() {
+            return Err("pbcopy exited with non-zero status".to_string());
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_map_update_note_error_maps_query_returned_no_rows_to_note_not_found() {
+        let err = rusqlite::Error::QueryReturnedNoRows;
+        assert_eq!(map_update_note_error(err), "NOTE_NOT_FOUND");
+    }
+
+    #[test]
+    fn test_map_update_note_error_preserves_other_errors() {
+        let err = rusqlite::Error::ExecuteReturnedResults;
+        assert_ne!(map_update_note_error(err), "NOTE_NOT_FOUND");
+    }
+
+    #[test]
+    fn test_database_update_missing_row_mapped_returns_note_not_found() {
+        let temp_dir = std::env::temp_dir().join(format!("raynote_map_test_{}", uuid::Uuid::new_v4()));
+        let db = Database::new(temp_dir.clone()).expect("Failed to initialize test db");
+        let result = db.update_note("missing-id-999", "Title", "Content").map_err(map_update_note_error);
+        assert_eq!(result, Err("NOTE_NOT_FOUND".to_string()));
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_pbcopy_utf8_roundtrip_with_unset_lang_and_lc_all() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let sample = "नमस्ते 😀 你好";
+
+        // Write via pbcopy with LANG and LC_ALL removed, and LC_CTYPE=UTF-8
+        let mut child = Command::new("pbcopy")
+            .env_remove("LANG")
+            .env_remove("LC_ALL")
+            .env("LC_CTYPE", "UTF-8")
+            .stdin(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn pbcopy in test");
+
+        if let Some(mut stdin) = child.stdin.take() {
+            stdin
+                .write_all(sample.as_bytes())
+                .expect("Failed to write to pbcopy stdin");
+            drop(stdin);
+        }
+        let status = child.wait().expect("Failed to wait on pbcopy");
+        assert!(status.success(), "pbcopy failed");
+
+        // Read back via pbpaste with LANG and LC_ALL removed, and LC_CTYPE=UTF-8
+        let output = Command::new("pbpaste")
+            .env_remove("LANG")
+            .env_remove("LC_ALL")
+            .env("LC_CTYPE", "UTF-8")
+            .output()
+            .expect("Failed to run pbpaste");
+
+        assert!(output.status.success(), "pbpaste failed");
+        let result = String::from_utf8(output.stdout).expect("pbpaste output was not valid UTF-8");
+        assert_eq!(result, sample);
+    }
 }

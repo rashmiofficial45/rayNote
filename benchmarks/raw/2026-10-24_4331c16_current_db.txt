@@ -1,0 +1,8 @@
+=========================================================
+  CURRENT TREE (ROUND 3) RUST DATABASE BENCHMARK
+=========================================================
+RUN 1: ColdOpen=50.872 ms | update_note p50=85.0 µs, p95=392.0 µs (min=47.0, max=8757.0) | Search 10q_avg=8.548 ms | KeysetNav=14.36 µs/step
+RUN 2: ColdOpen=46.791 ms | update_note p50=83.0 µs, p95=337.0 µs (min=45.0, max=9856.0) | Search 10q_avg=8.146 ms | KeysetNav=13.86 µs/step
+RUN 3: ColdOpen=43.784 ms | update_note p50=85.0 µs, p95=341.0 µs (min=46.0, max=8899.0) | Search 10q_avg=8.005 ms | KeysetNav=13.47 µs/step
+RUN 4: ColdOpen=43.375 ms | update_note p50=83.0 µs, p95=385.0 µs (min=46.0, max=8274.0) | Search 10q_avg=8.208 ms | KeysetNav=13.94 µs/step
+RUN 5: ColdOpen=64.194 ms | update_note p50=83.0 µs, p95=336.0 µs (min=46.0, max=5664.0) | Search 10q_avg=8.069 ms | KeysetNav=13.88 µs/step

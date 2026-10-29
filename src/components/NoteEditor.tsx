@@ -1,12 +1,17 @@
 import { Editor } from "../editor/Editor";
 import { FileText } from "lucide-react";
+import { SwitchConflictInfo } from "./SwitchConflictModal";
 
 interface NoteEditorProps {
   noteId: string | null;
   content?: string | null;
   noteTitle?: string;
   onSetTitle?: (title: string) => void;
-  onUpdate: (content: string, titleHint?: string) => void;
+  onUpdate: (id: string, content: string, titleHint?: string) => Promise<string | void> | string | void;
+  onRecoverOrphan?: (content: string) => void;
+  onSwitchFailed?: (failedId: string, error: unknown) => void;
+  onSwitchConflict?: (info: SwitchConflictInfo) => void;
+  discardedNoteId?: string | null;
   zoomLevel: number;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
@@ -18,6 +23,10 @@ export function NoteEditor({
   noteTitle,
   onSetTitle,
   onUpdate,
+  onRecoverOrphan,
+  onSwitchFailed,
+  onSwitchConflict,
+  discardedNoteId,
   zoomLevel,
   isFindOpen,
   onCloseFind,
@@ -51,6 +60,10 @@ export function NoteEditor({
         onSetTitle={onSetTitle}
         initialContent={content || ""}
         onUpdate={onUpdate}
+        onRecoverOrphan={onRecoverOrphan}
+        onSwitchFailed={onSwitchFailed}
+        onSwitchConflict={onSwitchConflict}
+        discardedNoteId={discardedNoteId}
         zoomLevel={zoomLevel}
         isFindOpen={isFindOpen}
         onCloseFind={onCloseFind}

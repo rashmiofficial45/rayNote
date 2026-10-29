@@ -395,7 +395,7 @@ body,
 /* ── Title Bar ────────────────────────────────────────── */
 .title-bar {
   display: grid;
-  grid-template-columns: 114px minmax(0, 1fr) 114px;
+  grid-template-columns: minmax(28px, 114px) minmax(0, 1fr) 114px;
   align-items: center;
   height: 52px;
   position: absolute;
@@ -404,6 +404,7 @@ body,
   right: 0;
   z-index: 30;
   padding: 0 16px 0 18px;
+  gap: 10px;
   box-sizing: border-box;
   background: transparent;
   border-bottom: none;
@@ -415,9 +416,9 @@ body,
   cursor: default;
 }
 
-@media (max-width: 360px) {
+@media (min-width: 480px) {
   .title-bar {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: 114px minmax(0, 1fr) 114px;
   }
 }
 
@@ -458,8 +459,6 @@ body,
   );
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 .app-bottom-blend {
@@ -498,8 +497,6 @@ body,
   );
   border-bottom-left-radius: 28px;
   border-bottom-right-radius: 28px;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 /* Block all text selection on double-click */
@@ -515,17 +512,58 @@ body,
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.01em;
-  padding: 0 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 0 4px;
   user-select: none;
   text-align: center;
   pointer-events: none;
   cursor: default;
   min-width: 0;
+  max-width: 100%;
   width: 100%;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  white-space: nowrap !important;
+}
+
+.title-bar .title-text span,
+.title-bar .title-text .title-text-content {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  text-align: center;
+  display: inline-block;
+  pointer-events: auto;
+}
+
+.save-status-indicator {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  user-select: none;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.save-status-indicator.is-saved {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.save-status-indicator.is-saving {
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .title-bar-left {
@@ -533,6 +571,8 @@ body,
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
+  flex-shrink: 0;
+  min-width: 24px;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);
@@ -544,6 +584,8 @@ body,
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
+  flex-shrink: 0 !important;
+  min-width: 114px;
   -webkit-app-region: no-drag;
   opacity: 0;
   pointer-events: none;
@@ -587,8 +629,14 @@ body,
 }
 
 .title-bar-btn {
-  width: 34px;
-  height: 34px;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  aspect-ratio: 1 / 1 !important;
+  flex-shrink: 0 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -747,7 +795,6 @@ body,
 }
 
 .tiptap {
-  transform: translateZ(0);
   outline: none;
   min-height: auto;
   padding-top: 58px;
@@ -896,15 +943,24 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 /* Lists */
-.tiptap ul, .tiptap ol {
-  padding-left: 1.4em;
+.tiptap ul:not([data-type="taskList"]),
+.tiptap ol {
+  padding-left: 0;
   margin: 0.5em 0;
 }
 
-.tiptap ul { list-style-type: disc; }
+.tiptap ul:not([data-type="taskList"]) { list-style-type: disc; }
 .tiptap ol { list-style-type: decimal; }
 
-.tiptap ul li::marker {
+.tiptap ul:not([data-type="taskList"]) li,
+.tiptap ol li {
+  list-style-position: inside;
+  margin-bottom: 0.5em;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+
+.tiptap ul:not([data-type="taskList"]) li::marker {
   color: var(--color-accent);
   font-size: 1.05em;
 }
@@ -912,6 +968,15 @@ html[data-smooth-caret="false"] .tiptap {
 .tiptap ol li::marker {
   color: var(--color-accent);
   font-weight: 600;
+}
+
+/* Nested lists: indent cleanly */
+.tiptap ul:not([data-type="taskList"]) ul,
+.tiptap ul:not([data-type="taskList"]) ol,
+.tiptap ol ul,
+.tiptap ol ol {
+  padding-left: 1.4em;
+  margin: 0.2em 0;
 }
 
 .tiptap li {
@@ -2017,7 +2082,6 @@ body:has(.command-overlay) .editor-char-count {
   flex-direction: column;
   gap: 2px;
   animation: none !important;
-  will-change: transform, opacity;
   contain: content;
 }
 
@@ -2294,7 +2358,6 @@ body:has(.command-overlay) .editor-char-count {
 [data-scroll-container] {
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
-  transform: translateZ(0);
 }
 
 /* Hide native text selection when blocks are selected */
@@ -4988,10 +5051,10 @@ body:has(.command-overlay) .editor-char-count {
   align-items: flex-end;
   justify-content: center;
   z-index: 35;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
-  opacity: 0;
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.65;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Hide default browser scrollbar on the editor text area so only the tick slider is visible */
@@ -5009,8 +5072,8 @@ body:has(.command-overlay) .editor-char-count {
   height: 0 !important;
 }
 
-/* Responsive: only hide on extremely cramped window sizes (< 260px width or < 200px height) */
-@media (max-width: 260px), (max-height: 200px) {
+/* Responsive: only hide on extremely cramped window sizes (< 200px width or < 160px height) */
+@media (max-width: 200px), (max-height: 160px) {
   .doc-tick-slider-wrapper {
     display: none !important;
   }
@@ -5021,13 +5084,13 @@ body:has(.command-overlay) .editor-char-count {
 .editor-wrapper:hover .doc-tick-slider-wrapper,
 .doc-tick-slider-wrapper:hover,
 .doc-tick-slider-wrapper.is-dragging {
-  opacity: 0.8 !important;
+  opacity: 1 !important;
 }
 
 .app-shell:not(:hover):not(.is-cursor-in-page) .doc-tick-slider-wrapper,
 .app-shell.is-idle .doc-tick-slider-wrapper {
-  opacity: 0 !important;
-  pointer-events: none !important;
+  opacity: 0.65 !important;
+  pointer-events: auto !important;
 }
 
 .doc-tick-slider-track {

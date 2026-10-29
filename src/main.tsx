@@ -2,6 +2,11 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { initFrameProbe } from "./lib/frameProbe";
+
+if (import.meta.env.DEV) {
+  initFrameProbe();
+}
 
 const isSettings =
   window.location.search.includes("window=settings") ||
