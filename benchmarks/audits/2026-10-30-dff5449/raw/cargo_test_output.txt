@@ -1,0 +1,46 @@
+running 33 tests
+test database::tests::test_adjacent_note_10k_bench ... ignored
+test database::tests::test_big_note_write_benchmarks ... ignored
+test database::tests::test_condition6_benchmarks ... ignored
+test commands::tests::test_map_update_note_error_maps_query_returned_no_rows_to_note_not_found ... ok
+test commands::tests::test_map_update_note_error_preserves_other_errors ... ok
+test database::tests::test_extract_searchable_text_markdown_and_html ... ok
+test database::tests::test_extract_searchable_text_tiptap_json ... ok
+test commands::tests::test_database_update_missing_row_mapped_returns_note_not_found ... ok
+test database::tests::test_hybrid_search_comparison_and_triggers ... ignored
+test database::tests::test_real_db_search_benchmark ... ignored
+test database::tests::test_create_note_idempotent_no_duplicates ... ok
+test database::tests::test_cache_race_stale_snapshot_not_cached ... ok
+test database::tests::test_database_search_lifecycle ... ok
+test database::tests::test_get_adjacent_note_keyset_navigation ... ok
+test search::tests::test_damerau_levenshtein ... ok
+test search::tests::test_deterministic_ranking ... ok
+test search::tests::test_diacritics_matching_bidirectional ... ok
+test search::tests::test_empty_and_whitespace_query_fallbacks ... ok
+test search::tests::test_normalization ... ok
+test search::tests::test_order_independent_words_in_title ... ok
+test search::tests::test_ranking_exact_title_ranks_first ... ok
+test search::tests::test_ranking_title_prefix_outranks_content_match ... ok
+test search::tests::test_snippet_generation_boundary_conditions ... ok
+test search::tests::test_snippet_multibyte_utf8_boundary ... ok
+test search::tests::test_typo_tolerant_match ... ok
+test search::tests::test_unrelated_query_is_unmatched ... ok
+test database::tests::test_update_note_missing_id_returns_err_and_preserves_cache ... ok
+test database::tests::test_summary_query_uses_covering_index ... ok
+test database::tests::test_update_note_empty_title_preserves_existing_title ... ok
+test database::tests::test_concurrent_updates_integrity ... ok
+test database::tests::test_update_note_returned_timestamp_equals_stored_updated_at ... ok
+test database::tests::test_cache_sort_order_invariants ... ok
+test commands::tests::test_pbcopy_utf8_roundtrip_with_unset_lang_and_lc_all ... ok
+
+test result: ok. 28 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

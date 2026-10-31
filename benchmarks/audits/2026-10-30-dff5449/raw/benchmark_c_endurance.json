@@ -1,0 +1,1180 @@
+{
+  "switch_100": {
+    "count": 100,
+    "elapsedMs": 1830.1423749999958,
+    "latencyPerSwitch": 18.30142374999996,
+    "base": {
+      "timestamp": "2026-10-29T19:46:19.831Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 41.16,
+        "physFootprintMb": 24,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.9,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 65.39,
+        "physFootprintMb": 83,
+        "peakFootprintMb": 100,
+        "cpuPct": 0.6,
+        "threads": 0
+      },
+      "totalFootprintMb": 107
+    },
+    "peak": {
+      "timestamp": "2026-10-29T19:46:21.828Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 53.33,
+        "physFootprintMb": 28,
+        "peakFootprintMb": 28,
+        "cpuPct": 8.8,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 108.03,
+        "physFootprintMb": 140,
+        "peakFootprintMb": 142,
+        "cpuPct": 26.8,
+        "threads": 0
+      },
+      "totalFootprintMb": 168
+    },
+    "settled": {
+      "timestamp": "2026-10-29T19:46:32.002Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 53.75,
+        "physFootprintMb": 27,
+        "peakFootprintMb": 28,
+        "cpuPct": 3.6,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 108.36,
+        "physFootprintMb": 103,
+        "peakFootprintMb": 142,
+        "cpuPct": 2.4,
+        "threads": 0
+      },
+      "totalFootprintMb": 130
+    },
+    "deltaMb": 23
+  },
+  "switch_500": {
+    "count": 500,
+    "elapsedMs": 8984.431291999994,
+    "latencyPerSwitch": 17.96886258399999,
+    "base": {
+      "timestamp": "2026-10-29T19:46:33.342Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 53.81,
+        "physFootprintMb": 27,
+        "peakFootprintMb": 28,
+        "cpuPct": 6.6,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 108.7,
+        "physFootprintMb": 126,
+        "peakFootprintMb": 142,
+        "cpuPct": 4.8,
+        "threads": 0
+      },
+      "totalFootprintMb": 153
+    },
+    "peak": {
+      "timestamp": "2026-10-29T19:46:42.489Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 127.14,
+        "physFootprintMb": 52,
+        "peakFootprintMb": 108,
+        "cpuPct": 3.6,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 425.61,
+        "physFootprintMb": 280,
+        "peakFootprintMb": 512,
+        "cpuPct": 101.1,
+        "threads": 0
+      },
+      "totalFootprintMb": 332
+    },
+    "settled": {
+      "timestamp": "2026-10-29T19:46:52.677Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 126.63,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 108,
+        "cpuPct": 19,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 464.8,
+        "physFootprintMb": 384,
+        "peakFootprintMb": 512,
+        "cpuPct": 93.7,
+        "threads": 0
+      },
+      "totalFootprintMb": 439
+    },
+    "deltaMb": 286
+  },
+  "switch_1000": {
+    "count": 1000,
+    "elapsedMs": 17830.810333,
+    "latencyPerSwitch": 17.830810333000002,
+    "base": {
+      "timestamp": "2026-10-29T19:46:54.026Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 128.34,
+        "physFootprintMb": 54,
+        "peakFootprintMb": 108,
+        "cpuPct": 41.9,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 466.39,
+        "physFootprintMb": 344,
+        "peakFootprintMb": 512,
+        "cpuPct": 95.7,
+        "threads": 0
+      },
+      "totalFootprintMb": 398
+    },
+    "peak": {
+      "timestamp": "2026-10-29T19:47:12.027Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 132.63,
+        "physFootprintMb": 141,
+        "peakFootprintMb": 149,
+        "cpuPct": 0.6,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 547.88,
+        "physFootprintMb": 277,
+        "peakFootprintMb": 526,
+        "cpuPct": 99.1,
+        "threads": 0
+      },
+      "totalFootprintMb": 418
+    },
+    "settled": {
+      "timestamp": "2026-10-29T19:47:22.197Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 108.19,
+        "physFootprintMb": 140,
+        "peakFootprintMb": 149,
+        "cpuPct": 0.9,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 564.23,
+        "physFootprintMb": 266,
+        "peakFootprintMb": 526,
+        "cpuPct": 99.8,
+        "threads": 0
+      },
+      "totalFootprintMb": 406
+    },
+    "deltaMb": 8
+  },
+  "enduranceRuns": [
+    {
+      "rep": 1,
+      "base": {
+        "timestamp": "2026-10-29T19:47:29.031Z",
+        "tauri": {
+          "pid": 53949,
+          "rssMb": 111.13,
+          "physFootprintMb": 28,
+          "peakFootprintMb": 30,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 53954,
+          "rssMb": 195.66,
+          "physFootprintMb": 144,
+          "peakFootprintMb": 197,
+          "cpuPct": 0.7,
+          "threads": 0
+        },
+        "totalFootprintMb": 172
+      },
+      "milestones": [
+        {
+          "timestamp": "2026-10-29T19:47:29.031Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 111.13,
+            "physFootprintMb": 28,
+            "peakFootprintMb": 30,
+            "cpuPct": 0.5,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 195.66,
+            "physFootprintMb": 144,
+            "peakFootprintMb": 197,
+            "cpuPct": 0.7,
+            "threads": 0
+          },
+          "totalFootprintMb": 172
+        },
+        {
+          "timestamp": "2026-10-29T19:47:33.367Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 145.13,
+            "physFootprintMb": 81,
+            "peakFootprintMb": 100,
+            "cpuPct": 0.4,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 699.3,
+            "physFootprintMb": 580,
+            "peakFootprintMb": 603,
+            "cpuPct": 99.9,
+            "threads": 0
+          },
+          "totalFootprintMb": 661
+        },
+        {
+          "timestamp": "2026-10-29T19:47:37.700Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 145.67,
+            "physFootprintMb": 82,
+            "peakFootprintMb": 100,
+            "cpuPct": 0.4,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 705.47,
+            "physFootprintMb": 647,
+            "peakFootprintMb": 647,
+            "cpuPct": 100,
+            "threads": 0
+          },
+          "totalFootprintMb": 729
+        },
+        {
+          "timestamp": "2026-10-29T19:47:42.049Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 147.11,
+            "physFootprintMb": 83,
+            "peakFootprintMb": 100,
+            "cpuPct": 1.7,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 802.14,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 100.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 809
+        },
+        {
+          "timestamp": "2026-10-29T19:47:46.478Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 148.27,
+            "physFootprintMb": 84,
+            "peakFootprintMb": 100,
+            "cpuPct": 1.7,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 802.19,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 98.5,
+            "threads": 0
+          },
+          "totalFootprintMb": 810
+        },
+        {
+          "timestamp": "2026-10-29T19:47:50.883Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 149.55,
+            "physFootprintMb": 85,
+            "peakFootprintMb": 100,
+            "cpuPct": 1.8,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 798.3,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 100.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 811
+        },
+        {
+          "timestamp": "2026-10-29T19:47:55.264Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 151.06,
+            "physFootprintMb": 86,
+            "peakFootprintMb": 100,
+            "cpuPct": 2.3,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 729.86,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 99.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 812
+        },
+        {
+          "timestamp": "2026-10-29T19:47:59.653Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 152.27,
+            "physFootprintMb": 88,
+            "peakFootprintMb": 100,
+            "cpuPct": 2.5,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 648.8,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 99.8,
+            "threads": 0
+          },
+          "totalFootprintMb": 814
+        },
+        {
+          "timestamp": "2026-10-29T19:48:04.035Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 152.05,
+            "physFootprintMb": 89,
+            "peakFootprintMb": 100,
+            "cpuPct": 1.5,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 647.92,
+            "physFootprintMb": 726,
+            "peakFootprintMb": 771,
+            "cpuPct": 96.2,
+            "threads": 0
+          },
+          "totalFootprintMb": 815
+        },
+        {
+          "timestamp": "2026-10-29T19:48:08.438Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 108.34,
+            "physFootprintMb": 91,
+            "peakFootprintMb": 100,
+            "cpuPct": 1.5,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 515.75,
+            "physFootprintMb": 754,
+            "peakFootprintMb": 771,
+            "cpuPct": 100.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 845
+        },
+        {
+          "timestamp": "2026-10-29T19:48:12.807Z",
+          "tauri": {
+            "pid": 53949,
+            "rssMb": 108.75,
+            "physFootprintMb": 92,
+            "peakFootprintMb": 100,
+            "cpuPct": 2.8,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 53954,
+            "rssMb": 516.73,
+            "physFootprintMb": 749,
+            "peakFootprintMb": 771,
+            "cpuPct": 100.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 841
+        }
+      ],
+      "peak": {
+        "timestamp": "2026-10-29T19:48:08.438Z",
+        "tauri": {
+          "pid": 53949,
+          "rssMb": 108.34,
+          "physFootprintMb": 91,
+          "peakFootprintMb": 100,
+          "cpuPct": 1.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 53954,
+          "rssMb": 515.75,
+          "physFootprintMb": 754,
+          "peakFootprintMb": 771,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 845
+      },
+      "settled10s": {
+        "timestamp": "2026-10-29T19:48:22.978Z",
+        "tauri": {
+          "pid": 53949,
+          "rssMb": 81.39,
+          "physFootprintMb": 92,
+          "peakFootprintMb": 100,
+          "cpuPct": 6,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 53954,
+          "rssMb": 227.59,
+          "physFootprintMb": 749,
+          "peakFootprintMb": 771,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 841
+      },
+      "settled30s": {
+        "timestamp": "2026-10-29T19:48:43.142Z",
+        "tauri": {
+          "pid": 53949,
+          "rssMb": 70.41,
+          "physFootprintMb": 92,
+          "peakFootprintMb": 100,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 53954,
+          "rssMb": 591.17,
+          "physFootprintMb": 756,
+          "peakFootprintMb": 771,
+          "cpuPct": 99.8,
+          "threads": 0
+        },
+        "totalFootprintMb": 848
+      },
+      "settled60s": {
+        "timestamp": "2026-10-29T19:49:13.308Z",
+        "tauri": {
+          "pid": 53949,
+          "rssMb": 166.5,
+          "physFootprintMb": 62,
+          "peakFootprintMb": 258,
+          "cpuPct": 0.3,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 53954,
+          "rssMb": 681.72,
+          "physFootprintMb": 229,
+          "peakFootprintMb": 973,
+          "cpuPct": 104.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 291
+      },
+      "netDelta": 119
+    },
+    {
+      "rep": 2,
+      "base": {
+        "timestamp": "2026-10-29T19:49:20.160Z",
+        "tauri": {
+          "pid": 54928,
+          "rssMb": 108.03,
+          "physFootprintMb": 28,
+          "peakFootprintMb": 31,
+          "cpuPct": 0.3,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 54932,
+          "rssMb": 119.36,
+          "physFootprintMb": 95,
+          "peakFootprintMb": 135,
+          "cpuPct": 0.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 123
+      },
+      "milestones": [
+        {
+          "timestamp": "2026-10-29T19:49:20.160Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 108.03,
+            "physFootprintMb": 28,
+            "peakFootprintMb": 31,
+            "cpuPct": 0.3,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 119.36,
+            "physFootprintMb": 95,
+            "peakFootprintMb": 135,
+            "cpuPct": 0.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 123
+        },
+        {
+          "timestamp": "2026-10-29T19:49:24.532Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 204.97,
+            "physFootprintMb": 49,
+            "peakFootprintMb": 106,
+            "cpuPct": 29.1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 451.03,
+            "physFootprintMb": 385,
+            "peakFootprintMb": 528,
+            "cpuPct": 105,
+            "threads": 0
+          },
+          "totalFootprintMb": 434
+        },
+        {
+          "timestamp": "2026-10-29T19:49:28.916Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 240.72,
+            "physFootprintMb": 121,
+            "peakFootprintMb": 145,
+            "cpuPct": 2.1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 596.34,
+            "physFootprintMb": 268,
+            "peakFootprintMb": 528,
+            "cpuPct": 105.8,
+            "threads": 0
+          },
+          "totalFootprintMb": 389
+        },
+        {
+          "timestamp": "2026-10-29T19:49:33.288Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 264.27,
+            "physFootprintMb": 143,
+            "peakFootprintMb": 153,
+            "cpuPct": 3.6,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 513.56,
+            "physFootprintMb": 255,
+            "peakFootprintMb": 528,
+            "cpuPct": 118.6,
+            "threads": 0
+          },
+          "totalFootprintMb": 398
+        },
+        {
+          "timestamp": "2026-10-29T19:49:37.668Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 239.89,
+            "physFootprintMb": 146,
+            "peakFootprintMb": 153,
+            "cpuPct": 8.9,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 481.72,
+            "physFootprintMb": 279,
+            "peakFootprintMb": 528,
+            "cpuPct": 107.9,
+            "threads": 0
+          },
+          "totalFootprintMb": 425
+        },
+        {
+          "timestamp": "2026-10-29T19:49:42.060Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 225.3,
+            "physFootprintMb": 51,
+            "peakFootprintMb": 161,
+            "cpuPct": 45.9,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 505.97,
+            "physFootprintMb": 282,
+            "peakFootprintMb": 528,
+            "cpuPct": 97.6,
+            "threads": 0
+          },
+          "totalFootprintMb": 333
+        },
+        {
+          "timestamp": "2026-10-29T19:49:46.447Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 266.81,
+            "physFootprintMb": 132,
+            "peakFootprintMb": 161,
+            "cpuPct": 12,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 582.14,
+            "physFootprintMb": 337,
+            "peakFootprintMb": 531,
+            "cpuPct": 99.6,
+            "threads": 0
+          },
+          "totalFootprintMb": 469
+        },
+        {
+          "timestamp": "2026-10-29T19:49:50.810Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 262.84,
+            "physFootprintMb": 195,
+            "peakFootprintMb": 205,
+            "cpuPct": 7.9,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 555.94,
+            "physFootprintMb": 249,
+            "peakFootprintMb": 531,
+            "cpuPct": 101.8,
+            "threads": 0
+          },
+          "totalFootprintMb": 444
+        },
+        {
+          "timestamp": "2026-10-29T19:49:55.194Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 280.67,
+            "physFootprintMb": 214,
+            "peakFootprintMb": 264,
+            "cpuPct": 4.1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 578.55,
+            "physFootprintMb": 303,
+            "peakFootprintMb": 531,
+            "cpuPct": 104.6,
+            "threads": 0
+          },
+          "totalFootprintMb": 517
+        },
+        {
+          "timestamp": "2026-10-29T19:49:59.539Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 281.2,
+            "physFootprintMb": 213,
+            "peakFootprintMb": 264,
+            "cpuPct": 1.6,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 583.25,
+            "physFootprintMb": 226,
+            "peakFootprintMb": 531,
+            "cpuPct": 103.3,
+            "threads": 0
+          },
+          "totalFootprintMb": 439
+        },
+        {
+          "timestamp": "2026-10-29T19:50:03.918Z",
+          "tauri": {
+            "pid": 54928,
+            "rssMb": 270.84,
+            "physFootprintMb": 215,
+            "peakFootprintMb": 264,
+            "cpuPct": 1.3,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 54932,
+            "rssMb": 556.31,
+            "physFootprintMb": 224,
+            "peakFootprintMb": 531,
+            "cpuPct": 105.2,
+            "threads": 0
+          },
+          "totalFootprintMb": 439
+        }
+      ],
+      "peak": {
+        "timestamp": "2026-10-29T19:49:55.194Z",
+        "tauri": {
+          "pid": 54928,
+          "rssMb": 280.67,
+          "physFootprintMb": 214,
+          "peakFootprintMb": 264,
+          "cpuPct": 4.1,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 54932,
+          "rssMb": 578.55,
+          "physFootprintMb": 303,
+          "peakFootprintMb": 531,
+          "cpuPct": 104.6,
+          "threads": 0
+        },
+        "totalFootprintMb": 517
+      },
+      "settled10s": {
+        "timestamp": "2026-10-29T19:50:14.089Z",
+        "tauri": {
+          "pid": 54928,
+          "rssMb": 270.16,
+          "physFootprintMb": 215,
+          "peakFootprintMb": 264,
+          "cpuPct": 0.1,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 54932,
+          "rssMb": 544.3,
+          "physFootprintMb": 214,
+          "peakFootprintMb": 531,
+          "cpuPct": 101.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 429
+      },
+      "settled30s": {
+        "timestamp": "2026-10-29T19:50:34.259Z",
+        "tauri": {
+          "pid": 54928,
+          "rssMb": 266.39,
+          "physFootprintMb": 215,
+          "peakFootprintMb": 264,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 54932,
+          "rssMb": 531.3,
+          "physFootprintMb": 215,
+          "peakFootprintMb": 531,
+          "cpuPct": 102.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 430
+      },
+      "settled60s": {
+        "timestamp": "2026-10-29T19:51:04.448Z",
+        "tauri": {
+          "pid": 54928,
+          "rssMb": 287.67,
+          "physFootprintMb": 254,
+          "peakFootprintMb": 264,
+          "cpuPct": 25.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 54932,
+          "rssMb": 592.22,
+          "physFootprintMb": 336,
+          "peakFootprintMb": 531,
+          "cpuPct": 99.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 590
+      },
+      "netDelta": 467
+    },
+    {
+      "rep": 3,
+      "base": {
+        "timestamp": "2026-10-29T19:51:10.831Z",
+        "tauri": {
+          "pid": 55900,
+          "rssMb": 112.94,
+          "physFootprintMb": 30,
+          "peakFootprintMb": 32,
+          "cpuPct": 0.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 55904,
+          "rssMb": 190.72,
+          "physFootprintMb": 140,
+          "peakFootprintMb": 187,
+          "cpuPct": 0.9,
+          "threads": 0
+        },
+        "totalFootprintMb": 170
+      },
+      "milestones": [
+        {
+          "timestamp": "2026-10-29T19:51:10.831Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 112.94,
+            "physFootprintMb": 30,
+            "peakFootprintMb": 32,
+            "cpuPct": 0.7,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 190.72,
+            "physFootprintMb": 140,
+            "peakFootprintMb": 187,
+            "cpuPct": 0.9,
+            "threads": 0
+          },
+          "totalFootprintMb": 170
+        },
+        {
+          "timestamp": "2026-10-29T19:51:15.189Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 202.34,
+            "physFootprintMb": 118,
+            "peakFootprintMb": 125,
+            "cpuPct": 0.6,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 475.72,
+            "physFootprintMb": 170,
+            "peakFootprintMb": 329,
+            "cpuPct": 99.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 288
+        },
+        {
+          "timestamp": "2026-10-29T19:51:19.583Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 203.06,
+            "physFootprintMb": 118,
+            "peakFootprintMb": 125,
+            "cpuPct": 1.1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 511.44,
+            "physFootprintMb": 184,
+            "peakFootprintMb": 329,
+            "cpuPct": 104.6,
+            "threads": 0
+          },
+          "totalFootprintMb": 302
+        },
+        {
+          "timestamp": "2026-10-29T19:51:23.935Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 204.34,
+            "physFootprintMb": 118,
+            "peakFootprintMb": 125,
+            "cpuPct": 1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 515.03,
+            "physFootprintMb": 167,
+            "peakFootprintMb": 329,
+            "cpuPct": 104.1,
+            "threads": 0
+          },
+          "totalFootprintMb": 285
+        },
+        {
+          "timestamp": "2026-10-29T19:51:28.342Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 205.47,
+            "physFootprintMb": 120,
+            "peakFootprintMb": 125,
+            "cpuPct": 1.1,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 515.11,
+            "physFootprintMb": 161,
+            "peakFootprintMb": 329,
+            "cpuPct": 100.7,
+            "threads": 0
+          },
+          "totalFootprintMb": 281
+        },
+        {
+          "timestamp": "2026-10-29T19:51:32.741Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 244.92,
+            "physFootprintMb": 162,
+            "peakFootprintMb": 172,
+            "cpuPct": 14,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 509.81,
+            "physFootprintMb": 253,
+            "peakFootprintMb": 329,
+            "cpuPct": 106.4,
+            "threads": 0
+          },
+          "totalFootprintMb": 415
+        },
+        {
+          "timestamp": "2026-10-29T19:51:37.064Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 205.34,
+            "physFootprintMb": 58,
+            "peakFootprintMb": 244,
+            "cpuPct": 23.2,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 555.86,
+            "physFootprintMb": 397,
+            "peakFootprintMb": 534,
+            "cpuPct": 105.9,
+            "threads": 0
+          },
+          "totalFootprintMb": 455
+        },
+        {
+          "timestamp": "2026-10-29T19:51:41.454Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 224.14,
+            "physFootprintMb": 139,
+            "peakFootprintMb": 244,
+            "cpuPct": 5.3,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 630.23,
+            "physFootprintMb": 245,
+            "peakFootprintMb": 534,
+            "cpuPct": 104.9,
+            "threads": 0
+          },
+          "totalFootprintMb": 384
+        },
+        {
+          "timestamp": "2026-10-29T19:51:45.843Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 239.02,
+            "physFootprintMb": 140,
+            "peakFootprintMb": 244,
+            "cpuPct": 18,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 549.64,
+            "physFootprintMb": 235,
+            "peakFootprintMb": 534,
+            "cpuPct": 104.7,
+            "threads": 0
+          },
+          "totalFootprintMb": 375
+        },
+        {
+          "timestamp": "2026-10-29T19:51:50.295Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 200.03,
+            "physFootprintMb": 141,
+            "peakFootprintMb": 244,
+            "cpuPct": 19,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 553.89,
+            "physFootprintMb": 302,
+            "peakFootprintMb": 534,
+            "cpuPct": 104.3,
+            "threads": 0
+          },
+          "totalFootprintMb": 443
+        },
+        {
+          "timestamp": "2026-10-29T19:51:54.687Z",
+          "tauri": {
+            "pid": 55900,
+            "rssMb": 245.14,
+            "physFootprintMb": 142,
+            "peakFootprintMb": 244,
+            "cpuPct": 3.3,
+            "threads": 0
+          },
+          "webKit": {
+            "pid": 55904,
+            "rssMb": 612.97,
+            "physFootprintMb": 316,
+            "peakFootprintMb": 534,
+            "cpuPct": 101.4,
+            "threads": 0
+          },
+          "totalFootprintMb": 458
+        }
+      ],
+      "peak": {
+        "timestamp": "2026-10-29T19:51:54.687Z",
+        "tauri": {
+          "pid": 55900,
+          "rssMb": 245.14,
+          "physFootprintMb": 142,
+          "peakFootprintMb": 244,
+          "cpuPct": 3.3,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 55904,
+          "rssMb": 612.97,
+          "physFootprintMb": 316,
+          "peakFootprintMb": 534,
+          "cpuPct": 101.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 458
+      },
+      "settled10s": {
+        "timestamp": "2026-10-29T19:52:04.855Z",
+        "tauri": {
+          "pid": 55900,
+          "rssMb": 234.36,
+          "physFootprintMb": 168,
+          "peakFootprintMb": 244,
+          "cpuPct": 0,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 55904,
+          "rssMb": 625.5,
+          "physFootprintMb": 657,
+          "peakFootprintMb": 667,
+          "cpuPct": 99.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 825
+      },
+      "settled30s": {
+        "timestamp": "2026-10-29T19:52:25.031Z",
+        "tauri": {
+          "pid": 55900,
+          "rssMb": 221.39,
+          "physFootprintMb": 275,
+          "peakFootprintMb": 285,
+          "cpuPct": 0,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 55904,
+          "rssMb": 1128.53,
+          "physFootprintMb": 500,
+          "peakFootprintMb": 923,
+          "cpuPct": 100,
+          "threads": 0
+        },
+        "totalFootprintMb": 775
+      },
+      "settled60s": {
+        "timestamp": "2026-10-29T19:52:55.206Z",
+        "tauri": {
+          "pid": 55900,
+          "rssMb": 193.78,
+          "physFootprintMb": 103,
+          "peakFootprintMb": 328,
+          "cpuPct": 0,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 55904,
+          "rssMb": 1001.7,
+          "physFootprintMb": 252,
+          "peakFootprintMb": 929,
+          "cpuPct": 99.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 355
+      },
+      "netDelta": 185
+    }
+  ]
+}

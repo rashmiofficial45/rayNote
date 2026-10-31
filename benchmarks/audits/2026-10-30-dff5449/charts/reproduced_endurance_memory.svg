@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 740 380" width="100%" height="100%" style="background:#0d1117; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <rect width="100%" height="100%" fill="#0d1117" rx="8"/>
+  <text x="370" y="32" fill="#f0f6fc" font-size="17" font-weight="600" text-anchor="middle">Reproduced 2,000-Switch Memory Trajectory (Complete Time Series)</text>
+  <text x="370" y="50" fill="#8b949e" font-size="11" text-anchor="middle">Full Physical Footprint (Native + WebKit) across 2,000 Ops and 60s Cooldown</text>
+  
+  <!-- Y Grid -->
+  <line x1="70" y1="60" x2="690" y2="60" stroke="#30363d" stroke-dasharray="4"/>
+  <text x="60" y="65" fill="#8b949e" font-size="10" text-anchor="end">1200 MB</text>
+
+  <line x1="70" y1="120" x2="690" y2="120" stroke="#30363d" stroke-dasharray="4"/>
+  <text x="60" y="125" fill="#8b949e" font-size="10" text-anchor="end">900 MB</text>
+
+  <line x1="70" y1="180" x2="690" y2="180" stroke="#30363d" stroke-dasharray="4"/>
+  <text x="60" y="185" fill="#8b949e" font-size="10" text-anchor="end">600 MB</text>
+
+  <line x1="70" y1="240" x2="690" y2="240" stroke="#30363d" stroke-dasharray="4"/>
+  <text x="60" y="245" fill="#8b949e" font-size="10" text-anchor="end">300 MB</text>
+
+  <line x1="70" y1="300" x2="690" y2="300" stroke="#8b949e"/>
+  <text x="60" y="305" fill="#8b949e" font-size="10" text-anchor="end">0 MB</text>
+
+  <!-- Cooldown divider line -->
+  <line x1="531.5384615384615" y1="60" x2="531.5384615384615" y2="300" stroke="#f85149" stroke-dasharray="2" stroke-width="1.5"/>
+  <text x="536.5384615384615" y="75" fill="#f85149" font-size="10">End of Workload (Cooldown begins)</text>
+
+  <!-- X Labels -->
+  <text x="70" y="320" fill="#8b949e" font-size="10" text-anchor="middle">0</text><text x="116.15384615384616" y="320" fill="#8b949e" font-size="10" text-anchor="middle">200</text><text x="162.30769230769232" y="320" fill="#8b949e" font-size="10" text-anchor="middle">400</text><text x="208.46153846153848" y="320" fill="#8b949e" font-size="10" text-anchor="middle">600</text><text x="254.6153846153846" y="320" fill="#8b949e" font-size="10" text-anchor="middle">800</text><text x="300.7692307692308" y="320" fill="#8b949e" font-size="10" text-anchor="middle">1k</text><text x="346.92307692307696" y="320" fill="#8b949e" font-size="10" text-anchor="middle">1.2k</text><text x="393.07692307692304" y="320" fill="#8b949e" font-size="10" text-anchor="middle">1.4k</text><text x="439.2307692307692" y="320" fill="#8b949e" font-size="10" text-anchor="middle">1.6k</text><text x="485.38461538461536" y="320" fill="#8b949e" font-size="10" text-anchor="middle">1.8k</text><text x="531.5384615384615" y="320" fill="#8b949e" font-size="10" text-anchor="middle">2k</text><text x="577.6923076923076" y="320" fill="#8b949e" font-size="10" text-anchor="middle">+10s</text><text x="623.8461538461539" y="320" fill="#8b949e" font-size="10" text-anchor="middle">+30s</text><text x="670" y="320" fill="#8b949e" font-size="10" text-anchor="middle">+60s</text>
+  <text x="370" y="338" fill="#8b949e" font-size="11" text-anchor="middle">Operations Completed &amp; Post-Workload Cooldown Intervals</text>
+
+  <!-- Run Lines -->
+  <polyline fill="none" stroke="#58a6ff" stroke-width="2.5" points="70,272.6 116.15384615384616,205 162.30769230769232,238.6 208.46153846153848,154.6 254.6153846153846,139.4 300.7692307692308,118.20000000000002 346.92307692307696,118 393.07692307692304,118 439.2307692307692,116.6 485.38461538461536,116.4 531.5384615384615,116.19999999999999 577.6923076923076,115.19999999999999 623.8461538461539,223.4 670,234.6"/>
+  <polyline fill="none" stroke="#bc8cff" stroke-width="2.5" points="70,268 116.15384615384616,244.4 162.30769230769232,222.4 208.46153846153848,171.39999999999998 254.6153846153846,159.8 300.7692307692308,132.2 346.92307692307696,133.6 393.07692307692304,133.20000000000002 439.2307692307692,133 485.38461538461536,132.4 531.5384615384615,132.2 577.6923076923076,132.4 623.8461538461539,95 670,99.60000000000002"/>
+  <polyline fill="none" stroke="#e3b341" stroke-width="2.5" points="70,156 116.15384615384616,148.6 162.30769230769232,145.6 208.46153846153848,142 254.6153846153846,120.20000000000002 300.7692307692308,110.80000000000001 346.92307692307696,86.6 393.07692307692304,98.19999999999999 439.2307692307692,102.80000000000001 485.38461538461536,102.4 531.5384615384615,102.19999999999999 577.6923076923076,102.4 623.8461538461539,102.6 670,246"/>
+
+  <!-- Legend -->
+  <line x1="130" y1="360" x2="160" y2="360" stroke="#58a6ff" stroke-width="2.5"/>
+  <text x="165" y="364" fill="#c9d1d9" font-size="11">Run 1: Peak 924 MB (at +10s) | Settled: 327 MB</text>
+
+  <line x1="430" y1="360" x2="460" y2="360" stroke="#bc8cff" stroke-width="2.5"/>
+  <text x="465" y="364" fill="#c9d1d9" font-size="11">Run 2: Peak 1025 MB (at +30s) | Settled: 1002 MB</text>
+</svg>

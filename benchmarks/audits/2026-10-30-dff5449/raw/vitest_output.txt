@@ -1,0 +1,196 @@
+RUN  v5.0.3 /Users/rashmipersonal/Desktop/MAC Apps/rayNote
+
+stdout | src/editor/__tests__/markdownSerialization.test.ts > Markdown Serialization & Clipboard Utilities (Test C) > Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) > serializes realistic 100 KB fixture with headings, marks, code, emoji, and Devanagari (5 runs)
+[MEASURED: Node/V8 performance.now(), 100 KB Realistic Doc (5 runs, run 1 discarded)]: median=11.792 ms (min=9.378 ms, max=20.892 ms) | raw runs: 44.180, 13.434, 20.892, 10.151, 9.378 ms
+
+stdout | src/editor/__tests__/transactionAudit.test.ts > Transaction Audit: Extension Decorations & 1 MB Note Keystroke Profiling > verifies Placeholder with showOnlyCurrent: true does not traverse 1 MB blocks on keystroke
+[MEASURED: Vitest/Node performance.now(), development, 50 keystrokes]: Placeholder per-keystroke = 1.863 ms
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > does not update lastSavedDocRef when DB write rejects, and next flush still saves
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=test-note-1)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Real App onUpdate handler wiring propagates rejecting invoke and retries dirty state on next flush
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=real-app-note-1)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > (a) edits made while a save is in flight are saved after it resolves
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=flight-note)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Real App wiring (invoke mocked, no mocked onUpdate): type in note 1, hold first update_note pending, type more, switch to note 2, resolve - all note 1 text saves to note-1 and never note-2
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-1)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > (b) the exit flush waits for the in-flight save AND the follow-up
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=exit-note)
+
+ ✓ src/components/__tests__/bottomToolbar.test.tsx (8 tests) 360ms
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > continuous typing during a slow save does not recurse without bound and coalesces into a single follow-up save
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=continuous-note)
+
+stdout | src/editor/__tests__/transactionAudit.test.ts > Transaction Audit: Extension Decorations & 1 MB Note Keystroke Profiling > profiles 1 MB note with vs without CodeBlockLowlight to measure findChildren iteration cost
+[MEASURED: Vitest/Node performance.now(), development, 30 keystrokes on 2,000 paragraphs]: Without Lowlight = 3.627 ms/keystroke | With Lowlight = 4.920 ms/keystroke | Overhead = 1.293 ms
+
+ ✓ src/editor/__tests__/transactionAudit.test.ts (2 tests) 947ms
+   ✓ Transaction Audit: Extension Decorations & 1 MB Note Keystroke Profiling (2)
+     ✓ verifies Placeholder with showOnlyCurrent: true does not traverse 1 MB blocks on keystroke 368ms
+     ✓ profiles 1 MB note with vs without CodeBlockLowlight to measure findChildren iteration cost 578ms
+stdout | src/editor/__tests__/phase4TypingPath.test.tsx > Phase 4: Typing Path Optimizations & Format Menu State > Data Safety & Persistence Guarantees (Mounted Real Editor Component) > blur within 50ms of typing saves the latest text
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-test-blur)
+
+stdout | src/editor/__tests__/phase4TypingPath.test.tsx > Phase 4: Typing Path Optimizations & Format Menu State > Data Safety & Persistence Guarantees (Mounted Real Editor Component) > continuous typing for 5+ seconds triggers save at the 5000ms max-wait bound
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-test-maxwait)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Real App wiring (invoke mocked, no mocked onUpdate): type in note 1, hold first update_note pending, type more, switch to note 2, resolve - all note 1 text saves to note-1 and never note-2
+[performSwitch lock duration] 50.000 ms (prevId=note-1, nextId=note-2)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > type A (save starts and hangs), type B, switch notes, resolve first save, assert note 1 final saved content contains AB
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-switch-1)
+
+ ✓ src/editor/__tests__/formattingAndShortcuts.test.ts (31 tests) 440ms
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > type A (save starts and hangs), type B, switch notes, resolve first save, assert note 1 final saved content contains AB
+[performSwitch lock duration] 50.000 ms (prevId=note-switch-1, nextId=note-switch-2)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > View without editing: switching through notes without typing makes 0 update_note calls and preserves updated_at and recents order
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-1)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > rapid note switch without save errors does NOT trigger onSwitchConflict
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=switch-test-1)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > View without editing: switching through notes without typing makes 0 update_note calls and preserves updated_at and recents order
+[performSwitch lock duration] 0.000 ms (prevId=note-1, nextId=note-2)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > rapid note switch without save errors does NOT trigger onSwitchConflict
+[performSwitch lock duration] 0.000 ms (prevId=switch-test-1, nextId=switch-test-2)
+
+stdout | src/editor/__tests__/phase4TypingPath.test.tsx > Phase 4: Typing Path Optimizations & Format Menu State > Data Safety & Persistence Guarantees (Mounted Real Editor Component) > switching notes mid-debounce saves the OLD note under the OLD id
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-A)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > View without editing: switching through notes without typing makes 0 update_note calls and preserves updated_at and recents order
+[performSwitch lock duration] 0.000 ms (prevId=note-2, nextId=note-1)
+
+stdout | src/editor/__tests__/phase4TypingPath.test.tsx > Phase 4: Typing Path Optimizations & Format Menu State > Data Safety & Persistence Guarantees (Mounted Real Editor Component) > switching notes mid-debounce saves the OLD note under the OLD id
+[performSwitch lock duration] 0.000 ms (prevId=note-A, nextId=note-B)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > forced save failure during note switch triggers onSwitchConflict escape hatch
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=switch-fail-1)
+
+stdout | src/editor/__tests__/phase4TypingPath.test.tsx > Phase 4: Typing Path Optimizations & Format Menu State > Data Safety & Persistence Guarantees (Mounted Real Editor Component) > panel-will-hide flushes editor and title
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-panel-hide)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Orphan snapshot on boot: unsaved snapshot for missing note creates new note, switches to it, and clears dead snapshot
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=recovered-fresh-note-id)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > forced save failure during note switch triggers onSwitchConflict escape hatch
+[performSwitch lock duration] 0.000 ms (prevId=switch-fail-1, nextId=switch-fail-2)
+
+ ✓ src/editor/__tests__/phase4TypingPath.test.tsx (14 tests) 532ms
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > when NOTE_NOT_FOUND recovery fails, keeps dirty state, keeps snapshot, and opens conflict modal
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=missing-1)
+
+stdout | src/editor/__tests__/savePathRejection.test.tsx > Save Path Rejection Recovery & lastSavedDocRef Invariants > when NOTE_NOT_FOUND recovery fails, keeps dirty state, keeps snapshot, and opens conflict modal
+[performSwitch lock duration] 0.000 ms (prevId=missing-1, nextId=target-2)
+
+ ✓ src/editor/__tests__/savePathRejection.test.tsx (8 tests) 567ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 1 & 2: performSwitch unlocks editor in finally even if save throws, staying on current note with visible toast, and setEditable with emitUpdate=false never marks note dirty
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-1)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 1 & 2: performSwitch unlocks editor in finally even if save throws, staying on current note with visible toast, and setEditable with emitUpdate=false never marks note dirty
+[performSwitch lock duration] 0.000 ms (prevId=note-1, nextId=note-2)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 4: doc.eq() structural comparison prevents update_note when opening note with table and code block and switching away
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-complex)
+
+ ✓ src/lib/__tests__/saveQueue.test.ts (7 tests) 187ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 4: doc.eq() structural comparison prevents update_note when opening note with table and code block and switching away
+[performSwitch lock duration] 0.000 ms (prevId=note-complex, nextId=note-other)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 6 & 7: Missing-row error (Query returned no rows) routes to orphan recovery with toast, adhering to strict crash-safe order
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-deleted-remote)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 6 & 7: Missing-row error (Query returned no rows) routes to orphan recovery with toast, adhering to strict crash-safe order
+[performSwitch lock duration] 0.000 ms (prevId=note-deleted-remote, nextId=recovered-new-note-id)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 8: Auto-title-on-paste sets title through id-aware handleUpdateNote without legacy timers
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-paste-target)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 2: Switch-failure trap: presents choices modal ('Save as new note', 'Copy text', 'Discard and switch') and does not trap user
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-failing-1)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 2 & 4: NOTE_NOT_FOUND missing-row error inside switch path routes directly to orphan recovery
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-remote-deleted)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 2 & 4: NOTE_NOT_FOUND missing-row error inside switch path routes directly to orphan recovery
+[performSwitch lock duration] 0.000 ms (prevId=note-remote-deleted, nextId=new-orphan-note-id)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Autosave NOTE_NOT_FOUND recovery failure: keeps note dirty, keeps snapshot, and displays Not saved pill in TitleBar
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-autosave-missing)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 3: Persistent unsaved indicator appears when circuit breaker trips (>= 5 failures), stays across edits, and clears on resolve
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-circuit-breaker)
+
+ ✓ src/components/__tests__/commandPaletteNotesSearch.test.tsx (2 tests) 160ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 5: Idempotent duplicate recovery: does NOT create duplicate note if recovered note row already exists in SQLite before boot
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=already-created-recovery-note-id)
+
+ ✓ src/lib/__tests__/dictation.test.ts (17 tests) 164ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 6: Lock duration instrumentation: measures performSwitch duration with performance.now() on 100 KB note and unlocks in finally
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-large-100k)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 1: Title wipe check: paste-title, type text, save, reload - title persists in list, SQLite, and title bar
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-title-wipe-1)
+
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 1: Title wipe check: paste-title, type text, save, reload - title persists in list, SQLite, and title bar
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-title-wipe-1)
+
+ ✓ src/editor/__tests__/formatMemory.test.ts (10 tests) 146ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 2: Title source rule: title comes ONLY from doc.child(0) being H1; later H1 does NOT change title
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-h1-rule-1)
+
+ ✓ src/editor/__tests__/pasteTitle.test.ts (19 tests) 251ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 4: Circuit breaker half-open retry: 1 attempt after backoff (10s), failure keeps pill, fresh edit triggers 1 attempt, success clears pill
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=note-cb-1)
+
+ ✓ src/editor/__tests__/horizontalRule.test.ts (8 tests) 208ms
+stdout | src/components/__tests__/appSaveWiring.test.tsx > App onUpdate Save Wiring & IPC Invariants > Item 5: notefast_recovered_note_id matches sourceId: reuses recovered row; different sourceId creates a fresh note
+[performSwitch lock duration] 0.000 ms (prevId=null, nextId=newly-created-1)
+
+ ✓ src/components/__tests__/appSaveWiring.test.tsx (20 tests) 1764ms
+ ✓ src/components/__tests__/findBar.test.tsx (6 tests) 152ms
+ ✓ src/components/__tests__/phase3DataFlow.test.tsx (7 tests) 99ms
+ ✓ src/editor/__tests__/selectionBehaviors.test.ts (7 tests) 124ms
+ ✓ src/editor/__tests__/lowlightDynamic.test.ts (4 tests) 57ms
+ ✓ src/components/__tests__/smartSearchPaletteGuards.test.tsx (3 tests) 70ms
+ ✓ src/extensions/__tests__/useBlockDrag.test.tsx (6 tests) 41ms
+ ✓ src/lib/__tests__/clipboard.test.ts (4 tests) 13ms
+ ✓ src/editor/__tests__/editorCharCount.test.tsx (8 tests) 42ms
+ ✓ src/components/__tests__/titleBar.test.tsx (8 tests) 36ms
+ ✓ src/components/__tests__/smoothCaretPhase5.test.tsx (3 tests) 17ms
+ ✓ src/components/__tests__/palettePrefetch.test.tsx (2 tests) 33ms
+ ✓ src/lib/__tests__/noteCache.test.ts (9 tests) 12ms
+ ✓ src/lib/__tests__/smartSearchRanking.test.ts (18 tests) 8ms
+ ✓ src/editor/__tests__/cmdBackspace.test.ts (21 tests) 10ms
+ ✓ src/components/__tests__/smoothCaret.test.ts (5 tests) 3ms
+stdout | src/editor/__tests__/markdownSerialization.test.ts > Markdown Serialization & Clipboard Utilities (Test C) > Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) > serializes realistic 1 MB fixture with headings, marks, code, emoji, and Devanagari (5 runs)
+[MEASURED: Node/V8 performance.now(), 1 MB Realistic Doc (5 runs, run 1 discarded)]: median=99.331 ms (min=70.204 ms, max=111.627 ms) | raw runs: 62.859, 70.204, 108.694, 89.968, 111.627 ms
+
+ ✓ src/editor/__tests__/markdownSerialization.test.ts (16 tests) 4473ms
+   ✓ Markdown Serialization & Clipboard Utilities (Test C) (16)
+     ✓ Realistic 100 KB and 1 MB Serialization Benchmark (Node/V8) (2)
+       ✓ serializes realistic 1 MB fixture with headings, marks, code, emoji, and Devanagari (5 runs) 4302ms
+ ✓ src/lib/__tests__/theme.test.ts (19 tests) 15ms
+ ✓ src/components/__tests__/titleBarSwitch.test.tsx (1 test) 19ms
+ ✓ src/lib/__tests__/settingsSync.test.ts (12 tests) 10ms
+ ✓ src/extensions/__tests__/blockSelection.test.ts (21 tests) 5ms
+ ✓ src/components/__tests__/smartSearchKeyboard.test.ts (7 tests) 5ms
+ ✓ src/lib/__tests__/commandsConfig.test.ts (3 tests) 3ms
+ ✓ src/lib/__tests__/storageCoalesce.test.ts (4 tests) 5ms
+ ✓ src/editor/__tests__/slashCommand.test.ts (9 tests) 4ms
+ ✓ src/components/__tests__/windowResizeHandles.test.ts (6 tests) 2ms
+ ✓ src/lib/__tests__/fastBootReconcile.test.ts (9 tests) 3ms
+ ✓ src/components/__tests__/navigationCoalesce.test.tsx (2 tests) 2ms
+
+ Test Files  39 passed (39)
+      Tests  366 passed (366)
+   Start at  01:23:55
+   Duration  5.08s (tests 37%, environment 30%, import 24%, transform 8%, worker 1%)
+
+    Isolate  39 workers spawned · ~354ms startup each (spawn + environment, per file)
+             at least ~1.62s faster with isolate: false — reuses workers across files instead of one per file

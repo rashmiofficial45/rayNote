@@ -1,0 +1,160 @@
+{
+  "totalJsKb": 1192.08,
+  "totalCssKb": 121.47,
+  "bundleDetails": [
+    {
+      "file": "index-DCVywaxP.js",
+      "sizeBytes": 1125229,
+      "sizeKb": 1098.86,
+      "gzipBytes": 340852,
+      "gzipKb": 332.86
+    },
+    {
+      "file": "index-NnUntPaw.css",
+      "sizeBytes": 124390,
+      "sizeKb": 121.47,
+      "gzipBytes": 21310,
+      "gzipKb": 20.81
+    },
+    {
+      "file": "SettingsApp-nlXA6F88.js",
+      "sizeBytes": 25550,
+      "sizeKb": 24.95,
+      "gzipBytes": 5991,
+      "gzipKb": 5.85
+    },
+    {
+      "file": "css-CunjgVpT.js",
+      "sizeBytes": 12006,
+      "sizeKb": 11.72,
+      "gzipBytes": 4353,
+      "gzipKb": 4.25
+    },
+    {
+      "file": "typescript-DfOdISYs.js",
+      "sizeBytes": 7682,
+      "sizeKb": 7.5,
+      "gzipBytes": 3116,
+      "gzipKb": 3.04
+    },
+    {
+      "file": "javascript-QsOaq-xI.js",
+      "sizeBytes": 6425,
+      "sizeKb": 6.27,
+      "gzipBytes": 2667,
+      "gzipKb": 2.6
+    },
+    {
+      "file": "sql-Bx3rmqu-.js",
+      "sizeBytes": 5642,
+      "sizeKb": 5.51,
+      "gzipBytes": 2451,
+      "gzipKb": 2.39
+    },
+    {
+      "file": "MarkdownViewerModal-gNj-Gwjt.js",
+      "sizeBytes": 5535,
+      "sizeKb": 5.41,
+      "gzipBytes": 1958,
+      "gzipKb": 1.91
+    },
+    {
+      "file": "cpp-DTdHjX0h.js",
+      "sizeBytes": 5509,
+      "sizeKb": 5.38,
+      "gzipBytes": 2527,
+      "gzipKb": 2.47
+    },
+    {
+      "file": "c-u-r8Hv0I.js",
+      "sizeBytes": 4008,
+      "sizeKb": 3.91,
+      "gzipBytes": 1891,
+      "gzipKb": 1.85
+    },
+    {
+      "file": "csharp-CSgP9w7Z.js",
+      "sizeBytes": 3930,
+      "sizeKb": 3.84,
+      "gzipBytes": 1641,
+      "gzipKb": 1.6
+    },
+    {
+      "file": "python-w1jWhufv.js",
+      "sizeBytes": 3339,
+      "sizeKb": 3.26,
+      "gzipBytes": 1517,
+      "gzipKb": 1.48
+    },
+    {
+      "file": "rust-B9iKSdTg.js",
+      "sizeBytes": 2748,
+      "sizeKb": 2.68,
+      "gzipBytes": 1475,
+      "gzipKb": 1.44
+    },
+    {
+      "file": "java-BCnfQ6MX.js",
+      "sizeBytes": 2603,
+      "sizeKb": 2.54,
+      "gzipBytes": 1253,
+      "gzipKb": 1.22
+    },
+    {
+      "file": "markdown-DLM988Ns.js",
+      "sizeBytes": 2152,
+      "sizeKb": 2.1,
+      "gzipBytes": 949,
+      "gzipKb": 0.93
+    },
+    {
+      "file": "xml-Hn7tkzR4.js",
+      "sizeBytes": 1979,
+      "sizeKb": 1.93,
+      "gzipBytes": 844,
+      "gzipKb": 0.82
+    },
+    {
+      "file": "yaml-B5dpTiHm.js",
+      "sizeBytes": 1917,
+      "sizeKb": 1.87,
+      "gzipBytes": 898,
+      "gzipKb": 0.88
+    },
+    {
+      "file": "go-B5qOYZGC.js",
+      "sizeBytes": 1484,
+      "sizeKb": 1.45,
+      "gzipBytes": 761,
+      "gzipKb": 0.74
+    },
+    {
+      "file": "PaletteSubViews-BBskRYSz.js",
+      "sizeBytes": 1031,
+      "sizeKb": 1.01,
+      "gzipBytes": 573,
+      "gzipKb": 0.56
+    },
+    {
+      "file": "json-7eZ-6Gsl.js",
+      "sizeBytes": 667,
+      "sizeKb": 0.65,
+      "gzipBytes": 488,
+      "gzipKb": 0.48
+    },
+    {
+      "file": "diff-CNQ9GcjB.js",
+      "sizeBytes": 661,
+      "sizeKb": 0.65,
+      "gzipBytes": 383,
+      "gzipKb": 0.37
+    },
+    {
+      "file": "rolldown-runtime-CbXtAM7H.js",
+      "sizeBytes": 589,
+      "sizeKb": 0.58,
+      "gzipBytes": 397,
+      "gzipKb": 0.39
+    }
+  ]
+}

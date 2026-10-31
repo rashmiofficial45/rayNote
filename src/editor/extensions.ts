@@ -283,18 +283,19 @@ export function getExtensions(
     ShortcutsExtension,
     SearchExtension,
     Placeholder.configure({
-      placeholder: ({ pos, hasAnchor }) => {
+      placeholder: ({ pos, node }) => {
         // First node in the document → always show "Note Title"
         if (pos === 0) {
           return "Note Title";
         }
-        // Only show "Type '/' for commands…" on the current active line where the cursor is
-        if (hasAnchor) {
+        // Top-level empty paragraph where the cursor is
+        if (node.type.name === "paragraph") {
           return "Type '/' for commands…";
         }
         return "";
       },
-      showOnlyCurrent: false,
+      showOnlyCurrent: true,
+      includeChildren: false,
       emptyEditorClass: "is-editor-empty",
     }),
     TaskList,

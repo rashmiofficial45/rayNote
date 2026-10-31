@@ -868,24 +868,36 @@ html[data-smooth-caret="false"] .tiptap {
   margin-bottom: 0.95em !important;
 }
 
+.tiptap > .is-empty {
+  position: relative;
+}
+
 /* Placeholder for empty first node (title placeholder) */
 .tiptap > .is-empty:first-child::before {
   content: attr(data-placeholder);
-  float: left;
+  position: absolute;
+  left: 0;
+  top: 0;
   color: var(--placeholder);
   pointer-events: none;
-  height: 0;
   font-style: normal;
+  line-height: inherit;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 /* Placeholder for empty nodes after the first */
 .tiptap > .is-empty:not(:first-child)::before {
   content: attr(data-placeholder);
-  float: left;
+  position: absolute;
+  left: 0;
+  top: 0;
   color: var(--placeholder);
   pointer-events: none;
-  height: 0;
   font-style: normal;
+  line-height: inherit;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .tiptap [data-placeholder=""]::before {

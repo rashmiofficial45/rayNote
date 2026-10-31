@@ -1,0 +1,185 @@
+======================================================================
+com.apple.WebKit.WebContent [55904]: 64-bit    Footprint: 823 MB (16384 bytes per page)
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+ 762 MB        0 B       880 KB         58    WebKit Malloc
+9760 KB        0 B          0 B          3    JS JIT Generated Code
+8496 KB        0 B        16 KB        610    Malloc Small
+5440 KB        0 B          0 B         21    Untagged
+1634 KB        0 B          0 B          1    page table
+1252 KB        0 B          0 B        129    __DATA_DIRTY
+1088 KB        0 B          0 B        546    WebAssembly Memory
+ 741 KB        0 B          0 B         67    __DATA
+ 656 KB        0 B          0 B         12    Malloc Metadata
+ 464 KB        0 B          0 B          6    Stack
+ 432 KB        0 B          0 B       6871    Owned physical footprint (unmapped) (graphics)
+ 288 KB        0 B          0 B          1    Malloc Tiny
+ 205 KB        0 B          0 B         85    unused dyld shared cache area
+ 128 KB        0 B          0 B          1    Accelerate Framework
+ 115 KB        0 B          0 B         20    __AUTH
+  52 KB        0 B          0 B          4    __TPRO_CONST
+  36 KB        0 B          0 B          1    __OBJC_RW
+  32 KB        0 B          0 B          2    ColorSync
+  16 KB        0 B          0 B          1    Foundation
+  16 KB        0 B          0 B          1    CoreServices
+  16 KB        0 B          0 B          1    OS Alloc Once
+    0 B        0 B       400 KB         50    Image IO
+    0 B    2720 KB          0 B         47    mapped file
+    0 B      16 KB          0 B          1    __TEXT
+    0 B        0 B          0 B          2    App-Specific Tag 1
+    0 B        0 B          0 B          1    __DATA_CONST
+    0 B        0 B          0 B         95    Guard
+    0 B        0 B          0 B          1    Dyld Private Memory
+    0 B        0 B          0 B          1    __LINKEDIT
+    ---        ---          ---        ---    ---
+ 792 MB    2736 KB      1296 KB       8641    TOTAL
+
+Shared with raynote [55900]:
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+  30 MB        0 B          0 B         58    IOSurface (graphics)
+ 192 KB        0 B          0 B          3    Untagged
+    0 B    2288 KB          0 B         10    mapped file
+    0 B      16 KB          0 B          2    __TEXT
+    0 B      16 KB          0 B          2    __LINKEDIT
+    ---        ---          ---        ---    ---
+  30 MB    2320 KB          0 B         75    TOTAL
+
+Auxiliary data:
+    phys_footprint: 822 MB
+    phys_footprint_peak: 929 MB
+
+======================================================================
+raynote [55900]: 64-bit    Footprint: 212 MB (16384 bytes per page)
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+ 130 MB        0 B          0 B         34    Malloc Large
+  69 MB        0 B          0 B         29    Malloc Small
+4832 KB        0 B        48 KB          8    WebKit Malloc
+2041 KB        0 B          0 B        278    __DATA_DIRTY
+1424 KB        0 B          0 B         13    Malloc Metadata
+1178 KB        0 B          0 B        122    __DATA
+ 977 KB        0 B          0 B          1    page table
+ 544 KB        0 B          0 B         37    Stack
+ 493 KB        0 B          0 B         78    __AUTH
+ 333 KB        0 B          0 B        148    unused dyld shared cache area
+ 304 KB        0 B          0 B          1    Malloc Tiny
+ 288 KB        0 B          0 B         42    Untagged
+ 176 KB        0 B          0 B          2    __DATA_CONST
+ 112 KB        0 B          0 B          3    __TPRO_CONST
+  64 KB        0 B          0 B          2    IOAccelerator
+  64 KB        0 B          0 B          1    Deferred Reclaim
+  48 KB        0 B          0 B          1    Activity Tracing
+  48 KB        0 B          0 B          2    Malloc Nano
+  48 KB        0 B          0 B         11    IOKit
+  48 KB        0 B          0 B          3    CoreGraphics
+  36 KB        0 B          0 B          1    __OBJC_RW
+  32 KB        0 B          0 B          1    SQLite Page Cache
+  32 KB        0 B          0 B          2    ColorSync
+  16 KB        0 B          0 B          1    OS Alloc Once
+  16 KB        0 B          0 B          2    IOAccelerator (graphics)
+  16 KB        0 B          0 B          2    Foundation
+    0 B      11 MB          0 B         42    mapped file
+    0 B    2832 KB          0 B          2    __TEXT
+    0 B      16 KB          0 B          2    __LINKEDIT
+    0 B        0 B          0 B         32    WebAssembly Memory
+    0 B        0 B          0 B        123    IOSurface
+    ---        ---          ---        ---    ---
+ 212 MB      14 MB        48 KB       1028    TOTAL
+
+Shared with com.apple.WebKit.WebContent [55904]:
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+  48 KB     144 KB          0 B          3    Untagged
+    0 B      30 MB        74 MB         57    IOSurface
+    0 B    1184 KB          0 B         10    mapped file
+    0 B      16 KB          0 B          2    __TEXT
+    0 B      16 KB          0 B          2    __LINKEDIT
+    0 B        0 B          0 B          1    IOSurface (graphics)
+    ---        ---          ---        ---    ---
+  48 KB      32 MB        74 MB         75    TOTAL
+
+Auxiliary data:
+    phys_footprint: 212 MB
+    phys_footprint_peak: 328 MB
+
+======================================================================
+Shared Cache B411828B-4450-38E3-973A-AFE7B7B5BEF5
+======================================================================
+
+Shared with raynote [55900], com.apple.WebKit.WebContent [55904]:
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+    0 B        0 B          0 B       1693    __DATA_CONST
+    0 B        0 B          0 B          2    __FONT_DATA
+    0 B        0 B          0 B       3604    unused dyld shared cache area
+    0 B        0 B          0 B          2    __OBJC_RO
+    0 B        0 B          0 B        714    __AUTH
+    0 B        0 B          0 B       1164    __DATA_DIRTY
+    0 B        0 B          0 B       1691    __AUTH_CONST
+    0 B        0 B          0 B          1    __GLSLBUILTINS
+    0 B        0 B          0 B       1866    __TEXT
+    0 B        0 B          0 B          2    __LINKEDIT
+    0 B        0 B          0 B          2    __CTF
+    0 B        0 B          0 B          1    __TPRO_CONST
+    0 B        0 B          0 B       1380    __DATA
+    ---        ---          ---        ---    ---
+    0 B        0 B          0 B      12122    TOTAL
+
+======================================================================
+Summary Footprint: 1035 MB
+======================================================================
+
+  Dirty      Clean  Reclaimable    Regions    Category
+    ---        ---          ---        ---    ---
+ 767 MB        0 B       928 KB         66    WebKit Malloc
+ 130 MB        0 B          0 B         34    Malloc Large
+  78 MB        0 B        16 KB        639    Malloc Small
+  30 MB        0 B        74 MB        116    IOSurface (graphics)
+9760 KB        0 B          0 B          3    JS JIT Generated Code
+5920 KB        0 B          0 B         69    Untagged
+3293 KB        0 B          0 B       1571    __DATA_DIRTY
+2612 KB        0 B          0 B          2    page table
+2080 KB        0 B          0 B         25    Malloc Metadata
+1918 KB        0 B          0 B       1569    __DATA
+1088 KB        0 B          0 B        578    WebAssembly Memory
+1008 KB        0 B          0 B         43    Stack
+ 607 KB        0 B          0 B        812    __AUTH
+ 592 KB        0 B          0 B          2    Malloc Tiny
+ 538 KB        0 B          0 B       3837    unused dyld shared cache area
+ 432 KB        0 B          0 B       6871    Owned physical footprint (unmapped) (graphics)
+ 176 KB        0 B          0 B       1696    __DATA_CONST
+ 164 KB        0 B          0 B          8    __TPRO_CONST
+ 128 KB        0 B          0 B          1    Accelerate Framework
+  71 KB        0 B          0 B          2    __OBJC_RW
+  64 KB        0 B          0 B          2    IOAccelerator
+  64 KB        0 B          0 B          1    Deferred Reclaim
+  64 KB        0 B          0 B          4    ColorSync
+  48 KB        0 B          0 B          1    Activity Tracing
+  48 KB        0 B          0 B          2    Malloc Nano
+  48 KB        0 B          0 B          3    CoreGraphics
+  48 KB        0 B          0 B         11    IOKit
+  32 KB        0 B          0 B          1    SQLite Page Cache
+  32 KB        0 B          0 B          2    OS Alloc Once
+  32 KB        0 B          0 B          3    Foundation
+  16 KB        0 B          0 B          1    CoreServices
+  16 KB        0 B          0 B          2    IOAccelerator (graphics)
+    0 B        0 B       400 KB         50    Image IO
+    0 B      16 MB          0 B        109    mapped file
+    0 B    2864 KB          0 B       1871    __TEXT
+    0 B      32 KB          0 B          7    __LINKEDIT
+    0 B        0 B          0 B          1    __GLSLBUILTINS
+    0 B        0 B          0 B          2    __OBJC_RO
+    0 B        0 B          0 B          2    __FONT_DATA
+    0 B        0 B          0 B          2    App-Specific Tag 1
+    0 B        0 B          0 B        123    IOSurface
+    0 B        0 B          0 B          1    Dyld Private Memory
+    0 B        0 B          0 B         95    Guard
+    0 B        0 B          0 B          2    __CTF
+    0 B        0 B          0 B       1691    __AUTH_CONST
+    ---        ---          ---        ---    ---
+1035 MB      19 MB        75 MB      21937    TOTAL

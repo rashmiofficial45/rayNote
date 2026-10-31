@@ -1,0 +1,66 @@
+{
+  "coldRuns": [
+    {
+      "latencyMs": 1794.180166,
+      "tauriFootprint": 28,
+      "webKitFootprint": 74,
+      "totalFootprint": 102
+    },
+    {
+      "latencyMs": 466.9345830000002,
+      "tauriFootprint": 28,
+      "webKitFootprint": 79,
+      "totalFootprint": 107
+    },
+    {
+      "latencyMs": 432.4807089999995,
+      "tauriFootprint": 29,
+      "webKitFootprint": 60,
+      "totalFootprint": 89
+    },
+    {
+      "latencyMs": 494.62975000000006,
+      "tauriFootprint": 28,
+      "webKitFootprint": 80,
+      "totalFootprint": 108
+    },
+    {
+      "latencyMs": 555.0542080000014,
+      "tauriFootprint": 29,
+      "webKitFootprint": 59,
+      "totalFootprint": 88
+    }
+  ],
+  "warmRuns": [
+    {
+      "latencyMs": 487.7077910000007,
+      "tauriFootprint": 29,
+      "webKitFootprint": 60,
+      "totalFootprint": 89
+    },
+    {
+      "latencyMs": 548.4257499999985,
+      "tauriFootprint": 27,
+      "webKitFootprint": 76,
+      "totalFootprint": 103
+    },
+    {
+      "latencyMs": 456.5886249999967,
+      "tauriFootprint": 29,
+      "webKitFootprint": 76,
+      "totalFootprint": 105
+    },
+    {
+      "latencyMs": 536.6992499999978,
+      "tauriFootprint": 28,
+      "webKitFootprint": 61,
+      "totalFootprint": 89
+    },
+    {
+      "latencyMs": 602.4396249999991,
+      "tauriFootprint": 28,
+      "webKitFootprint": 72,
+      "totalFootprint": 100
+    }
+  ]
+}

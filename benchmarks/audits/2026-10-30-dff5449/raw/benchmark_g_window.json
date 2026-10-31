@@ -1,0 +1,24 @@
+{
+  "showHide50Ms": 8204.245165999979,
+  "avgShowHideMs": 164.08490331999957,
+  "postStats": {
+    "timestamp": "2026-10-29T19:53:35.363Z",
+    "tauri": {
+      "pid": 55900,
+      "rssMb": 138.48,
+      "physFootprintMb": 253,
+      "peakFootprintMb": 328,
+      "cpuPct": 0.7,
+      "threads": 0
+    },
+    "webKit": {
+      "pid": 55904,
+      "rssMb": 1058.41,
+      "physFootprintMb": 708,
+      "peakFootprintMb": 1090,
+      "cpuPct": 100.6,
+      "threads": 0
+    },
+    "totalFootprintMb": 961
+  }
+}

@@ -1,0 +1,486 @@
+{
+  "visibleSamples": [
+    {
+      "timestamp": "2026-10-29T19:44:05.781Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 70.31,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 50.84,
+        "physFootprintMb": 59,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 85
+    },
+    {
+      "timestamp": "2026-10-29T19:44:10.951Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.28,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.23,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:16.114Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.67,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.28,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:21.284Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.67,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.2,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.17,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:26.452Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.66,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.11,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:31.616Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.94,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.38,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:36.782Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.94,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.38,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:41.955Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 65.92,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 14.38,
+        "physFootprintMb": 55,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 81
+    },
+    {
+      "timestamp": "2026-10-29T19:44:47.165Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 41.92,
+        "physFootprintMb": 26,
+        "peakFootprintMb": 28,
+        "cpuPct": 1.8,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 30.41,
+        "physFootprintMb": 61,
+        "peakFootprintMb": 88,
+        "cpuPct": 1.1,
+        "threads": 0
+      },
+      "totalFootprintMb": 87
+    },
+    {
+      "timestamp": "2026-10-29T19:44:52.441Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 30.2,
+        "physFootprintMb": 24,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.3,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 26.17,
+        "physFootprintMb": 64,
+        "peakFootprintMb": 88,
+        "cpuPct": 1.3,
+        "threads": 0
+      },
+      "totalFootprintMb": 88
+    },
+    {
+      "timestamp": "2026-10-29T19:44:57.606Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 31.53,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 3.9,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 37.97,
+        "physFootprintMb": 66,
+        "peakFootprintMb": 88,
+        "cpuPct": 1.4,
+        "threads": 0
+      },
+      "totalFootprintMb": 89
+    },
+    {
+      "timestamp": "2026-10-29T19:45:02.784Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 26.17,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 13.38,
+        "physFootprintMb": 65,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 88
+    }
+  ],
+  "hiddenSamples": [
+    {
+      "timestamp": "2026-10-29T19:45:14.327Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 30.03,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 25.41,
+        "physFootprintMb": 65,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 88
+    },
+    {
+      "timestamp": "2026-10-29T19:45:19.495Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.25,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.52,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:24.664Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.23,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.52,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:29.823Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.31,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.55,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:34.979Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.31,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.55,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:40.133Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.3,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.55,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:45.303Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.3,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 24.55,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:50.478Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 29.27,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 23.94,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:45:55.650Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 27.89,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 4.8,
+        "physFootprintMb": 63,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 86
+    },
+    {
+      "timestamp": "2026-10-29T19:46:00.821Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 36.25,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.2,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 45.91,
+        "physFootprintMb": 66,
+        "peakFootprintMb": 88,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "totalFootprintMb": 89
+    },
+    {
+      "timestamp": "2026-10-29T19:46:05.985Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 36.17,
+        "physFootprintMb": 23,
+        "peakFootprintMb": 28,
+        "cpuPct": 0.1,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 45.92,
+        "physFootprintMb": 66,
+        "peakFootprintMb": 88,
+        "cpuPct": 0,
+        "threads": 0
+      },
+      "totalFootprintMb": 89
+    },
+    {
+      "timestamp": "2026-10-29T19:46:11.172Z",
+      "tauri": {
+        "pid": 51793,
+        "rssMb": 38.64,
+        "physFootprintMb": 24,
+        "peakFootprintMb": 28,
+        "cpuPct": 8.9,
+        "threads": 0
+      },
+      "webKit": {
+        "pid": 51810,
+        "rssMb": 57.8,
+        "physFootprintMb": 100,
+        "peakFootprintMb": 100,
+        "cpuPct": 16.7,
+        "threads": 0
+      },
+      "totalFootprintMb": 124
+    }
+  ]
+}

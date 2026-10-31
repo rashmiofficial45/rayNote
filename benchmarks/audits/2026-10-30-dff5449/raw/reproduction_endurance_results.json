@@ -1,0 +1,992 @@
+[
+  {
+    "rep": 1,
+    "pids": {
+      "tauriPid": 71623,
+      "webKitPid": 71629
+    },
+    "initialFootprint": 137,
+    "endOfWorkloadFootprint": 919,
+    "truePeak": {
+      "totalFootprintMb": 924,
+      "tauriMb": 43,
+      "webKitMb": 881,
+      "phase": "cooldown-10s",
+      "milestoneOps": 2000
+    },
+    "cooldown10sFootprint": 924,
+    "cooldown30sFootprint": 383,
+    "cooldown60sFootprint": 327,
+    "netChange60s": 190,
+    "samples": [
+      {
+        "phase": "baseline",
+        "milestoneOps": 0,
+        "timestamp": "2026-10-30T02:08:08.602Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 38.27,
+          "physFootprintMb": 28,
+          "peakFootprintMb": 34,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 65.59,
+          "physFootprintMb": 109,
+          "peakFootprintMb": 164,
+          "cpuPct": 1.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 137
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 200,
+        "timestamp": "2026-10-30T02:08:13.108Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 95.11,
+          "physFootprintMb": 51,
+          "peakFootprintMb": 79,
+          "cpuPct": 27.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 331.28,
+          "physFootprintMb": 424,
+          "peakFootprintMb": 428,
+          "cpuPct": 110.7,
+          "threads": 0
+        },
+        "totalFootprintMb": 475
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 400,
+        "timestamp": "2026-10-30T02:08:17.513Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 103.41,
+          "physFootprintMb": 47,
+          "peakFootprintMb": 79,
+          "cpuPct": 3.8,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 387.31,
+          "physFootprintMb": 260,
+          "peakFootprintMb": 442,
+          "cpuPct": 106.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 307
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 600,
+        "timestamp": "2026-10-30T02:08:21.899Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 59.39,
+          "physFootprintMb": 36,
+          "peakFootprintMb": 162,
+          "cpuPct": 0.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 855.09,
+          "physFootprintMb": 691,
+          "peakFootprintMb": 761,
+          "cpuPct": 100,
+          "threads": 0
+        },
+        "totalFootprintMb": 727
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 800,
+        "timestamp": "2026-10-30T02:08:26.252Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 50.45,
+          "physFootprintMb": 36,
+          "peakFootprintMb": 162,
+          "cpuPct": 1.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 690.86,
+          "physFootprintMb": 767,
+          "peakFootprintMb": 766,
+          "cpuPct": 99.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 803
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1000,
+        "timestamp": "2026-10-30T02:08:30.730Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 38.83,
+          "physFootprintMb": 38,
+          "peakFootprintMb": 162,
+          "cpuPct": 2.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 302.28,
+          "physFootprintMb": 871,
+          "peakFootprintMb": 926,
+          "cpuPct": 99.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 909
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1200,
+        "timestamp": "2026-10-30T02:08:35.068Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 39.73,
+          "physFootprintMb": 39,
+          "peakFootprintMb": 162,
+          "cpuPct": 2.1,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 297.03,
+          "physFootprintMb": 871,
+          "peakFootprintMb": 926,
+          "cpuPct": 99.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 910
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1400,
+        "timestamp": "2026-10-30T02:08:39.399Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 40.58,
+          "physFootprintMb": 39,
+          "peakFootprintMb": 162,
+          "cpuPct": 2.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 300.3,
+          "physFootprintMb": 871,
+          "peakFootprintMb": 926,
+          "cpuPct": 99.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 910
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1600,
+        "timestamp": "2026-10-30T02:08:43.953Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 37.2,
+          "physFootprintMb": 40,
+          "peakFootprintMb": 162,
+          "cpuPct": 2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 261.34,
+          "physFootprintMb": 877,
+          "peakFootprintMb": 926,
+          "cpuPct": 98.5,
+          "threads": 0
+        },
+        "totalFootprintMb": 917
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1800,
+        "timestamp": "2026-10-30T02:08:48.349Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 39.73,
+          "physFootprintMb": 41,
+          "peakFootprintMb": 162,
+          "cpuPct": 1.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 222.83,
+          "physFootprintMb": 877,
+          "peakFootprintMb": 926,
+          "cpuPct": 99.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 918
+      },
+      {
+        "phase": "end-of-workload",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:08:52.658Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 41.92,
+          "physFootprintMb": 42,
+          "peakFootprintMb": 162,
+          "cpuPct": 1.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 252.16,
+          "physFootprintMb": 877,
+          "peakFootprintMb": 926,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 919
+      },
+      {
+        "phase": "cooldown-10s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:09:02.824Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 40.22,
+          "physFootprintMb": 43,
+          "peakFootprintMb": 162,
+          "cpuPct": 1.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 363.78,
+          "physFootprintMb": 881,
+          "peakFootprintMb": 926,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 924
+      },
+      {
+        "phase": "cooldown-30s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:09:22.984Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 114.88,
+          "physFootprintMb": 48,
+          "peakFootprintMb": 228,
+          "cpuPct": 8.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 801.44,
+          "physFootprintMb": 335,
+          "peakFootprintMb": 1299,
+          "cpuPct": 104.9,
+          "threads": 0
+        },
+        "totalFootprintMb": 383
+      },
+      {
+        "phase": "cooldown-60s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:09:53.176Z",
+        "tauri": {
+          "pid": 71623,
+          "rssMb": 122.17,
+          "physFootprintMb": 58,
+          "peakFootprintMb": 228,
+          "cpuPct": 0.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 71629,
+          "rssMb": 392.58,
+          "physFootprintMb": 269,
+          "peakFootprintMb": 1299,
+          "cpuPct": 1.9,
+          "threads": 0
+        },
+        "totalFootprintMb": 327
+      }
+    ]
+  },
+  {
+    "rep": 2,
+    "pids": {
+      "tauriPid": 72589,
+      "webKitPid": 72602
+    },
+    "initialFootprint": 160,
+    "endOfWorkloadFootprint": 839,
+    "truePeak": {
+      "totalFootprintMb": 1025,
+      "tauriMb": 125,
+      "webKitMb": 900,
+      "phase": "cooldown-30s",
+      "milestoneOps": 2000
+    },
+    "cooldown10sFootprint": 838,
+    "cooldown30sFootprint": 1025,
+    "cooldown60sFootprint": 1002,
+    "netChange60s": 842,
+    "samples": [
+      {
+        "phase": "baseline",
+        "milestoneOps": 0,
+        "timestamp": "2026-10-30T02:10:01.081Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 103.84,
+          "physFootprintMb": 32,
+          "peakFootprintMb": 35,
+          "cpuPct": 0.8,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 138.14,
+          "physFootprintMb": 128,
+          "peakFootprintMb": 181,
+          "cpuPct": 1.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 160
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 200,
+        "timestamp": "2026-10-30T02:10:05.596Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 83.88,
+          "physFootprintMb": 40,
+          "peakFootprintMb": 42,
+          "cpuPct": 4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 199.05,
+          "physFootprintMb": 238,
+          "peakFootprintMb": 258,
+          "cpuPct": 105.7,
+          "threads": 0
+        },
+        "totalFootprintMb": 278
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 400,
+        "timestamp": "2026-10-30T02:10:10.005Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 155.69,
+          "physFootprintMb": 109,
+          "peakFootprintMb": 133,
+          "cpuPct": 5.8,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 430.56,
+          "physFootprintMb": 279,
+          "peakFootprintMb": 493,
+          "cpuPct": 101.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 388
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 600,
+        "timestamp": "2026-10-30T02:10:14.342Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 80.64,
+          "physFootprintMb": 30,
+          "peakFootprintMb": 189,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 738.59,
+          "physFootprintMb": 613,
+          "peakFootprintMb": 626,
+          "cpuPct": 99.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 643
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 800,
+        "timestamp": "2026-10-30T02:10:18.622Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 79.03,
+          "physFootprintMb": 31,
+          "peakFootprintMb": 189,
+          "cpuPct": 0.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 684.02,
+          "physFootprintMb": 670,
+          "peakFootprintMb": 670,
+          "cpuPct": 99,
+          "threads": 0
+        },
+        "totalFootprintMb": 701
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1000,
+        "timestamp": "2026-10-30T02:10:22.954Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 76.97,
+          "physFootprintMb": 33,
+          "peakFootprintMb": 189,
+          "cpuPct": 1.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 849.14,
+          "physFootprintMb": 806,
+          "peakFootprintMb": 832,
+          "cpuPct": 100.6,
+          "threads": 0
+        },
+        "totalFootprintMb": 839
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1200,
+        "timestamp": "2026-10-30T02:10:27.248Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 79.5,
+          "physFootprintMb": 34,
+          "peakFootprintMb": 189,
+          "cpuPct": 1.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 802.34,
+          "physFootprintMb": 798,
+          "peakFootprintMb": 832,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 832
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1400,
+        "timestamp": "2026-10-30T02:10:31.692Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 44.42,
+          "physFootprintMb": 35,
+          "peakFootprintMb": 189,
+          "cpuPct": 2.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 291.83,
+          "physFootprintMb": 799,
+          "peakFootprintMb": 832,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 834
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1600,
+        "timestamp": "2026-10-30T02:10:36.128Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 43.33,
+          "physFootprintMb": 36,
+          "peakFootprintMb": 189,
+          "cpuPct": 2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 227.08,
+          "physFootprintMb": 799,
+          "peakFootprintMb": 832,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 835
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1800,
+        "timestamp": "2026-10-30T02:10:40.636Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 33.69,
+          "physFootprintMb": 38,
+          "peakFootprintMb": 189,
+          "cpuPct": 2.5,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 221.63,
+          "physFootprintMb": 800,
+          "peakFootprintMb": 832,
+          "cpuPct": 99.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 838
+      },
+      {
+        "phase": "end-of-workload",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:10:45.001Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 42.78,
+          "physFootprintMb": 39,
+          "peakFootprintMb": 189,
+          "cpuPct": 6.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 221.84,
+          "physFootprintMb": 800,
+          "peakFootprintMb": 832,
+          "cpuPct": 100,
+          "threads": 0
+        },
+        "totalFootprintMb": 839
+      },
+      {
+        "phase": "cooldown-10s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:10:55.163Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 40.17,
+          "physFootprintMb": 39,
+          "peakFootprintMb": 189,
+          "cpuPct": 1.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 222.06,
+          "physFootprintMb": 799,
+          "peakFootprintMb": 832,
+          "cpuPct": 99.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 838
+      },
+      {
+        "phase": "cooldown-30s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:11:15.365Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 108.89,
+          "physFootprintMb": 125,
+          "peakFootprintMb": 189,
+          "cpuPct": 19.6,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 869.23,
+          "physFootprintMb": 900,
+          "peakFootprintMb": 995,
+          "cpuPct": 111.8,
+          "threads": 0
+        },
+        "totalFootprintMb": 1025
+      },
+      {
+        "phase": "cooldown-60s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:11:45.612Z",
+        "tauri": {
+          "pid": 72589,
+          "rssMb": 118.06,
+          "physFootprintMb": 173,
+          "peakFootprintMb": 189,
+          "cpuPct": 13.6,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 72602,
+          "rssMb": 645.75,
+          "physFootprintMb": 829,
+          "peakFootprintMb": 1045,
+          "cpuPct": 110.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 1002
+      }
+    ]
+  },
+  {
+    "rep": 3,
+    "pids": {
+      "tauriPid": 73542,
+      "webKitPid": 73550
+    },
+    "initialFootprint": 720,
+    "endOfWorkloadFootprint": 989,
+    "truePeak": {
+      "totalFootprintMb": 1067,
+      "tauriMb": 124,
+      "webKitMb": 943,
+      "phase": "in-progress",
+      "milestoneOps": 1200
+    },
+    "cooldown10sFootprint": 988,
+    "cooldown30sFootprint": 987,
+    "cooldown60sFootprint": 270,
+    "netChange60s": -450,
+    "samples": [
+      {
+        "phase": "baseline",
+        "milestoneOps": 0,
+        "timestamp": "2026-10-30T02:11:53.503Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 78.73,
+          "physFootprintMb": 24,
+          "peakFootprintMb": 107,
+          "cpuPct": 0.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 685.22,
+          "physFootprintMb": 696,
+          "peakFootprintMb": 815,
+          "cpuPct": 0.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 720
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 200,
+        "timestamp": "2026-10-30T02:11:57.922Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 48.59,
+          "physFootprintMb": 28,
+          "peakFootprintMb": 107,
+          "cpuPct": 1.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 378.75,
+          "physFootprintMb": 729,
+          "peakFootprintMb": 849,
+          "cpuPct": 99.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 757
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 400,
+        "timestamp": "2026-10-30T02:12:02.306Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 50.48,
+          "physFootprintMb": 29,
+          "peakFootprintMb": 107,
+          "cpuPct": 1.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 518.52,
+          "physFootprintMb": 743,
+          "peakFootprintMb": 849,
+          "cpuPct": 129.5,
+          "threads": 0
+        },
+        "totalFootprintMb": 772
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 600,
+        "timestamp": "2026-10-30T02:12:06.680Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 52.09,
+          "physFootprintMb": 29,
+          "peakFootprintMb": 107,
+          "cpuPct": 0.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 587.52,
+          "physFootprintMb": 761,
+          "peakFootprintMb": 849,
+          "cpuPct": 99.8,
+          "threads": 0
+        },
+        "totalFootprintMb": 790
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 800,
+        "timestamp": "2026-10-30T02:12:11.007Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 123.78,
+          "physFootprintMb": 121,
+          "peakFootprintMb": 147,
+          "cpuPct": 0.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 883.52,
+          "physFootprintMb": 778,
+          "peakFootprintMb": 1060,
+          "cpuPct": 100,
+          "threads": 0
+        },
+        "totalFootprintMb": 899
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1000,
+        "timestamp": "2026-10-30T02:12:15.297Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 117.86,
+          "physFootprintMb": 122,
+          "peakFootprintMb": 147,
+          "cpuPct": 0.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 886.56,
+          "physFootprintMb": 824,
+          "peakFootprintMb": 1060,
+          "cpuPct": 99.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 946
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1200,
+        "timestamp": "2026-10-30T02:12:19.659Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 115.72,
+          "physFootprintMb": 124,
+          "peakFootprintMb": 147,
+          "cpuPct": 1.7,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 1006.67,
+          "physFootprintMb": 943,
+          "peakFootprintMb": 1060,
+          "cpuPct": 100.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 1067
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1400,
+        "timestamp": "2026-10-30T02:12:24.046Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 48.84,
+          "physFootprintMb": 60,
+          "peakFootprintMb": 147,
+          "cpuPct": 2.3,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 537.2,
+          "physFootprintMb": 949,
+          "peakFootprintMb": 1060,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 1009
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1600,
+        "timestamp": "2026-10-30T02:12:28.386Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 50.94,
+          "physFootprintMb": 35,
+          "peakFootprintMb": 147,
+          "cpuPct": 1.8,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 425.91,
+          "physFootprintMb": 951,
+          "peakFootprintMb": 1060,
+          "cpuPct": 99.4,
+          "threads": 0
+        },
+        "totalFootprintMb": 986
+      },
+      {
+        "phase": "in-progress",
+        "milestoneOps": 1800,
+        "timestamp": "2026-10-30T02:12:32.793Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 47.59,
+          "physFootprintMb": 36,
+          "peakFootprintMb": 147,
+          "cpuPct": 2.1,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 310.14,
+          "physFootprintMb": 952,
+          "peakFootprintMb": 1060,
+          "cpuPct": 98.9,
+          "threads": 0
+        },
+        "totalFootprintMb": 988
+      },
+      {
+        "phase": "end-of-workload",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:12:37.165Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 48.38,
+          "physFootprintMb": 38,
+          "peakFootprintMb": 147,
+          "cpuPct": 1.2,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 294.73,
+          "physFootprintMb": 951,
+          "peakFootprintMb": 1060,
+          "cpuPct": 100.1,
+          "threads": 0
+        },
+        "totalFootprintMb": 989
+      },
+      {
+        "phase": "cooldown-10s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:12:47.328Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 47.56,
+          "physFootprintMb": 38,
+          "peakFootprintMb": 147,
+          "cpuPct": 1.4,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 233.7,
+          "physFootprintMb": 950,
+          "peakFootprintMb": 1060,
+          "cpuPct": 99.2,
+          "threads": 0
+        },
+        "totalFootprintMb": 988
+      },
+      {
+        "phase": "cooldown-30s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:13:07.549Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 29.95,
+          "physFootprintMb": 37,
+          "peakFootprintMb": 185,
+          "cpuPct": 0.1,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 385.06,
+          "physFootprintMb": 950,
+          "peakFootprintMb": 1070,
+          "cpuPct": 97.5,
+          "threads": 0
+        },
+        "totalFootprintMb": 987
+      },
+      {
+        "phase": "cooldown-60s",
+        "milestoneOps": 2000,
+        "timestamp": "2026-10-30T02:13:37.777Z",
+        "tauri": {
+          "pid": 73542,
+          "rssMb": 98.45,
+          "physFootprintMb": 49,
+          "peakFootprintMb": 185,
+          "cpuPct": 6.9,
+          "threads": 0
+        },
+        "webKit": {
+          "pid": 73550,
+          "rssMb": 351.47,
+          "physFootprintMb": 221,
+          "peakFootprintMb": 1070,
+          "cpuPct": 15.3,
+          "threads": 0
+        },
+        "totalFootprintMb": 270
+      }
+    ]
+  }
+]

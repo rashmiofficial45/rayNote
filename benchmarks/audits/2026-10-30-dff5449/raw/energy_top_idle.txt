@@ -1,0 +1,70 @@
+Processes: 596 total, 4 running, 592 sleeping, 3089 threads 
+2026/10/30 01:23:38
+Load Avg: 3.16, 3.23, 3.13 
+CPU usage: 20.17% user, 16.14% sys, 63.67% idle 
+SharedLibs: 376M resident, 60M data, 61M linkedit.
+MemRegions: 378935 total, 1704M resident, 88M private, 726M shared.
+PhysMem: 7510M used (1660M wired, 2416M compressor), 97M unused.
+VM: 299T vsize, 57G framework vsize, 654940(0) swapins, 929971(0) swapouts.
+Networks: packets: 4380062/5222M in, 949597/615M out.
+Disks: 5461434/174G read, 889208/34G written.
+
+PID    COMMAND          %CPU #TH  RPRVT
+55904  com.apple.WebKit 0.0  13/1 N/A  
+55900  raynote          0.0  22   N/A  
+Processes: 597 total, 4 running, 593 sleeping, 3100 threads 
+2026/10/30 01:23:40
+Load Avg: 3.16, 3.23, 3.13 
+CPU usage: 14.61% user, 3.96% sys, 81.41% idle 
+SharedLibs: 376M resident, 60M data, 61M linkedit.
+MemRegions: 12006 total, 26M resident, 88M private, 727M shared.
+PhysMem: 7507M used (1714M wired, 2450M compressor), 100M unused.
+VM: 301T vsize, 57G framework vsize, 655155(215) swapins, 929971(0) swapouts.
+Networks: packets: 4380071/5222M in, 949607/615M out.
+Disks: 5462603/174G read, 889322/34G written.
+
+PID    COMMAND          %CPU #TH  RPRVT
+55904  com.apple.WebKit 90.2 11/1 N/A  
+55900  raynote          0.1  22   N/A  
+Processes: 597 total, 4 running, 1 stuck, 592 sleeping, 3088 threads 
+2026/10/30 01:23:42
+Load Avg: 3.07, 3.21, 3.13 
+CPU usage: 16.92% user, 6.87% sys, 76.20% idle 
+SharedLibs: 376M resident, 60M data, 61M linkedit.
+MemRegions: 0 total, 0B resident, 88M private, 727M shared.
+PhysMem: 7516M used (1911M wired, 2505M compressor), 92M unused.
+VM: 301T vsize, 57G framework vsize, 655155(0) swapins, 929971(0) swapouts.
+Networks: packets: 4380076/5222M in, 949615/615M out.
+Disks: 5464003/174G read, 889348/34G written.
+
+PID    COMMAND          %CPU  #TH  RPRVT
+55904  com.apple.WebKit 100.4 13/1 N/A  
+55900  raynote          8.9   22   N/A  
+Processes: 597 total, 4 running, 593 sleeping, 3050 threads 
+2026/10/30 01:23:45
+Load Avg: 3.07, 3.21, 3.13 
+CPU usage: 19.75% user, 5.62% sys, 74.61% idle 
+SharedLibs: 376M resident, 60M data, 61M linkedit.
+MemRegions: 42 total, 1216K resident, 88M private, 727M shared.
+PhysMem: 7507M used (1807M wired, 2411M compressor), 100M unused.
+VM: 301T vsize, 57G framework vsize, 655155(0) swapins, 929971(0) swapouts.
+Networks: packets: 4380091/5222M in, 949627/615M out.
+Disks: 5465117/174G read, 889968/34G written.
+
+PID    COMMAND          %CPU  #TH  RPRVT
+55904  com.apple.WebKit 105.3 12/1 N/A  
+55900  raynote          5.0   23   N/A  
+Processes: 597 total, 3 running, 594 sleeping, 3050 threads 
+2026/10/30 01:23:47
+Load Avg: 2.98, 3.19, 3.12 
+CPU usage: 18.39% user, 5.44% sys, 76.16% idle 
+SharedLibs: 376M resident, 60M data, 61M linkedit.
+MemRegions: 0 total, 0B resident, 88M private, 727M shared.
+PhysMem: 7512M used (1785M wired, 2475M compressor), 95M unused.
+VM: 301T vsize, 57G framework vsize, 655155(0) swapins, 929971(0) swapouts.
+Networks: packets: 4380093/5222M in, 949631/615M out.
+Disks: 5465340/174G read, 890198/34G written.
+
+PID    COMMAND          %CPU  #TH  RPRVT
+55904  com.apple.WebKit 100.9 13/1 N/A  
+55900  raynote          13.8  23   N/A

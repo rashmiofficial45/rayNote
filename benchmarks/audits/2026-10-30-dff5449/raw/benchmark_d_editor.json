@@ -1,0 +1,44 @@
+{
+  "typeMs": 3557.9559160000645,
+  "undoMs": 7472.328709000023,
+  "base": {
+    "timestamp": "2026-10-29T19:52:56.567Z",
+    "tauri": {
+      "pid": 55900,
+      "rssMb": 193.61,
+      "physFootprintMb": 103,
+      "peakFootprintMb": 328,
+      "cpuPct": 0.1,
+      "threads": 0
+    },
+    "webKit": {
+      "pid": 55904,
+      "rssMb": 940.2,
+      "physFootprintMb": 258,
+      "peakFootprintMb": 929,
+      "cpuPct": 100.1,
+      "threads": 0
+    },
+    "totalFootprintMb": 361
+  },
+  "postStats": {
+    "timestamp": "2026-10-29T19:53:11.112Z",
+    "tauri": {
+      "pid": 55900,
+      "rssMb": 251.45,
+      "physFootprintMb": 195,
+      "peakFootprintMb": 328,
+      "cpuPct": 5.9,
+      "threads": 0
+    },
+    "webKit": {
+      "pid": 55904,
+      "rssMb": 710.61,
+      "physFootprintMb": 344,
+      "peakFootprintMb": 929,
+      "cpuPct": 100.9,
+      "threads": 0
+    },
+    "totalFootprintMb": 539
+  }
+}
