@@ -431,6 +431,10 @@ body,
   height: 64px;
   pointer-events: none;
   z-index: 15;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
   background: linear-gradient(
     180deg,
     rgba(var(--app-bg-rgb), 0.98) 0%,
@@ -469,6 +473,10 @@ body,
   height: 52px;
   pointer-events: none;
   z-index: 15;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
   background: linear-gradient(
     0deg,
     rgba(var(--app-bg-rgb), 0.96) 0%,
@@ -921,8 +929,21 @@ html[data-smooth-caret="false"] .tiptap {
   display: none !important;
 }
 
+/* When an empty block is selected, align the placeholder with the 8px padding */
+.tiptap > .is-empty.raynote-block-selected::before,
+.tiptap > .is-empty.notefast-block-selected::before,
+.tiptap .is-empty.raynote-block-selected::before,
+.tiptap .is-empty.notefast-block-selected::before {
+  left: 8px !important;
+}
+
+.tiptap blockquote.is-empty::before,
+.tiptap blockquote.is-empty.raynote-block-selected::before {
+  left: 14px !important;
+}
+
 .tiptap > * + * {
-  margin-top: 0.4em;
+  margin-top: 0.5em;
 }
 
 .tiptap > h1:first-child {
@@ -943,6 +964,14 @@ html[data-smooth-caret="false"] .tiptap {
   margin-bottom: 0.95em !important;
 }
 
+/* Paragraphs (top-level blocks only, preserving zero margins in list/task items) */
+.tiptap > p {
+  margin-top: 0;
+  margin-bottom: 0.45em;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* Headings */
 .tiptap h1 {
   font-size: 1.7rem;
@@ -950,7 +979,9 @@ html[data-smooth-caret="false"] .tiptap {
   line-height: 1.3;
   color: var(--text-primary);
   margin-top: 0.9em;
-  margin-bottom: 0.2em;
+  margin-bottom: 0.4em;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .tiptap h2 {
@@ -959,7 +990,9 @@ html[data-smooth-caret="false"] .tiptap {
   line-height: 1.35;
   color: var(--text-primary);
   margin-top: 0.8em;
-  margin-bottom: 0.2em;
+  margin-bottom: 0.35em;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .tiptap h3 {
@@ -968,7 +1001,22 @@ html[data-smooth-caret="false"] .tiptap {
   line-height: 1.4;
   color: var(--text-secondary);
   margin-top: 0.7em;
-  margin-bottom: 0.15em;
+  margin-bottom: 0.3em;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+  margin-top: 0.6em;
+  margin-bottom: 0.25em;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 /* Lists */
@@ -984,9 +1032,11 @@ html[data-smooth-caret="false"] .tiptap {
 .tiptap ul:not([data-type="taskList"]) li,
 .tiptap ol li {
   list-style-position: inside;
-  margin-bottom: 0.5em;
+  margin-bottom: 6px;
   line-height: 1.65;
   color: var(--text-primary);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .tiptap ul:not([data-type="taskList"]) li::marker {
@@ -1009,14 +1059,17 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .tiptap li {
-  margin-bottom: 0.5em;
+  margin-bottom: 6px;
   line-height: 1.65;
   color: var(--text-primary);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .tiptap li p {
   margin: 0;
   display: inline;
+  padding: 0;
 }
 
 .tiptap li strong,
@@ -1043,34 +1096,40 @@ html[data-smooth-caret="false"] .tiptap {
   align-items: flex-start;
   gap: 8px;
   margin-bottom: 6px;
-  line-height: 1.85;
+  line-height: 1.65;
   min-width: 0;
   max-width: 100%;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li > div {
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
-  line-height: 1.85;
+  line-height: 1.65;
   overflow-wrap: break-word;
   word-break: break-word;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li > div > p {
   margin: 0;
-  line-height: 1.85;
+  line-height: 1.65;
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
@@ -1112,7 +1171,9 @@ html[data-smooth-caret="false"] .tiptap {
 .tiptap blockquote {
   border-left: 3px solid var(--color-accent);
   padding-left: 14px;
-  margin: 0.8em 0;
+  padding-right: 8px;
+  margin: 0.8em -8px;
+  max-width: none !important;
   color: var(--text-secondary);
 }
 
@@ -1144,7 +1205,8 @@ html[data-smooth-caret="false"] .tiptap {
 /* ── Modern Code Block (Header with Liquid Glass Language Selector & Copy Button) ── */
 .code-block-wrapper {
   position: relative;
-  margin: 1.1em 0;
+  margin: 1.1em -8px;
+  max-width: none !important;
   border-radius: 12px;
   background: var(--code-block-bg, rgba(24, 24, 28, 0.95));
   border: 1px solid var(--code-block-border, rgba(255, 255, 255, 0.08));
@@ -1443,7 +1505,8 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 pre.notefast-code-block {
-  margin: 1.1em 0 !important;
+  margin: 1.1em -8px !important;
+  max-width: none !important;
   padding: 26px 14px 12px 14px !important;
   background: var(--code-block-bg, rgba(24, 24, 28, 0.95)) !important;
   border: 1px solid var(--code-block-border, rgba(255, 255, 255, 0.08)) !important;
@@ -2165,15 +2228,73 @@ body:has(.command-overlay) .editor-char-count {
   transition: background-color 80ms ease, box-shadow 80ms ease, border-radius 80ms ease;
   position: relative;
   outline: none !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
 }
 
-/* Apply left/right margin ONLY to text block spaces, NEVER tables or code blocks */
-.raynote-block-selected:not(table):not(.tableWrapper):not(pre):not(.code-block-wrapper):not(.notefast-code-block),
-.notefast-block-selected:not(table):not(.tableWrapper):not(pre):not(.code-block-wrapper):not(.notefast-code-block) {
-  margin-left: -10px !important;
-  padding-left: 10px !important;
+/* Left & right margin/padding ONLY for todolist, bullet points, normal paragraph, headings, numlist */
+.tiptap ul[data-type="taskList"] li.raynote-block-selected,
+.tiptap ul[data-type="taskList"] li.notefast-block-selected,
+.tiptap ul:not([data-type="taskList"]) li.raynote-block-selected,
+.tiptap ul:not([data-type="taskList"]) li.notefast-block-selected,
+.tiptap ol li.raynote-block-selected,
+.tiptap ol li.notefast-block-selected,
+.tiptap > p.raynote-block-selected,
+.tiptap > p.notefast-block-selected,
+.tiptap > h1.raynote-block-selected,
+.tiptap > h1.notefast-block-selected,
+.tiptap > h2.raynote-block-selected,
+.tiptap > h2.notefast-block-selected,
+.tiptap > h3.raynote-block-selected,
+.tiptap > h3.notefast-block-selected,
+.tiptap > h4.raynote-block-selected,
+.tiptap > h4.notefast-block-selected,
+.tiptap > h5.raynote-block-selected,
+.tiptap > h5.notefast-block-selected,
+.tiptap > h6.raynote-block-selected,
+.tiptap > h6.notefast-block-selected {
+  margin-left: -8px !important;
+  padding-left: 8px !important;
   margin-right: -8px !important;
   padding-right: 8px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  max-width: none !important;
+}
+
+/* Headings inside blockquote: never apply negative margin */
+.tiptap blockquote h1.raynote-block-selected,
+.tiptap blockquote h2.raynote-block-selected,
+.tiptap blockquote h3.raynote-block-selected,
+.tiptap blockquote h4.raynote-block-selected,
+.tiptap blockquote h5.raynote-block-selected,
+.tiptap blockquote h6.raynote-block-selected {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+}
+
+/* Blockquote selection: matches selection gutter with -8px margins */
+.tiptap blockquote.raynote-block-selected,
+.tiptap blockquote.notefast-block-selected {
+  margin-left: -8px !important;
+  margin-right: -8px !important;
+  padding-left: 14px !important;
+  padding-right: 8px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-left: 3px solid var(--color-accent) !important;
+  border-radius: 6px !important;
+  max-width: none !important;
+}
+
+.tiptap blockquote.raynote-block-selected p,
+.tiptap blockquote.notefast-block-selected p {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
 }
 
 .dark .raynote-block-selected,
@@ -2194,39 +2315,41 @@ body:has(.command-overlay) .editor-char-count {
   border-radius: 6px !important;
 }
 
-/* Table block selection: strictly NO extra margin or padding shift */
+/* Table block selection: matches selection gutter */
 .tiptap table.raynote-block-selected,
 .tiptap .tableWrapper.raynote-block-selected {
-  margin-left: 0 !important;
+  margin-left: -8px !important;
+  margin-right: -8px !important;
   padding-left: 0 !important;
-  margin-right: 0 !important;
   padding-right: 0 !important;
-  border-radius: 6px !important;
+  border-radius: 14px !important;
+  max-width: none !important;
   overflow: hidden !important;
 }
 
 .tiptap table.raynote-block-selected tr:first-child th:first-child,
 .tiptap table.raynote-block-selected tr:first-child td:first-child {
-  border-top-left-radius: 6px !important;
+  border-top-left-radius: 14px !important;
 }
 .tiptap table.raynote-block-selected tr:first-child th:last-child,
 .tiptap table.raynote-block-selected tr:first-child td:last-child {
-  border-top-right-radius: 6px !important;
+  border-top-right-radius: 14px !important;
 }
 .tiptap table.raynote-block-selected tr:last-child td:first-child {
-  border-bottom-left-radius: 6px !important;
+  border-bottom-left-radius: 14px !important;
 }
 .tiptap table.raynote-block-selected tr:last-child td:last-child {
-  border-bottom-right-radius: 6px !important;
+  border-bottom-right-radius: 14px !important;
 }
 
-/* Code block selection: strictly NO extra margin or padding shift */
+/* Code block selection: matches selection gutter */
 .tiptap pre.notefast-code-block.raynote-block-selected,
 .tiptap .code-block-wrapper.raynote-block-selected,
 .tiptap pre.notefast-code-block[data-block-selected="true"],
 .tiptap .code-block-wrapper[data-block-selected="true"] {
-  margin-left: 0 !important;
-  margin-right: 0 !important;
+  margin-left: -8px !important;
+  margin-right: -8px !important;
+  max-width: none !important;
 }
 
 /* ── Code Block Selection Styling (Light & Dark Mode) ──── */
@@ -2294,12 +2417,20 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 [data-scroll-container].is-block-dragging {
+  overflow-x: hidden !important;
+  overscroll-behavior: none;
   overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
 }
 
 [data-scroll-container] {
+  overflow-x: hidden !important;
+  overscroll-behavior: none;
   overscroll-behavior-y: none;
-  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: none;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* Hide native text selection when blocks are selected */
@@ -3169,7 +3300,8 @@ body:has(.command-overlay) .editor-char-count {
 /* ── Table Styling ────────────────────────────────────── */
 .tiptap .tableWrapper {
   overflow-x: auto;
-  margin: 14px 0;
+  margin: 14px -8px;
+  max-width: none !important;
   border-radius: 14px;
   border: 1px solid var(--table-cell-border);
   background: transparent;

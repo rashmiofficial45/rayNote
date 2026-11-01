@@ -510,6 +510,18 @@ export function Editor({
           class: "tiptap",
           spellcheck: "false",
         },
+        scrollMargin: {
+          top: 66,
+          bottom: 96,
+          left: 0,
+          right: 0,
+        },
+        scrollThreshold: {
+          top: 66,
+          bottom: 96,
+          left: 0,
+          right: 0,
+        },
         handleDOMEvents: {
           blur: () => {
             saveNow();
@@ -731,6 +743,7 @@ export function Editor({
           requestAnimationFrame(() => {
             if (scrollContainerRef.current && currentNoteIdRef.current === targetId) {
               scrollContainerRef.current.scrollTop = targetScroll;
+              scrollContainerRef.current.scrollLeft = 0;
             }
           });
         };
@@ -820,6 +833,9 @@ export function Editor({
     if (!container) return;
 
     const handleScroll = () => {
+      if (container.scrollLeft !== 0) {
+        container.scrollLeft = 0;
+      }
       if (currentNoteIdRef.current) {
         noteCache.updateScrollTop(currentNoteIdRef.current, container.scrollTop);
       }
