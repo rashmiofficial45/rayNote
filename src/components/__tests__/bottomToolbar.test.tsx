@@ -5,7 +5,6 @@ import { createRoot, Root } from "react-dom/client";
 import { Editor } from "@tiptap/core";
 import { getExtensions } from "../../editor/extensions";
 import { BottomToolbar } from "../BottomToolbar";
-import * as dictationModule from "../../lib/dictation";
 import * as themeModule from "../../lib/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -51,64 +50,13 @@ describe("BottomToolbar UI Component", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders dictation and format corner buttons", () => {
+  it("renders format corner button", () => {
     act(() => {
       root.render(<BottomToolbar editor={editor} />);
     });
 
-    const dictationBtn = container.querySelector(".dictation-corner-btn");
     const formatBtn = container.querySelector(".format-corner-btn[aria-label='Format']");
-
-    expect(dictationBtn).not.toBeNull();
     expect(formatBtn).not.toBeNull();
-    expect(dictationBtn?.getAttribute("aria-label")).toBe("Voice Dictation");
-  });
-
-  it("clicking dictation button triggers toggleDictation", () => {
-    const toggleSpy = vi.spyOn(dictationModule, "toggleDictation").mockResolvedValue(true);
-
-    act(() => {
-      root.render(<BottomToolbar editor={editor} />);
-    });
-
-    const dictationBtn = container.querySelector(".dictation-corner-btn") as HTMLButtonElement;
-    expect(dictationBtn).not.toBeNull();
-
-    act(() => {
-      dictationBtn.click();
-    });
-
-    expect(toggleSpy).toHaveBeenCalled();
-  });
-
-  it("reflects active dictation state in button classes", () => {
-    let notifyCallback: (listening: boolean) => void = () => {};
-    vi.spyOn(dictationModule, "subscribeDictationState").mockImplementation((cb) => {
-      notifyCallback = cb;
-      cb(false);
-      return () => {};
-    });
-
-    act(() => {
-      root.render(<BottomToolbar editor={editor} />);
-    });
-
-    const dictationBtn = container.querySelector(".dictation-corner-btn") as HTMLButtonElement;
-    expect(dictationBtn.classList.contains("is-dictating")).toBe(false);
-
-    // Simulate dictation starting
-    act(() => {
-      notifyCallback(true);
-    });
-
-    expect(dictationBtn.classList.contains("is-dictating")).toBe(true);
-
-    // Simulate dictation ending
-    act(() => {
-      notifyCallback(false);
-    });
-
-    expect(dictationBtn.classList.contains("is-dictating")).toBe(false);
   });
 
   it("toggles format menu when format button is clicked", () => {

@@ -11,7 +11,6 @@ import {
   findBlockAtPos,
 } from "../extensions/BlockSelection";
 import { smartToggleBlockFormat, smartToggleMark } from "./formatMemory";
-import { toggleDictation } from "../lib/dictation";
 
 export const ShortcutsExtension = Extension.create({
   name: "shortcutsExtension",
@@ -86,24 +85,6 @@ export const ShortcutsExtension = Extension.create({
         } else {
           this.editor.chain().focus().setLink({ href: url.trim() }).run();
         }
-        return true;
-      },
-
-      // Voice Dictation: ⌥D or ⌘⌥D
-      "Alt-d": () => {
-        toggleDictation(this.editor);
-        return true;
-      },
-      "Alt-D": () => {
-        toggleDictation(this.editor);
-        return true;
-      },
-      "Mod-Alt-d": () => {
-        toggleDictation(this.editor);
-        return true;
-      },
-      "Mod-Alt-D": () => {
-        toggleDictation(this.editor);
         return true;
       },
 

@@ -23,7 +23,7 @@ tauri_panel! {
 
 #[cfg(target_os = "macos")]
 thread_local! {
-    static LAST_GRAB: std::cell::Cell<Option<std::time::Instant>> = std::cell::Cell::new(None);
+    static LAST_GRAB: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
 }
 
 /// Main thread, every 100ms. Panel visible + mouse is over the panel + not key => take keyboard focus.
@@ -81,7 +81,7 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
 
         // Cooldown to avoid spamming focus grabs
         let cooling = LAST_GRAB.with(|c| {
-            c.get().map_or(false, |t| t.elapsed() < Duration::from_millis(250))
+            c.get().is_some_and(|t| t.elapsed() < Duration::from_millis(250))
         });
         if cooling {
             return;
@@ -344,7 +344,7 @@ unsafe fn setup_macos_edit_menu() {
     let _: () = msg_send![main_menu, addItem: edit_item];
 }
 
-pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
+fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>) {
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::ManagerExt;
@@ -400,6 +400,14 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
     }
 }
 
+pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
+    let app_handle = manager.app_handle().clone();
+    let app_clone = app_handle.clone();
+    let _ = app_handle.run_on_main_thread(move || {
+        show_and_focus_main_panel_inner(&app_clone);
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -418,35 +426,38 @@ pub fn run() {
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        use tauri::Emitter;
+                        let app_handle = app.clone();
+                        let _ = app.run_on_main_thread(move || {
+                            use tauri::Emitter;
 
-                        #[cfg(target_os = "macos")]
-                        {
-                            use tauri_nspanel::ManagerExt;
+                            #[cfg(target_os = "macos")]
+                            {
+                                use tauri_nspanel::ManagerExt;
 
-                            if let Ok(panel) = app.get_webview_panel("main") {
-                                if panel.is_visible() {
-                                    let _ = app.emit("panel-will-hide", ());
-                                    panel.hide();
-                                } else {
-                                    show_and_focus_main_panel(app);
-                                }
-                            }
-                        }
-
-                        #[cfg(not(target_os = "macos"))]
-                        {
-                            if let Some(window) = app.get_webview_window("main") {
-                                if let Ok(is_visible) = window.is_visible() {
-                                    if is_visible {
-                                        let _ = window.emit("panel-will-hide", ());
-                                        let _ = window.hide();
+                                if let Ok(panel) = app_handle.get_webview_panel("main") {
+                                    if panel.is_visible() {
+                                        let _ = app_handle.emit("panel-will-hide", ());
+                                        panel.hide();
                                     } else {
-                                        show_and_focus_main_panel(app);
+                                        show_and_focus_main_panel_inner(&app_handle);
                                     }
                                 }
                             }
-                        }
+
+                            #[cfg(not(target_os = "macos"))]
+                            {
+                                if let Some(window) = app_handle.get_webview_window("main") {
+                                    if let Ok(is_visible) = window.is_visible() {
+                                        if is_visible {
+                                            let _ = window.emit("panel-will-hide", ());
+                                            let _ = window.hide();
+                                        } else {
+                                            show_and_focus_main_panel_inner(&app_handle);
+                                        }
+                                    }
+                                }
+                            }
+                        });
                     }
                 })
                 .build(),
@@ -568,7 +579,6 @@ pub fn run() {
             set_menu_bar_visible,
             export_notes_to_folder,
             export_all_notes_from_db,
-            start_native_dictation,
             flush_done,
             checkpoint_passive,
             write_to_clipboard,
