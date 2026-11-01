@@ -1164,10 +1164,10 @@ mod tests {
 
     #[test]
     fn test_database_update_missing_row_mapped_returns_note_not_found() {
-        let temp_dir = std::env::temp_dir().join(format!("raynote_map_test_{}", uuid::Uuid::new_v4()));
-        let db = Database::new(temp_dir.clone()).expect("Failed to initialize test db");
-        let result = db.update_note("missing-id-999", "Title", "Content").map_err(map_update_note_error);
-        assert_eq!(result, Err("NOTE_NOT_FOUND".to_string()));
+        let temp_dir: std::path::PathBuf = std::env::temp_dir().join(format!("raynote_map_test_{}", uuid::Uuid::new_v4()));
+        let db: Database = Database::new(temp_dir.clone()).expect("Failed to initialize test db");
+        let result: Result<String, String> = db.update_note("missing-id-999", "Title", "Content").map_err(map_update_note_error);
+        assert_eq!(result, Err::<String, String>("NOTE_NOT_FOUND".to_string()));
         let _ = std::fs::remove_dir_all(temp_dir);
     }
 

@@ -792,6 +792,8 @@ body,
 /* ── Tiptap Editor Container ──────────────────────────── */
 .editor-wrapper {
   contain: layout style;
+  max-width: 100%;
+  overflow-x: hidden !important;
 }
 
 .tiptap {
@@ -812,6 +814,21 @@ body,
   user-select: text;
   position: relative;
   box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tiptap p,
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap li,
+.tiptap blockquote {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
 }
 
 /* Hide native caret when smooth caret is enabled, show dynamic accent native caret if disabled */
@@ -1018,6 +1035,7 @@ html[data-smooth-caret="false"] .tiptap {
 .tiptap ul[data-type="taskList"] {
   list-style: none;
   padding-left: 0;
+  max-width: 100%;
 }
 
 .tiptap ul[data-type="taskList"] li {
@@ -1026,16 +1044,26 @@ html[data-smooth-caret="false"] .tiptap {
   gap: 8px;
   margin-bottom: 6px;
   line-height: 1.85;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .tiptap ul[data-type="taskList"] li > div {
   flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   line-height: 1.85;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .tiptap ul[data-type="taskList"] li > div > p {
   margin: 0;
   line-height: 1.85;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .tiptap ul[data-type="taskList"] li > label {
@@ -1548,13 +1576,24 @@ pre.notefast-code-block:hover {
 }
 
 .tiptap a,
-.editor-link {
+.editor-link,
+.tiptap a span,
+.tiptap a s,
+.tiptap a del,
+.tiptap a strike,
+.tiptap s a,
+.tiptap del a,
+.tiptap strike a {
   color: var(--color-accent-text, #8b7af7);
   text-decoration: underline;
   text-decoration-color: var(--color-accent-muted, rgba(108, 92, 231, 0.45));
   text-underline-offset: 3px;
   cursor: pointer;
   transition: color 0.12s ease, text-decoration-color 0.12s ease;
+  overflow-wrap: anywhere !important;
+  word-break: break-all !important;
+  white-space: normal !important;
+  max-width: 100%;
 }
 
 .tiptap a:hover,

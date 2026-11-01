@@ -462,4 +462,120 @@ describe("useBlockDrag Hook & Event Behavior", () => {
       window.dispatchEvent(new MouseEvent("pointerup"));
     });
   });
+
+  it("clicking above the first block focuses 'start' and clears block selection", () => {
+    const blockEl = createMockBlockElement();
+    const mockFocusStart = vi.fn();
+    const mockFocusEnd = vi.fn();
+    const mockEditor = createMockEditor(blockEl);
+    mockEditor.chain = () => ({
+      focus: (target?: string) => ({
+        run: target === "start" ? mockFocusStart : mockFocusEnd,
+      }),
+    }) as any;
+
+    let scrollEl!: HTMLDivElement;
+    act(() => {
+      root.render(
+        <TestHarness
+          mockEditor={mockEditor}
+          onMount={(s) => {
+            scrollEl = s;
+          }}
+        />
+      );
+    });
+
+    scrollEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 800,
+      width: 800,
+      height: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Click above first block (firstBlockTop is 50, click at y: 25)
+    const pointerDownEvent = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 200,
+      clientY: 25,
+      button: 0,
+    }) as any;
+    pointerDownEvent.pointerId = 1;
+
+    act(() => {
+      scrollEl.dispatchEvent(pointerDownEvent);
+    });
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent("pointerup"));
+    });
+
+    expect(mockFocusStart).toHaveBeenCalledTimes(1);
+    expect(mockFocusEnd).not.toHaveBeenCalled();
+    expect(mockEditor.view.dispatch).toHaveBeenCalled();
+  });
+
+  it("clicking below the last block focuses 'end' and clears block selection", () => {
+    const blockEl = createMockBlockElement();
+    const mockFocusStart = vi.fn();
+    const mockFocusEnd = vi.fn();
+    const mockEditor = createMockEditor(blockEl);
+    mockEditor.chain = () => ({
+      focus: (target?: string) => ({
+        run: target === "start" ? mockFocusStart : mockFocusEnd,
+      }),
+    }) as any;
+
+    let scrollEl!: HTMLDivElement;
+    act(() => {
+      root.render(
+        <TestHarness
+          mockEditor={mockEditor}
+          onMount={(s) => {
+            scrollEl = s;
+          }}
+        />
+      );
+    });
+
+    scrollEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      bottom: 600,
+      right: 800,
+      width: 800,
+      height: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => {},
+    });
+
+    // Click below last block (lastBlockBottom is 90, click at y: 200)
+    const pointerDownEvent = new MouseEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 200,
+      clientY: 200,
+      button: 0,
+    }) as any;
+    pointerDownEvent.pointerId = 1;
+
+    act(() => {
+      scrollEl.dispatchEvent(pointerDownEvent);
+    });
+
+    act(() => {
+      window.dispatchEvent(new MouseEvent("pointerup"));
+    });
+
+    expect(mockFocusEnd).toHaveBeenCalledTimes(1);
+    expect(mockFocusStart).not.toHaveBeenCalled();
+    expect(mockEditor.view.dispatch).toHaveBeenCalled();
+  });
 });

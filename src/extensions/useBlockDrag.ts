@@ -220,7 +220,10 @@ export function useBlockDrag({
     cachedBlocks: [] as CachedBlockRect[],
     selectedPositions: [] as number[],
     hasMoved: false,
+    isAboveFirstBlock: false,
     isBelowLastBlock: false,
+    isLeftMargin: false,
+    isRightMargin: false,
     isEmptyBlock: false,
     isBeyondText: false,
     rafId: null as number | null,
@@ -496,21 +499,35 @@ export function useBlockDrag({
       const state = dragRef.current;
       if (state.isDragging) {
         if (!state.hasMoved) {
+          // Always clear block selection when clicking without dragging
+          updateSelectedPositionsInView([]);
+
           // Click in empty space without dragging
-          if (state.isBelowLastBlock || state.isEmptyBlock) {
-            // Click below the last line or on empty block at end of note -> put caret at the end of the note!
+          if (state.isAboveFirstBlock) {
+            // Clicked in top padding or above the first line -> place caret at start of note
+            editor.chain().focus("start").run();
+          } else if (state.isBelowLastBlock) {
+            // Click below the last line -> put caret at the end of the note
             editor.chain().focus("end").run();
-          } else if (state.isBeyondText) {
+          } else {
+            // Margin, empty block, or beyond text -> place caret at closest position on that line
             const clickPos = editor.view.posAtCoords({
               left: state.currentPointerX,
               top: state.currentPointerY,
             });
             if (clickPos) {
               editor.commands.setTextSelection(clickPos.pos);
+            } else if (state.cachedBlocks.length > 0) {
+              const blockIdx = findBlockIndexByDocY(state.cachedBlocks, state.startDocY, true);
+              if (blockIdx >= 0 && blockIdx < state.cachedBlocks.length) {
+                const b = state.cachedBlocks[blockIdx];
+                const targetPos = state.isRightMargin || state.isBeyondText
+                  ? Math.max(b.pos, b.pos + b.nodeSize - 1)
+                  : Math.min(editor.state.doc.content.size, b.pos + 1);
+                editor.commands.setTextSelection(targetPos);
+              }
             }
             editor.view.focus();
-          } else {
-            updateSelectedPositionsInView([]);
           }
         } else {
           // Drag finished
@@ -694,7 +711,10 @@ export function useBlockDrag({
       state.cachedBlocks = cachedBlocks;
       state.selectedPositions = [];
       state.hasMoved = false;
+      state.isAboveFirstBlock = isAboveFirstBlock;
       state.isBelowLastBlock = isBelowLastBlock;
+      state.isLeftMargin = isLeftMargin;
+      state.isRightMargin = isRightMargin;
       state.isEmptyBlock = isEmptyBlock;
       state.isBeyondText = isBeyondText;
 
