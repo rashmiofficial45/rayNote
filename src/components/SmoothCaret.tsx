@@ -144,7 +144,8 @@ export function SmoothCaret({
 
     try {
       const from = state.selection.from;
-      const coords = view.coordsAtPos(from);
+      const side = state.selection.$from.parentOffset === 0 ? 1 : -1;
+      const coords = view.coordsAtPos(from, side);
       const parent = caret.parentElement;
       if (!parent || !coords) return;
 

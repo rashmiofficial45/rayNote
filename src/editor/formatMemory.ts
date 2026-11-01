@@ -14,7 +14,7 @@ export type FormatKind =
   | "codeBlock"
   | "paragraph";
 
-export type MarkKind = "bold" | "italic" | "underline" | "strike" | "highlight";
+export type MarkKind = "bold" | "italic" | "underline" | "strike" | "highlight" | "code";
 
 /**
  * Global attribute extension allowing nodes to store their previous formatting block type.
@@ -271,6 +271,8 @@ export function smartToggleMark(editor: Editor, markType: MarkKind): boolean {
         return editor.chain().focus().toggleStrike().run();
       case "highlight":
         return editor.chain().focus().toggleHighlight().run();
+      case "code":
+        return editor.chain().focus().toggleCode().run();
     }
   }
 

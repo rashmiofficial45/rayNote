@@ -21,6 +21,7 @@ import {
   CheckSquare,
   Quote,
   Code2,
+  Code,
   Minus,
   Type,
   Bold,
@@ -125,6 +126,15 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     icon: <Code2 size={13} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
+    },
+  },
+  {
+    title: "Inline Code",
+    badge: "inline",
+    aliases: ["inline", "code", "inlinecode", "ic"],
+    icon: <Code size={13} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).toggleCode().run();
     },
   },
   {

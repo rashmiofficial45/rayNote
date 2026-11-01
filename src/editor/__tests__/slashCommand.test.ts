@@ -73,4 +73,21 @@ describe('SlashCommand item filtering and ranking', () => {
     expect(items.length).toBe(1);
     expect(items[0].title).toBe('Italic');
   });
+
+  it('matches both Code Block and Inline Code for query "code"', () => {
+    const items = getItems({ query: 'code' });
+    const titles = items.map((i: any) => i.title);
+    expect(titles).toContain('Code Block');
+    expect(titles).toContain('Inline Code');
+  });
+
+  it('matches Inline Code for query "inline" and "ic"', () => {
+    const itemsInline = getItems({ query: 'inline' });
+    const titlesInline = itemsInline.map((i: any) => i.title);
+    expect(titlesInline).toContain('Inline Code');
+
+    const itemsIc = getItems({ query: 'ic' });
+    const titlesIc = itemsIc.map((i: any) => i.title);
+    expect(titlesIc).toContain('Inline Code');
+  });
 });

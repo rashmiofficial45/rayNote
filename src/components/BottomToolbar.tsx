@@ -14,6 +14,7 @@ import {
   Underline as UnderlineIcon,
   Strikethrough,
   Highlighter as HighlightIcon,
+  Code,
   Minus,
   Table as TableIcon,
   ALargeSmall,
@@ -193,6 +194,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
           isUnderline: false,
           isStrike: false,
           isHighlight: false,
+          isCode: false,
           isHeading1: false,
           isHeading2: false,
           isBulletList: false,
@@ -210,6 +212,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         isUnderline: ed.isActive("underline"),
         isStrike: ed.isActive("strike"),
         isHighlight: ed.isActive("highlight"),
+        isCode: ed.isActive("code"),
         isHeading1: ed.isActive("heading", { level: 1 }),
         isHeading2: ed.isActive("heading", { level: 2 }),
         isBulletList: ed.isActive("bulletList"),
@@ -231,6 +234,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     formatState?.isUnderline ||
     formatState?.isStrike ||
     formatState?.isHighlight ||
+    formatState?.isCode ||
     formatState?.isHeading1 ||
     formatState?.isHeading2 ||
     formatState?.isBulletList ||
@@ -320,6 +324,14 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
               title="Highlight (⇧⌘H)"
             >
               <HighlightIcon size={14} />
+            </button>
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => smartToggleMark(editor, "code")}
+              className={`toolbar-btn liquid-btn ${formatState?.isCode ? "is-active" : ""}`}
+              title="Inline Code (⌘E)"
+            >
+              <Code size={14} />
             </button>
           </div>
 
