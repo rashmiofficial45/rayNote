@@ -1023,41 +1023,45 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
 
         let _ = builder
             .on_menu_event(|app, event| {
-                match event.id().as_ref() {
-                    "toggle" => {
-                        #[cfg(target_os = "macos")]
-                        {
-                            use tauri_nspanel::ManagerExt;
-                            if let Ok(panel) = app.get_webview_panel("main") {
-                                if panel.is_visible() {
-                                    use tauri::Emitter;
-                                    let _ = app.emit("panel-will-hide", ());
-                                    panel.hide();
-                                } else {
-                                    crate::show_and_focus_main_panel(app);
+                let app_handle = app.clone();
+                let event_id = event.id().as_ref().to_string();
+                let _ = app.run_on_main_thread(move || {
+                    match event_id.as_str() {
+                        "toggle" => {
+                            #[cfg(target_os = "macos")]
+                            {
+                                use tauri_nspanel::ManagerExt;
+                                if let Ok(panel) = app_handle.get_webview_panel("main") {
+                                    if panel.is_visible() {
+                                        use tauri::Emitter;
+                                        let _ = app_handle.emit("panel-will-hide", ());
+                                        panel.hide();
+                                    } else {
+                                        crate::show_and_focus_main_panel(&app_handle);
+                                    }
                                 }
                             }
+                            #[cfg(not(target_os = "macos"))]
+                            {
+                                crate::show_and_focus_main_panel(&app_handle);
+                            }
                         }
-                        #[cfg(not(target_os = "macos"))]
-                        {
-                            crate::show_and_focus_main_panel(app);
+                        "new" => {
+                            crate::show_and_focus_main_panel(&app_handle);
+                            use tauri::Emitter;
+                            if let Some(win) = app_handle.get_webview_window("main") {
+                                let _ = win.emit("new-note", ());
+                            }
                         }
-                    }
-                    "new" => {
-                        crate::show_and_focus_main_panel(app);
-                        use tauri::Emitter;
-                        if let Some(win) = app.get_webview_window("main") {
-                            let _ = win.emit("new-note", ());
+                        "settings" => {
+                            let _ = crate::commands::open_settings_window(app_handle.clone());
                         }
+                        "quit" => {
+                            app_handle.exit(0);
+                        }
+                        _ => {}
                     }
-                    "settings" => {
-                        let _ = crate::commands::open_settings_window(app.clone());
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                }
+                });
             })
             .build(&app)
             .map_err(|e| e.to_string())?;
@@ -1094,25 +1098,6 @@ pub async fn get_storage_stats(
     })
     .await
     .map_err(|e| e.to_string())?
-}
-
-#[tauri::command]
-pub fn start_native_dictation() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    unsafe {
-        use objc2::msg_send;
-        use objc2::runtime::AnyObject;
-        let app_class = objc2::class!(NSApplication);
-        let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
-        let sel = objc2::sel!(startDictation:);
-        let _: () = msg_send![
-            shared_app,
-            sendAction: sel,
-            to: std::ptr::null_mut::<AnyObject>(),
-            from: std::ptr::null_mut::<AnyObject>()
-        ];
-    }
-    Ok(())
 }
 
 #[tauri::command]

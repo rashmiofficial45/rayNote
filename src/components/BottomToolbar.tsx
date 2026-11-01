@@ -22,10 +22,8 @@ import {
   Sun,
   Moon,
   Monitor,
-  Mic,
 } from "lucide-react";
 import { smartToggleBlockFormat, smartToggleMark } from "../editor/formatMemory";
-import { toggleDictation, subscribeDictationState } from "../lib/dictation";
 import {
   ACCENT_OPTIONS,
   FONT_OPTIONS,
@@ -55,13 +53,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
-  const [isDictating, setIsDictating] = useState(false);
-
-  useEffect(() => {
-    return subscribeDictationState((listening) => {
-      setIsDictating(listening);
-    });
-  }, []);
 
   useEffect(() => {
     const handleAccent = (e: Event) => {
@@ -330,15 +321,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             >
               <HighlightIcon size={14} />
             </button>
-            <div className="toolbar-separator" />
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => toggleDictation(editor)}
-              className={`toolbar-btn liquid-btn ${isDictating ? "is-dictating is-active" : ""}`}
-              title={isDictating ? "Stop Dictation (⌥D)" : "Voice Dictation (⌥D or Fn twice)"}
-            >
-              <Mic size={14} className={isDictating ? "animate-pulse" : ""} />
-            </button>
           </div>
 
           <div className="expanded-toolbar-divider" />
@@ -488,17 +470,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
       )}
 
       <div className="bottom-corner-buttons-row">
-        <button
-          type="button"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => toggleDictation(editor)}
-          className={`format-corner-btn liquid-btn dictation-corner-btn ${isDictating ? "is-dictating is-active" : ""}`}
-          title={isDictating ? "Stop Dictation (⌥D)" : "Voice Dictation (⌥D or Fn twice)"}
-          aria-label="Voice Dictation"
-        >
-          <Mic size={17} className={isDictating ? "animate-pulse" : ""} />
-        </button>
-
         <button
           type="button"
           onClick={() => setIsMenuOpen((prev) => !prev)}

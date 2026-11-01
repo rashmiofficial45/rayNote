@@ -407,26 +407,6 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
   });
 
   describe("8. Keyboard Shortcuts Mapping in shortcutsExtension", () => {
-    it("binds Voice Dictation shortcuts (Alt-d, Alt-D, Mod-Alt-d, Mod-Alt-D)", () => {
-      const editor = createTestEditor();
-      const shortcutsExt = editor.extensionManager.extensions.find(
-        (ext) => ext.name === "shortcutsExtension"
-      );
-      const shortcuts = (shortcutsExt as any)?.config?.addKeyboardShortcuts?.call({ editor });
-
-      expect(typeof shortcuts["Alt-d"]).toBe("function");
-      expect(typeof shortcuts["Alt-D"]).toBe("function");
-      expect(typeof shortcuts["Mod-Alt-d"]).toBe("function");
-      expect(typeof shortcuts["Mod-Alt-D"]).toBe("function");
-
-      // Execution returns true
-      expect(shortcuts["Alt-d"]()).toBe(true);
-      expect(shortcuts["Alt-D"]()).toBe(true);
-      expect(shortcuts["Mod-Alt-d"]()).toBe(true);
-      expect(shortcuts["Mod-Alt-D"]()).toBe(true);
-      editor.destroy();
-    });
-
     it("binds Heading shortcuts and toggles heading levels correctly", () => {
       const editor = createTestEditor("<p>Heading Line</p>");
       editor.commands.setTextSelection(3);

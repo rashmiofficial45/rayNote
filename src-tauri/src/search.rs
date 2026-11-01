@@ -70,11 +70,12 @@ pub fn normalize_query(s: &str) -> String {
         if normalized_char.is_alphanumeric() {
             out.push(normalized_char);
             last_was_space = false;
-        } else if normalized_char.is_whitespace() || normalized_char == '-' || normalized_char == '_' {
-            if !last_was_space && !out.is_empty() {
-                out.push(' ');
-                last_was_space = true;
-            }
+        } else if (normalized_char.is_whitespace() || normalized_char == '-' || normalized_char == '_')
+            && !last_was_space
+            && !out.is_empty()
+        {
+            out.push(' ');
+            last_was_space = true;
         }
     }
 
@@ -121,11 +122,11 @@ pub fn damerau_levenshtein(s1: &str, s2: &str) -> usize {
 
     let mut d = [[0usize; 49]; 49];
 
-    for i in 0..=len1 {
-        d[i][0] = i;
+    for (i, row) in d.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
-    for j in 0..=len2 {
-        d[0][j] = j;
+    for (j, item) in d[0].iter_mut().enumerate().take(len2 + 1) {
+        *item = j;
     }
 
     for i in 1..=len1 {
@@ -509,11 +510,7 @@ pub fn generate_contextual_snippet(
         }
 
         let chars_before = max_len / 3;
-        let mut start_idx = if match_char_idx > chars_before {
-            match_char_idx - chars_before
-        } else {
-            0
-        };
+        let mut start_idx = match_char_idx.saturating_sub(chars_before);
 
         // Snap start_idx to the next space so we don't awkwardly split words in half
         if start_idx > 0 && start_idx < match_char_idx {
