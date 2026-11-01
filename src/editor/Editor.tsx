@@ -1025,9 +1025,40 @@ export function Editor({
       // If a drag just concluded, ignore
       if (Date.now() - getLastDragEndTime() < 300) return;
 
-      if (editor && !editor.isDestroyed) {
-        editor.chain().focus("end").run();
+      if (!editor || editor.isDestroyed) return;
+
+      // Clear any active block selection
+      editor.commands.clearBlockSelection?.();
+
+      const tiptapDom = editor.view.dom as HTMLElement | null;
+      const editorRect = tiptapDom?.getBoundingClientRect();
+
+      if (editorRect) {
+        // Clicks in top padding or above editor text -> focus at start
+        if (e.clientY < editorRect.top + 60) {
+          editor.chain().focus("start").run();
+          return;
+        }
+
+        // Clicks strictly below editor content -> focus at end
+        if (e.clientY > editorRect.bottom) {
+          editor.chain().focus("end").run();
+          return;
+        }
+
+        // Clicks in side margins -> place caret at corresponding line
+        const clampedX = Math.max(
+          editorRect.left + 10,
+          Math.min(editorRect.right - 10, e.clientX)
+        );
+        const pos = editor.view.posAtCoords({ left: clampedX, top: e.clientY });
+        if (pos) {
+          editor.chain().focus().setTextSelection(pos.pos).run();
+          return;
+        }
       }
+
+      editor.chain().focus("end").run();
     },
     [editor]
   );
@@ -1045,7 +1076,7 @@ export function Editor({
         ref={scrollContainerRef}
         data-scroll-container
         onClick={handleWrapperClick}
-        className="flex-1 min-h-0 overflow-y-auto relative"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative"
       >
         <div
           style={zoomLevel && zoomLevel !== 1 ? ({ zoom: zoomLevel } as React.CSSProperties) : undefined}

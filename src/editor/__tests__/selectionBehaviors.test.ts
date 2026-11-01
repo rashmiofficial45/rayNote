@@ -34,6 +34,27 @@ describe("Selection Behaviors & Hit-Testing Acceptance Suite", () => {
       expect(editor.state.selection.to).toBe(docEnd);
       editor.destroy();
     });
+    it("focus('start') positions caret at the very beginning of the document", () => {
+      const editor = createTestEditor("<h1>Header title</h1><p>Line 2 with extra words</p>");
+      editor.chain().focus("end").run();
+      expect(editor.state.selection.from).toBe(editor.state.doc.content.size - 1);
+
+      // Simulates clicking top padding or above first block
+      editor.chain().focus("start").run();
+      expect(editor.state.selection.from).toBe(1);
+      expect(editor.state.selection.to).toBe(1);
+      editor.destroy();
+    });
+
+    it("clearing block selection dismisses selected positions and restores normal text selection", () => {
+      const editor = createTestEditor("<p>Block 1</p><p>Block 2</p>");
+      editor.commands.setBlockSelection(0, 10, [0, 10]);
+      editor.commands.clearBlockSelection();
+      editor.chain().focus("start").run();
+
+      expect(editor.state.selection.from).toBe(1);
+      editor.destroy();
+    });
   });
 
   describe("2. Word Double-Click Selection", () => {

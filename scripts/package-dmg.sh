@@ -39,15 +39,16 @@ if [[ -n "${TARGET_ARG}" ]]; then
   CANDIDATE_PATHS+=("${ROOT_DIR}/src-tauri/target/${TARGET_ARG}/release/bundle/macos/rayNote.app")
 fi
 CANDIDATE_PATHS+=(
-  "${ROOT_DIR}/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/rayNote.app"
   "${ROOT_DIR}/src-tauri/target/release/bundle/macos/rayNote.app"
+  "${ROOT_DIR}/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/rayNote.app"
 )
 
 APP_SRC=""
 for p in "${CANDIDATE_PATHS[@]}"; do
   if [[ -d "$p" ]]; then
-    APP_SRC="$p"
-    break
+    if [[ -z "${APP_SRC}" || "$p" -nt "${APP_SRC}" ]]; then
+      APP_SRC="$p"
+    fi
   fi
 done
 
@@ -60,8 +61,9 @@ if [[ -z "${APP_SRC}" || ! -d "${APP_SRC}" ]]; then
   fi
   for p in "${CANDIDATE_PATHS[@]}"; do
     if [[ -d "$p" ]]; then
-      APP_SRC="$p"
-      break
+      if [[ -z "${APP_SRC}" || "$p" -nt "${APP_SRC}" ]]; then
+        APP_SRC="$p"
+      fi
     fi
   done
 fi
@@ -69,6 +71,11 @@ fi
 if [[ -z "${APP_SRC}" || ! -d "${APP_SRC}" ]]; then
   echo "❌ Error: Could not locate rayNote.app"
   exit 1
+fi
+
+# Ensure latest compiled binary is synced into the app bundle
+if [[ -f "${ROOT_DIR}/src-tauri/target/release/raynote" && -d "${APP_SRC}/Contents/MacOS" ]]; then
+  cp -f "${ROOT_DIR}/src-tauri/target/release/raynote" "${APP_SRC}/Contents/MacOS/raynote"
 fi
 
 echo "📦 Bundling application: ${APP_SRC}"
