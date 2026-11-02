@@ -11,7 +11,7 @@
  * - Recency-Preserving: Every `get()` promotes the entry to the front of the LRU queue.
  */
 
-import { safeLocalStorageSetItem, safeLocalStorageRemoveItem } from "./storage";
+import { safeLocalStorageSetItem, clearActiveNoteSnapshot, readActiveNoteSnapshot, writeActiveNoteSnapshot } from "./storage";
 
 export interface CachedNote {
   id: string;
@@ -52,17 +52,9 @@ export class NoteLRUCache {
    * Hydrates the most recently active note from localStorage on app boot (0ms cold start).
    */
   hydrateFromLocalStorage(): void {
-    if (typeof localStorage === "undefined") return;
-    try {
-      const activeId = localStorage.getItem("notefast_active_note_id");
-      const activeContent = localStorage.getItem("notefast_active_note_content");
-      const baseUpdatedAt = localStorage.getItem("notefast_active_note_base_updated_at") || "";
-      const unsaved = localStorage.getItem("notefast_active_note_unsaved") === "true";
-      if (activeId && activeContent) {
-        this.set(activeId, activeContent, baseUpdatedAt, undefined, 0, unsaved);
-      }
-    } catch {
-      // Ignore storage errors
+    const snapshot = readActiveNoteSnapshot();
+    if (snapshot) {
+      this.set(snapshot.id, snapshot.content, snapshot.baseUpdatedAt, undefined, 0, snapshot.unsaved);
     }
   }
 
@@ -75,18 +67,14 @@ export class NoteLRUCache {
     baseUpdatedAt?: string,
     unsaved = false
   ): void {
-    if (typeof localStorage === "undefined") return;
-    safeLocalStorageSetItem("notefast_active_note_id", id);
+    // A target selection must never replace the outgoing document's pending recovery.
+    const previous = readActiveNoteSnapshot();
+    if (previous?.unsaved && previous.id !== id) return;
     if (content && content.length <= 65536) {
-      safeLocalStorageSetItem("notefast_active_note_content", content);
-      if (baseUpdatedAt) {
-        safeLocalStorageSetItem("notefast_active_note_base_updated_at", baseUpdatedAt);
-      }
-      safeLocalStorageSetItem("notefast_active_note_unsaved", unsaved ? "true" : "false");
+      writeActiveNoteSnapshot({ id, content, baseUpdatedAt: baseUpdatedAt || "", unsaved });
     } else {
-      safeLocalStorageRemoveItem("notefast_active_note_content");
-      safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
-      safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+      clearActiveNoteSnapshot();
+      safeLocalStorageSetItem("notefast_active_note_id", id);
     }
   }
 
@@ -143,7 +131,7 @@ export class NoteLRUCache {
     content: string,
     baseUpdatedAt?: number | string,
     preview?: string,
-    scrollTop = 0,
+    scrollTop?: number,
     unsaved = false
   ): void {
     const baseUpdatedStr =
@@ -176,7 +164,7 @@ export class NoteLRUCache {
       updatedAt: ts,
       preview,
       title: preview,
-      scrollTop: existing ? (scrollTop || existing.scrollTop) : scrollTop,
+      scrollTop: scrollTop ?? existing?.scrollTop ?? 0,
       byteSize,
     };
 
@@ -203,7 +191,7 @@ export class NoteLRUCache {
    */
   updateContent(id: string, content: string, preview?: string): void {
     const entry = this.cache.get(id);
-    const newByteSize = this.estimateSize(content, preview);
+    const newByteSize = this.estimateSize(content, preview ?? entry?.preview);
     const oldByteSize = entry ? entry.byteSize : 0;
     const currentScroll = entry ? entry.scrollTop : 0;
     const baseUpdatedAt = entry ? entry.baseUpdatedAt : new Date().toISOString();
@@ -249,14 +237,7 @@ export class NoteLRUCache {
     const entry = this.cache.get(id);
     if (entry) {
       this.currentTotalBytes -= entry.byteSize;
-      if (typeof localStorage !== "undefined") {
-        const activeId = localStorage.getItem("notefast_active_note_id");
-        if (activeId === id) {
-          try {
-            localStorage.removeItem("notefast_active_note_content");
-          } catch { }
-        }
-      }
+      clearActiveNoteSnapshot(id);
       return this.cache.delete(id);
     }
     return false;

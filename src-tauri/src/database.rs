@@ -199,16 +199,29 @@ impl Database {
         std::fs::create_dir_all(&app_dir).ok();
         let db_path = app_dir.join("raynote.db");
 
-        // Seamless migration: copy notes from legacy notefast.db if raynote.db doesn't exist yet
+        // Read through SQLite so committed WAL pages are included in the migration.
+        // Publish only a complete backup; a failed migration must remain retryable.
         if !db_path.exists() {
             let local_legacy = app_dir.join("notefast.db");
-            if local_legacy.exists() {
-                let _ = std::fs::copy(&local_legacy, &db_path);
-            } else if let Some(parent) = app_dir.parent() {
-                let old_app_dir = parent.join("com.notefast.app");
-                let old_db = old_app_dir.join("notefast.db");
-                if old_db.exists() {
-                    let _ = std::fs::copy(&old_db, &db_path);
+            let legacy_path = if local_legacy.exists() {
+                Some(local_legacy)
+            } else {
+                app_dir.parent().map(|parent| parent.join("com.notefast.app/notefast.db"))
+                    .filter(|path| path.exists())
+            };
+            if let Some(legacy_path) = legacy_path {
+                let source = Connection::open_with_flags(&legacy_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+                let staging = app_dir.join(format!("raynote-migration-{}.db", uuid::Uuid::new_v4()));
+                if let Err(error) = source.backup(rusqlite::DatabaseName::Main, &staging, None) {
+                    let _ = std::fs::remove_file(&staging);
+                    return Err(error);
+                }
+                if let Err(error) = std::fs::rename(&staging, &db_path) {
+                    let _ = std::fs::remove_file(&staging);
+                    return Err(rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_IOERR),
+                        Some(error.to_string()),
+                    ));
                 }
             }
         }
@@ -235,7 +248,6 @@ impl Database {
             );
 
             CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
-            CREATE INDEX IF NOT EXISTS idx_notes_covering ON notes(is_pinned DESC, updated_at DESC, id, title, preview, created_at);
             "
         )?;
 
@@ -347,15 +359,18 @@ impl Database {
                     "CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC)",
                     [],
                 )?;
-                tx.execute(
-                    "CREATE INDEX IF NOT EXISTS idx_notes_covering ON notes(is_pinned DESC, updated_at DESC, id, title, preview, created_at)",
-                    [],
-                )?;
             }
 
             tx.execute("PRAGMA user_version = 3", [])?;
             tx.commit()?;
         }
+
+        // Legacy columns must exist before creating this index. Also restore it
+        // if an otherwise current database is missing the index.
+        writer.execute(
+            "CREATE INDEX IF NOT EXISTS idx_notes_covering ON notes(is_pinned DESC, updated_at DESC, id, title, preview, created_at)",
+            [],
+        )?;
 
         // Startup self-heal: if notes count != notes_fts count, repopulate FTS index
         let notes_count: i64 = writer
@@ -1052,8 +1067,8 @@ impl Database {
             note.preview.clone()
         };
 
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         {
-            let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute(
                 "INSERT INTO notes (id, title, content, preview, search_text, created_at, updated_at, is_pinned)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
@@ -1103,8 +1118,8 @@ impl Database {
         let preview = truncate_preview(&search_text, 120);
         let title_trimmed = title.trim();
 
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         {
-            let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
             let rows_affected = conn.execute(
                 "UPDATE notes SET title = CASE WHEN length(trim(?1)) > 0 THEN ?1 ELSE title END, content = ?2, preview = ?3, search_text = ?4, updated_at = ?5 WHERE id = ?6",
                 params![title_trimmed, content, preview, search_text, now, id],
@@ -1148,8 +1163,8 @@ impl Database {
 
     /// Permanently deletes a note from SQLite and removes it from meta_cache in-place.
     pub fn delete_note(&self, id: &str) -> Result<()> {
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         {
-            let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
         }
 
@@ -1167,8 +1182,8 @@ impl Database {
 
     /// Toggles the is_pinned boolean flag for a note and updates meta_cache in-place with re-sorting.
     pub fn toggle_pin(&self, id: &str) -> Result<bool> {
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         let new_pinned = {
-            let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
             let current: i32 = conn.query_row(
                 "SELECT is_pinned FROM notes WHERE id = ?1",
                 params![id],
@@ -1202,6 +1217,65 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_legacy_schema_migrates_before_covering_index() {
+        let dir = std::env::temp_dir().join(format!("raynote_legacy_schema_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let conn = Connection::open(dir.join("raynote.db")).unwrap();
+        conn.execute_batch("CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_pinned INTEGER NOT NULL DEFAULT 0);
+            INSERT INTO notes VALUES ('legacy', 'Legacy', 'Preserved text', '2026-01-01', '2026-01-01', 0);").unwrap();
+        drop(conn);
+        let db = Database::new(dir.clone()).expect("legacy schema must migrate successfully");
+        let note = db.get_note("legacy").unwrap().unwrap();
+        assert_eq!(note.content, "Preserved text");
+        assert_eq!(note.preview, "Preserved text");
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_legacy_migration_preserves_committed_wal_content() {
+        let dir = std::env::temp_dir().join(format!("raynote_legacy_wal_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let legacy = Connection::open(dir.join("notefast.db")).unwrap();
+        legacy.query_row("PRAGMA journal_mode=WAL", [], |_| Ok(())).unwrap();
+        legacy.query_row("PRAGMA wal_autocheckpoint=0", [], |_| Ok(())).unwrap();
+        legacy.execute_batch("CREATE TABLE notes (id TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '', content TEXT NOT NULL DEFAULT '', preview TEXT NOT NULL DEFAULT '', search_text TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, is_pinned INTEGER NOT NULL DEFAULT 0);
+").unwrap();
+        legacy.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(())).unwrap();
+        legacy.execute_batch("INSERT INTO notes VALUES ('wal-note', 'WAL note', 'Latest committed text', '', '', '2026-01-01', '2026-01-01', 0);").unwrap();
+        let db = Database::new(dir.clone()).expect("WAL database migration must succeed");
+        assert_eq!(db.get_note("wal-note").unwrap().expect("committed WAL row must survive migration").content, "Latest committed text");
+        drop(db);
+        drop(legacy);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn test_mutation_holds_writer_until_cache_is_published() {
+        let dir = std::env::temp_dir().join(format!("raynote_cache_publish_{}", uuid::Uuid::new_v4()));
+        let db = Arc::new(Database::new(dir.clone()).unwrap());
+        let note = Note { id: "test".into(), title: "Initial".into(), content: "Text".into(), preview: "Text".into(), created_at: "2026-01-01".into(), updated_at: "2026-01-01".into(), is_pinned: false };
+        db.create_note(&note).unwrap();
+        db.get_all_notes_arc().unwrap();
+        let cache_guard = db.meta_cache.write().unwrap();
+        let worker_db = db.clone();
+        let worker = std::thread::spawn(move || worker_db.update_note("test", "Latest", "New text").unwrap());
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while db.get_note("test").unwrap().unwrap().title != "Latest" {
+            assert!(std::time::Instant::now() < deadline, "update must reach SQL commit");
+            std::thread::yield_now();
+        }
+        let writer_is_held = db.writer.try_lock().is_err();
+        drop(cache_guard);
+        worker.join().unwrap();
+        assert!(writer_is_held, "a later mutation must not commit before this mutation publishes its cache state");
+        assert_eq!(db.get_all_notes_arc().unwrap()[0].title, db.get_note("test").unwrap().unwrap().title);
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
 
     #[test]
     fn test_summary_query_uses_covering_index() {

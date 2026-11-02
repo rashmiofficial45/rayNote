@@ -28,35 +28,28 @@ declare module "@tiptap/core" {
  */
 export function normalizeEmbedUrl(url: string | null): string {
   if (!url) return "";
-  let src = url.trim();
-
   try {
-    // If standard youtube watch URL or youtu.be shortlink
-    const ytWatchMatch = src.match(
-      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
-    );
-    if (ytWatchMatch && ytWatchMatch[1]) {
-      const videoId = ytWatchMatch[1];
-      const validHttp = src.startsWith("http://") || src.startsWith("https://") ? src : `https://${src}`;
-      const urlObj = new URL(validHttp);
-      const params = new URLSearchParams(urlObj.search);
-      params.delete("v");
-      const query = params.toString() ? `?${params.toString()}` : "";
-      return `https://www.youtube-nocookie.com/embed/${videoId}${query}`;
+    const source = url.trim();
+    const parsed = new URL(/^(?:www\.)?(?:youtube\.com|youtu\.be)\//i.test(source) ? `https://${source}` : source);
+    if (!["https:", "http:"].includes(parsed.protocol)) return "";
+    const host = parsed.hostname.toLowerCase();
+    let videoId: string | null = null;
+    if (host === "youtu.be" || host === "www.youtu.be") {
+      videoId = parsed.pathname.split("/")[1];
+    } else if (["youtube.com", "www.youtube.com", "m.youtube.com", "youtube-nocookie.com", "www.youtube-nocookie.com"].includes(host)) {
+      videoId = parsed.pathname === "/watch"
+        ? parsed.searchParams.get("v")
+        : parsed.pathname.match(/^\/(?:embed|shorts)\/([^/]+)/)?.[1] ?? null;
     }
-
-    // If already youtube.com/embed/, convert to youtube-nocookie.com/embed/
-    if (src.includes("youtube.com/embed/")) {
-      src = src.replace("youtube.com/embed/", "youtube-nocookie.com/embed/");
+    if (videoId && /^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
+      parsed.searchParams.delete("v");
+      const query = parsed.searchParams.toString();
+      return `https://www.youtube-nocookie.com/embed/${videoId}${query ? `?${query}` : ""}`;
     }
+    return parsed.href;
   } catch {
-    // Fallback if URL parsing fails
-    if (src.includes("youtube.com/embed/")) {
-      src = src.replace("youtube.com/embed/", "youtube-nocookie.com/embed/");
-    }
+    return "";
   }
-
-  return src;
 }
 
 export const IframeExtension = Node.create<IframeOptions>({
@@ -115,9 +108,10 @@ export const IframeExtension = Node.create<IframeOptions>({
         tag: "iframe[src]",
         getAttrs: (element) => {
           const el = element as HTMLIFrameElement;
-          const rawSrc = el.getAttribute("src");
+          const src = normalizeEmbedUrl(el.getAttribute("src"));
+          if (!src) return false;
           return {
-            src: normalizeEmbedUrl(rawSrc),
+            src,
             width: el.getAttribute("width") || "100%",
             height: el.getAttribute("height") || 315,
             frameborder: el.getAttribute("frameborder") || 0,
@@ -144,7 +138,8 @@ export const IframeExtension = Node.create<IframeOptions>({
       [
         "iframe",
         mergeAttributes(this.options.HTMLAttributes, HTMLAttributes, {
-          src: normalizedSrc,
+          src: normalizedSrc || undefined,
+          sandbox: "allow-scripts allow-presentation",
           class: "notefast-embed-iframe",
           referrerpolicy: "strict-origin-when-cross-origin",
           allow:
@@ -162,11 +157,13 @@ export const IframeExtension = Node.create<IframeOptions>({
       setIframe:
         (options) =>
         ({ commands }) => {
+          const src = normalizeEmbedUrl(options.src);
+          if (!src) return false;
           return commands.insertContent({
             type: this.name,
             attrs: {
               ...options,
-              src: normalizeEmbedUrl(options.src),
+              src,
               referrerpolicy: "strict-origin-when-cross-origin",
             },
           });

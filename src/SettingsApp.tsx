@@ -1,3 +1,4 @@
+import { requestClearAllNotes } from "./lib/noteDeletion";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -38,8 +39,6 @@ import {
   openAppDataFolder,
   getStorageStats,
   StorageStats,
-  getAllNotes,
-  deleteNote,
   exportAllNotesFromDb,
 } from "./lib/db";
 import {
@@ -455,16 +454,13 @@ export default function SettingsApp() {
   const handleClearAllNotes = async () => {
     if (!clearAgreed) return;
     try {
-      const notes = await getAllNotes();
-      for (const n of notes) {
-        await deleteNote(n.id);
-      }
+      await requestClearAllNotes();
       setIsClearing(false);
       setClearAgreed(false);
       loadStorageStats();
       setActionMessage("All notes cleared.");
       setTimeout(() => setActionMessage(null), 3000);
-      broadcastSync({ type: "notes_cleared" });
+
     } catch (err) {
       console.error(err);
       setActionMessage("Failed to clear notes.");

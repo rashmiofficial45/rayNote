@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Editor } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
+import { copyToClipboard } from "../lib/clipboard";
 import { POPULAR_LANGUAGES } from "./CodeBlockComponent";
 import { blockSelectionPluginKey } from "../extensions/BlockSelection";
 import { ensureLanguageLoaded } from "./extensions";
@@ -311,7 +312,8 @@ export function FloatingCodeBlockToolbar({
       const codeEl = activeBlock.dom.querySelector("code");
       const text = codeEl?.textContent || activeBlock.dom.textContent || "";
       if (text) {
-        navigator.clipboard.writeText(text).then(() => {
+        copyToClipboard(text).then((success) => {
+        if (!success) return;
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         });
@@ -376,10 +378,13 @@ export function FloatingCodeBlockToolbar({
       }
       if (!editor || !activeBlock?.dom) return;
 
-      // Ensure language grammar is loaded and registered in lowlight before applying node markup
-      await ensureLanguageLoaded(langValue);
-
+      const sourceDoc = editor.state.doc;
+      const sourceDom = activeBlock.dom;
       try {
+        // A single editor may switch documents while a lazy grammar import is loading.
+        await ensureLanguageLoaded(langValue);
+        if (editor.isDestroyed || editor.state.doc !== sourceDoc ||
+            activeBlockRef.current?.dom !== sourceDom || !document.body.contains(sourceDom)) return;
         const pos = editor.view.posAtDOM(activeBlock.dom, 0);
         const resolved = editor.state.doc.resolve(pos);
         let blockPos = pos;
@@ -400,6 +405,7 @@ export function FloatingCodeBlockToolbar({
         }
       } catch (err) {
         console.error("Failed to update code block language:", err);
+        return;
       }
 
       setActiveBlock((prev) => (prev ? { ...prev, language: langValue } : null));

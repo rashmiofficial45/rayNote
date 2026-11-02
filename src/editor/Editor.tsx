@@ -13,6 +13,7 @@
  * - Stale-While-Revalidate: Renders cached content immediately and verifies against SQLite in background.
  */
 
+import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -31,11 +32,11 @@ import {
   sliceToMarkdown,
 } from "./markdownUtils";
 import { noteCache, reconcileSnapshotWithDb } from "../lib/noteCache";
-import { getNote, registerEditorFlush } from "../lib/db";
+import { getNote, registerEditorFlush, registerEditorDiscard } from "../lib/db";
 import { titleStore } from "../lib/titleStore";
 import { saveStatusStore } from "../lib/saveStatusStore";
 import { SwitchConflictInfo } from "../components/SwitchConflictModal";
-import { safeLocalStorageRemoveItem } from "../lib/storage";
+import { clearActiveNoteSnapshot } from "../lib/storage";
 import { preloadLanguagesForContent, scanCodeBlockLanguages, ensureLanguageLoaded } from "./extensions";
 
 export interface EditorCharCountProps {
@@ -253,6 +254,7 @@ export function Editor({
 
   // Track the active note ID internally to identify transitions (starts null so initial note mounts cleanly)
   const currentNoteIdRef = useRef<string | null>(null);
+  const noteSwitchGenerationRef = useRef(0);
 
   /**
    * Synchronously flushes any uncommitted editor changes to the memory cache, parent state, & SQLite.
@@ -266,6 +268,11 @@ export function Editor({
       debounceTimer.current = null;
     }
     firstPendingChangeTimeRef.current = null;
+
+    if (currentNoteIdRef.current && discardedNoteIdRef.current === currentNoteIdRef.current) {
+      isDirtyRef.current = false;
+      return Promise.resolve();
+    }
 
     if (isSavingRef.current) {
       saveAgainRef.current = true;
@@ -325,6 +332,7 @@ export function Editor({
 
     // Update in-memory LRU cache immediately
     noteCache.updateContent(currentId, strContent, title);
+    noteCache.persistActiveToLocalStorage(currentId, strContent, noteCache.peek(currentId)?.baseUpdatedAt, true);
 
     const runCycle = async (): Promise<void> => {
       try {
@@ -343,8 +351,12 @@ export function Editor({
           const isStillDirty = Boolean(currentDocNow && lastSavedDocRef.current && !currentDocNow.eq(lastSavedDocRef.current));
           isDirtyRef.current = isStillDirty;
           if (typeof saveRes === "string") {
+            const recoveryContent = isStillDirty ? JSON.stringify(editorRef.current.getJSON()) : strContent;
+            if (isStillDirty) {
+              noteCache.updateContent(currentId, recoveryContent, currentTitleRef.current);
+            }
             noteCache.setBaseUpdatedAt(currentId, saveRes, isStillDirty);
-            noteCache.persistActiveToLocalStorage(currentId, strContent, saveRes, isStillDirty);
+            noteCache.persistActiveToLocalStorage(currentId, recoveryContent, saveRes, isStillDirty);
           }
         }
       } catch (err) {
@@ -547,8 +559,12 @@ export function Editor({
 
             if (isMdFile) {
               event.preventDefault();
+              const pasteNoteId = currentNoteIdRef.current;
+              const pasteGeneration = noteSwitchGenerationRef.current;
+              const pasteEditor = editorRef.current;
               file.text().then((mdText) => {
-                if (editorRef.current) {
+                if (pasteEditor && !pasteEditor.isDestroyed && editorRef.current === pasteEditor &&
+                    currentNoteIdRef.current === pasteNoteId && noteSwitchGenerationRef.current === pasteGeneration) {
                   const fallbackTitle = file.name.replace(/\.[^/.]+$/, "");
                   const html = markdownToTipTapHtml(mdText, {
                     ensureFirstLineH1: true,
@@ -576,6 +592,8 @@ export function Editor({
                     editorRef.current.commands.insertContent(html);
                   }
                 }
+              }).catch((error) => {
+                console.error("Failed to read pasted Markdown file:", error);
               });
               return true;
             }
@@ -610,6 +628,7 @@ export function Editor({
     if (!editor || editor.isDestroyed) return;
     const prevId = currentNoteIdRef.current;
     if (prevId === noteId) return; // Same note, no-op
+    noteSwitchGenerationRef.current += 1;
 
     let cancelled = false;
 
@@ -724,10 +743,11 @@ export function Editor({
           } catch { }
         };
 
-        const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number) => {
+        const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number, expectedDoc?: ProseMirrorNode) => {
           // Pre-scan and await all code block languages before setContent so lowlight decorates on first render
           await preloadLanguagesForContent(rawContent);
-          if (cancelled || currentNoteIdRef.current !== targetId || editor.isDestroyed) {
+          if (cancelled || currentNoteIdRef.current !== targetId || editor.isDestroyed ||
+              (expectedDoc && editor.state.doc !== expectedDoc)) {
             return;
           }
 
@@ -746,27 +766,29 @@ export function Editor({
               scrollContainerRef.current.scrollLeft = 0;
             }
           });
+          return true;
         };
 
         // 4. Retrieve incoming note from in-memory LRU cache
         const cached = noteCache.get(noteId);
         if (cached) {
-          await loadAndApplyDoc(cached.content, noteId, cached.scrollTop);
+          const applied = await loadAndApplyDoc(cached.content, noteId, cached.scrollTop);
+          if (!applied) return;
+          noteCache.persistActiveToLocalStorage(noteId, cached.content, cached.baseUpdatedAt, cached.unsaved);
 
+          const revalidationDoc = editor.state.doc;
           // Background Stale-While-Revalidate: verify with SQLite without blocking UI
           getNote(noteId)
-            .then((fullNote) => {
-              if (currentNoteIdRef.current === noteId && !cancelled) {
+            .then(async (fullNote) => {
+              if (currentNoteIdRef.current === noteId && !cancelled &&
+                  !editor.isDestroyed && editor.state.doc === revalidationDoc) {
                 const reconciliation = reconcileSnapshotWithDb(cached, fullNote);
                 if (reconciliation.action === "recover_orphan_as_new") {
                   noteCache.delete(noteId);
                   if (onRecoverOrphan) {
-                    Promise.resolve(onRecoverOrphan(reconciliation.content))
+                    Promise.resolve(onRecoverOrphan(reconciliation.content, noteId))
                       .then(() => {
-                        safeLocalStorageRemoveItem("notefast_active_note_content");
-                        safeLocalStorageRemoveItem("notefast_active_note_id");
-                        safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
-                        safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+                        clearActiveNoteSnapshot(noteId);
                       })
                       .catch((err) => {
                         console.error("Orphan recovery failed:", err);
@@ -777,15 +799,14 @@ export function Editor({
                   isDirtyRef.current = true;
                   saveNow();
                 } else if (reconciliation.action === "apply_db" && fullNote) {
-                  noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, cached.scrollTop, false);
-                  loadAndApplyDoc(fullNote.content, noteId, cached.scrollTop);
-                  isDirtyRef.current = false;
+                  const applied = await loadAndApplyDoc(fullNote.content, noteId, cached.scrollTop, revalidationDoc);
+                  if (applied) {
+                    noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, cached.scrollTop, false);
+                    noteCache.persistActiveToLocalStorage(noteId, fullNote.content, fullNote.updated_at, false);
+                  }
                 } else if (reconciliation.action === "evict_orphan") {
                   noteCache.delete(noteId);
-                  safeLocalStorageRemoveItem("notefast_active_note_content");
-                  safeLocalStorageRemoveItem("notefast_active_note_id");
-                  safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
-                  safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+                  clearActiveNoteSnapshot(noteId);
                 }
               }
             })
@@ -796,7 +817,10 @@ export function Editor({
             const fullNote = await getNote(noteId);
             if (fullNote && currentNoteIdRef.current === noteId && !cancelled) {
               noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0, false);
-              await loadAndApplyDoc(fullNote.content, noteId, 0);
+              const applied = await loadAndApplyDoc(fullNote.content, noteId, 0);
+              if (applied) {
+                noteCache.persistActiveToLocalStorage(noteId, fullNote.content, fullNote.updated_at, false);
+              }
             }
           } catch (err) {
             console.error("Failed to load note from SQLite:", err);
@@ -1007,8 +1031,24 @@ export function Editor({
   // Register editor flush handler so exit and blur handlers can synchronously commit dirty state
   useEffect(() => {
     registerEditorFlush(saveNow);
+    registerEditorDiscard((id) => {
+      if (currentNoteIdRef.current !== id) return;
+      discardedNoteIdRef.current = id;
+      isDirtyRef.current = false;
+      saveAgainRef.current = false;
+      lastSaveErrorRef.current = null;
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
+      }
+      if (halfOpenRetryTimerRef.current) {
+        clearTimeout(halfOpenRetryTimerRef.current);
+        halfOpenRetryTimerRef.current = null;
+      }
+    });
     return () => {
       registerEditorFlush(null);
+      registerEditorDiscard(null);
     };
   }, [saveNow]);
 

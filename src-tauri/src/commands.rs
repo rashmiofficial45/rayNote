@@ -604,6 +604,50 @@ pub struct ExportNoteItem {
     pub content: String,
 }
 
+fn write_export_note(export_dir: &std::path::Path, title: &str, content: &str, index: usize) -> std::io::Result<std::path::PathBuf> {
+    let raw_title = if title.trim().is_empty() {
+        format!("Untitled_{}", index + 1)
+    } else {
+        title.trim().to_string()
+    };
+    // Leave room for a collision suffix and extension within common 255-byte limits.
+    let mut safe_name = String::new();
+    for c in raw_title.chars() {
+        let c = match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
+            c if c.is_control() => '-',
+            _ => c,
+        };
+        if safe_name.len() + c.len_utf8() > 200 {
+            break;
+        }
+        safe_name.push(c);
+    }
+    use std::io::Write;
+    for suffix in 0.. {
+        let filename = if suffix == 0 {
+            format!("{}.md", safe_name)
+        } else {
+            format!("{} ({}).md", safe_name, suffix)
+        };
+        let file_path = export_dir.join(filename);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&file_path) {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(content.as_bytes()) {
+                    drop(file);
+                    let _ = std::fs::remove_file(&file_path);
+                    return Err(error);
+                }
+                return Ok(file_path);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    unreachable!()
+
+}
+
 #[tauri::command]
 pub fn export_notes_to_folder(
     app: tauri::AppHandle,
@@ -620,20 +664,7 @@ pub fn export_notes_to_folder(
     std::fs::create_dir_all(&export_dir).map_err(|e| e.to_string())?;
 
     for (idx, note) in notes.into_iter().enumerate() {
-        let raw_title = if note.title.trim().is_empty() {
-            format!("Untitled_{}", idx + 1)
-        } else {
-            note.title.trim().to_string()
-        };
-        let safe_name: String = raw_title
-            .chars()
-            .map(|c| match c {
-                '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
-                _ => c,
-            })
-            .collect();
-        let file_path = export_dir.join(format!("{}.md", safe_name));
-        std::fs::write(&file_path, note.content).map_err(|e| e.to_string())?;
+        write_export_note(&export_dir, &note.title, &note.content, idx).map_err(|e| e.to_string())?;
     }
 
     #[cfg(target_os = "macos")]
@@ -664,21 +695,8 @@ pub async fn export_all_notes_from_db(
 
         let all_notes = db.get_all_notes_with_content().map_err(|e| e.to_string())?;
         for (idx, note) in all_notes.into_iter().enumerate() {
-            let raw_title = if note.title.trim().is_empty() {
-                format!("Untitled_{}", idx + 1)
-            } else {
-                note.title.trim().to_string()
-            };
-            let safe_name: String = raw_title
-                .chars()
-                .map(|c| match c {
-                    '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '-',
-                    _ => c,
-                })
-                .collect();
-            let file_path = export_dir.join(format!("{}.md", safe_name));
             let md = note_content_to_markdown_clean(&note.content, &note.title);
-            std::fs::write(&file_path, md).map_err(|e| e.to_string())?;
+            write_export_note(&export_dir, &note.title, &md, idx).map_err(|e| e.to_string())?;
         }
 
         #[cfg(target_os = "macos")]
@@ -765,6 +783,10 @@ fn serialize_inline_json(node: &serde_json::Value) -> String {
         }
     }
     text
+}
+
+fn escape_html_attribute(value: &str) -> String {
+    value.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, indent: &str) {
@@ -913,7 +935,9 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                 let lang = node.get("attrs").and_then(|a| a.get("language")).and_then(|l| l.as_str()).unwrap_or("");
                 let mut code = String::new();
                 collect_text_only(node, &mut code);
-                out.push_str(&format!("{}```{}\n{}\n{}```\n\n", indent, lang, code, indent));
+                let longest_run = code.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+                let fence = "`".repeat(longest_run.max(2) + 1);
+                out.push_str(&format!("{}{}{}\n{}\n{}{}\n\n", indent, fence, lang, code, indent, fence));
             }
             "blockquote" => {
                 let mut bq_text = String::new();
@@ -927,6 +951,32 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                 }
                 out.push('\n');
             }
+            "iframe" | "youtube" => {
+                if let Some(attrs) = node.get("attrs") {
+                    if let Some(src) = attrs.get("src").and_then(|value| value.as_str()) {
+                        if let Ok(url) = tauri::Url::parse(src) {
+                            if matches!(url.scheme(), "http" | "https") {
+                                if node_type == "youtube" {
+                                    out.push_str(&format!("{}<{}>\n\n", indent, url.as_str().replace('<', "%3C").replace('>', "%3E")));
+                                    return;
+                                }
+                                let width = attrs.get("width").map(|value| value.as_str().map(str::to_owned).unwrap_or_else(|| value.to_string())).unwrap_or_else(|| "100%".into());
+                                let height = attrs.get("height").map(|value| value.as_str().map(str::to_owned).unwrap_or_else(|| value.to_string())).unwrap_or_else(|| "315".into());
+                                out.push_str(&format!("{}<iframe src=\"{}\" width=\"{}\" height=\"{}\" sandbox=\"allow-scripts allow-presentation\" allowfullscreen></iframe>\n\n",
+                                    indent, escape_html_attribute(src), escape_html_attribute(&width), escape_html_attribute(&height)));
+                            }
+                        }
+                    }
+                }
+            }
+            "tableRow" | "tableCell" | "tableHeader" => {
+                if let Some(content) = node.get("content").and_then(|content| content.as_array()) {
+                    for child in content {
+                        json_doc_to_markdown_recursive(child, out, indent);
+                    }
+                }
+            }
+            "hardBreak" => out.push_str("  \n"),
             "horizontalRule" => {
                 out.push_str(&format!("{}---\n\n", indent));
             }
@@ -937,8 +987,8 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                         if let Some(cell_nodes) = row.get("content").and_then(|c| c.as_array()) {
                             for cell in cell_nodes {
                                 let mut cell_text = String::new();
-                                collect_text_only(cell, &mut cell_text);
-                                cells.push(cell_text.replace('|', "\\|").trim().to_string());
+                                json_doc_to_markdown_recursive(cell, &mut cell_text, "");
+                                cells.push(cell_text.trim().replace('|', "\\|").replace('\n', "<br>"));
                             }
                         }
                         out.push_str(&format!("{}| {} |\n", indent, cells.join(" | ")));
@@ -1149,6 +1199,78 @@ pub async fn write_to_clipboard(text: String) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_exports_support_long_unicode_titles_and_control_characters() {
+        let dir = std::env::temp_dir().join(format!("raynote_long_exports_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for title in ["नमस्ते".repeat(50), "Short\0line\nend".into()] {
+            let path = write_export_note(&dir, &title, "Preserved note", 0).expect("valid note titles must export even when they exceed filesystem filename limits");
+            assert!(path.file_name().unwrap().as_encoded_bytes().len() <= 255);
+            assert_eq!(std::fs::read_to_string(path).unwrap(), "Preserved note");
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+
+    #[test]
+    fn test_markdown_export_preserves_embeds_with_escaped_attributes() {
+        let doc = serde_json::json!({"type":"doc", "content":[
+            {"type":"iframe","attrs":{"src":"https://example.com/embed?a=1&title=\"quote\"","width":"100%","height":400}},
+            {"type":"youtube","attrs":{"src":"https://www.youtube.com/watch?v=abcdefghijk"}},
+            {"type":"iframe","attrs":{"src":"javascript:alert(1)"}}
+        ]});
+        let md = note_content_to_markdown_clean(&doc.to_string(), "");
+        assert!(md.contains("src=\"https://example.com/embed?a=1&amp;title=&quot;quote&quot;\""), "iframe source and attribute escaping must survive: {md:?}");
+        assert!(md.contains("height=\"400\""));
+        assert!(md.contains("https://www.youtube.com/watch?v=abcdefghijk"));
+        assert!(!md.contains("javascript:"));
+    }
+
+    #[test]
+    fn test_markdown_export_preserves_table_cell_formatting_and_paragraphs() {
+        let doc = serde_json::json!({"type":"doc", "content":[
+            {"type":"table","content":[{"type":"tableRow","content":[{"type":"tableCell","content":[
+                {"type":"paragraph","content":[{"type":"text","text":"Bold | text","marks":[{"type":"bold"}]}]},
+                {"type":"paragraph","content":[{"type":"text","text":"Second line"}]}
+            ]}]}]}
+        ]});
+        let md = note_content_to_markdown_clean(&doc.to_string(), "");
+        assert!(md.contains("**Bold \\| text**<br><br>Second line"), "table cells must keep marks, delimiters, and paragraphs: {md:?}");
+    }
+
+
+    #[test]
+    fn test_markdown_export_preserves_hard_breaks_and_nested_code_fences() {
+        let doc = serde_json::json!({"type":"doc", "content":[
+            {"type":"paragraph","content":[{"type":"text","text":"First"},{"type":"hardBreak"},{"type":"text","text":"Second"}]},
+            {"type":"codeBlock","attrs":{"language":"markdown"},"content":[{"type":"text","text":"```js\nconst x = 1;\n```"}]}
+        ]});
+        let md = note_content_to_markdown_clean(&doc.to_string(), "");
+        assert!(md.contains("First  \nSecond"), "hard breaks must survive: {md:?}");
+        assert!(md.contains("````markdown\n```js\nconst x = 1;\n```\n````"), "code fences must exceed embedded backtick runs: {md:?}");
+    }
+
+
+    #[test]
+    fn test_exports_preserve_colliding_titles_and_existing_files() {
+        let dir = std::env::temp_dir().join(format!("raynote_exports_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("Same.md"), "Existing export").unwrap();
+        let first = write_export_note(&dir, "Same", "First note", 0).unwrap();
+        let second = write_export_note(&dir, "Same", "Second note", 1).unwrap();
+        let sanitized_a = write_export_note(&dir, "A/B", "Slash", 2).unwrap();
+        let sanitized_b = write_export_note(&dir, "A:B", "Colon", 3).unwrap();
+        assert_eq!(std::fs::read_to_string(dir.join("Same.md")).unwrap(), "Existing export");
+        assert_ne!(first, second);
+        assert_ne!(sanitized_a, sanitized_b);
+        assert_eq!(std::fs::read_to_string(first).unwrap(), "First note");
+        assert_eq!(std::fs::read_to_string(second).unwrap(), "Second note");
+        assert_eq!(std::fs::read_to_string(sanitized_a).unwrap(), "Slash");
+        assert_eq!(std::fs::read_to_string(sanitized_b).unwrap(), "Colon");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
 
     #[test]
     fn test_map_update_note_error_maps_query_returned_no_rows_to_note_not_found() {

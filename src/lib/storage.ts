@@ -33,7 +33,7 @@ export function isProtectedRecoveryKey(key: string): boolean {
 }
 
 export function safeLocalStorageSetItem(key: string, value: string): boolean {
-  if (typeof window === "undefined" || !window.localStorage) return false;
+  if (typeof window === "undefined") return false;
   try {
     localStorage.setItem(key, value);
     return true;
@@ -55,7 +55,7 @@ export function safeLocalStorageSetItem(key: string, value: string): boolean {
 }
 
 export function safeLocalStorageGetItem(key: string): string | null {
-  if (typeof window === "undefined" || !window.localStorage) return null;
+  if (typeof window === "undefined") return null;
   try {
     return localStorage.getItem(key);
   } catch {
@@ -64,7 +64,7 @@ export function safeLocalStorageGetItem(key: string): string | null {
 }
 
 export function safeLocalStorageRemoveItem(key: string): void {
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(key);
   } catch {}
@@ -95,24 +95,23 @@ export function createCoalescedWriter(
       return;
     }
     isExecuting = true;
-    try {
-      const res = writerFn();
-      if (res && typeof (res as any).then === "function") {
-        return (res as Promise<void>).finally(() => {
-          isExecuting = false;
-          if (retriggerPending) {
-            retriggerPending = false;
-            schedule();
-          }
-        });
-      }
-    } finally {
+    const complete = () => {
       isExecuting = false;
       if (retriggerPending) {
         retriggerPending = false;
         schedule();
       }
+    };
+    try {
+      const res = writerFn();
+      if (res && typeof res.then === "function") {
+        return res.finally(complete);
+      }
+    } catch (error) {
+      complete();
+      throw error;
     }
+    complete();
   };
 
   const schedule = () => {
@@ -134,4 +133,58 @@ export function createCoalescedWriter(
       retriggerPending = false;
     },
   };
+}
+
+export interface ActiveNoteSnapshot {
+  id: string;
+  content: string;
+  baseUpdatedAt: string;
+  unsaved: boolean;
+}
+
+const ACTIVE_SNAPSHOT_KEY = "notefast_active_note_snapshot";
+
+/** One atomic record owns recovery; legacy keys remain mirrors for compatibility. */
+export function readActiveNoteSnapshot(): ActiveNoteSnapshot | null {
+  const atomic = safeLocalStorageGetItem(ACTIVE_SNAPSHOT_KEY);
+  if (atomic !== null) {
+    try {
+      const record = JSON.parse(atomic);
+      if (record && typeof record.id === "string" && record.id &&
+          typeof record.content === "string" && typeof record.baseUpdatedAt === "string" &&
+          typeof record.unsaved === "boolean") return record;
+    } catch {}
+    return null;
+  }
+  const id = safeLocalStorageGetItem(STORAGE_KEYS.ACTIVE_NOTE_ID);
+  const content = safeLocalStorageGetItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT);
+  if (!id || content === null) return null;
+  return {
+    id, content,
+    baseUpdatedAt: safeLocalStorageGetItem("notefast_active_note_base_updated_at") || "",
+    unsaved: safeLocalStorageGetItem("notefast_active_note_unsaved") === "true",
+  };
+}
+
+export function writeActiveNoteSnapshot(snapshot: ActiveNoteSnapshot): boolean {
+  if (!safeLocalStorageSetItem(ACTIVE_SNAPSHOT_KEY, JSON.stringify(snapshot))) return false;
+  safeLocalStorageSetItem(STORAGE_KEYS.ACTIVE_NOTE_ID, snapshot.id);
+  safeLocalStorageSetItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT, snapshot.content);
+  safeLocalStorageSetItem("notefast_active_note_base_updated_at", snapshot.baseUpdatedAt);
+  safeLocalStorageSetItem("notefast_active_note_unsaved", String(snapshot.unsaved));
+  return true;
+}
+
+export function clearActiveNoteSnapshot(id?: string): void {
+  if (!id || readActiveNoteSnapshot()?.id === id) {
+    // A tombstone prevents partial legacy cleanup from being read as a snapshot.
+    // It is replaced atomically by the next complete snapshot.
+    safeLocalStorageSetItem(ACTIVE_SNAPSHOT_KEY, "null");
+  }
+  if (!id || safeLocalStorageGetItem(STORAGE_KEYS.ACTIVE_NOTE_ID) === id) {
+    safeLocalStorageRemoveItem(STORAGE_KEYS.ACTIVE_NOTE_ID);
+    safeLocalStorageRemoveItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT);
+    safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
+    safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+  }
 }

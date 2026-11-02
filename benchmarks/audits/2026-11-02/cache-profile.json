@@ -1,0 +1,39 @@
+{
+  "scope": "Isolated serialized-cache accounting and lookup microbenchmark; not native/WebKit process footprint",
+  "baseline": {
+    "entries": 25,
+    "trackedBytes": 350,
+    "retainedStringBytes": 10000350,
+    "maxBytes": 8388608,
+    "lookup100kMs": [
+      7.833292,
+      7.304667000000023,
+      7.157749999999993,
+      5.743290999999999,
+      5.532625000000024,
+      5.746915999999999,
+      5.711000000000013,
+      5.6106670000000065,
+      5.719124999999991
+    ],
+    "medianLookup100kMs": 5.743290999999999
+  },
+  "fixed": {
+    "entries": 20,
+    "trackedBytes": 8000280,
+    "retainedStringBytes": 8000280,
+    "maxBytes": 8388608,
+    "lookup100kMs": [
+      8.445625000000007,
+      7.492250000000013,
+      5.55125000000001,
+      5.605542000000014,
+      5.7409999999999854,
+      5.724041999999997,
+      5.7743750000000205,
+      5.761832999999967,
+      5.786457999999982
+    ],
+    "medianLookup100kMs": 5.761832999999967
+  }
+}

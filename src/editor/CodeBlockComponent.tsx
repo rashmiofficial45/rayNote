@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
+import { copyToClipboard } from "../lib/clipboard";
 
 export const POPULAR_LANGUAGES = [
   { label: "Bash", value: "bash", ext: "sh" },
@@ -48,7 +49,8 @@ export function CodeBlockComponent({
     e.stopPropagation();
     const text = node?.textContent || "";
     if (text) {
-      navigator.clipboard.writeText(text).then(() => {
+      copyToClipboard(text).then((success) => {
+        if (!success) return;
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       });

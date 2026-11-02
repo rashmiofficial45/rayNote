@@ -160,3 +160,28 @@ describe('NoteLRUCache Regression & Boundedness Tests', () => {
     expect(cache.size).toBe(1);
   });
 });
+
+
+describe('Cache accounting regressions', () => {
+  it('counts a preserved preview when updating content without a new preview', () => {
+    const cache = new NoteLRUCache(25, 100);
+    cache.set('a', '12345', undefined, 'p'.repeat(30));
+    cache.updateContent('a', '1234567890');
+    expect(cache.totalBytes).toBe(80);
+    cache.set('b', 'b'.repeat(15));
+    expect(cache.has('a')).toBe(false);
+    expect(cache.totalBytes).toBe(30);
+  });
+  it('restores an explicitly supplied zero scroll position', () => {
+    const cache = new NoteLRUCache();
+    cache.set('a', 'text', undefined, undefined, 500);
+    cache.set('a', 'text', undefined, undefined, 0);
+    expect(cache.getScrollTop('a')).toBe(0);
+  });
+  it('preserves scroll position when no position is supplied', () => {
+    const cache = new NoteLRUCache();
+    cache.set('a', 'text', undefined, undefined, 500);
+    cache.set('a', 'updated');
+    expect(cache.getScrollTop('a')).toBe(500);
+  });
+});

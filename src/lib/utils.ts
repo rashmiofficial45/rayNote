@@ -151,6 +151,17 @@ export function extractTitleFromMarkdown(text: string, fallbackFileName = "Untit
   return base || "Untitled Note";
 }
 
+/** Uses a fence longer than any backtick run in the source, preserving nested Markdown examples. */
+export function markdownCodeBlock(code: string, language = ""): string {
+  let fenceLength = 3;
+  for (const match of code.matchAll(/`+/g)) {
+    fenceLength = Math.max(fenceLength, match[0].length + 1);
+  }
+  const fence = "`".repeat(fenceLength);
+  const info = String(language).replace(/[\r\n`]/g, "");
+  return `${fence}${info}\n${code}\n${fence}\n\n`;
+}
+
 export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled"): string {
   if (!content) return `# ${fallbackTitle}\n\n`;
   try {
@@ -264,7 +275,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
         case "codeBlock": {
           const lang = node.attrs?.language || "";
           const text = (node.content || []).map((n: any) => n.text || "").join("");
-          return `\`\`\`${lang}\n${text}\n\`\`\`\n\n`;
+          return markdownCodeBlock(text, lang);
         }
         case "table": {
           const rows = node.content || [];

@@ -29,8 +29,9 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 
   // Layer 3: document.execCommand fallback
   if (typeof document !== "undefined") {
+    let textArea: HTMLTextAreaElement | undefined;
     try {
-      const textArea = document.createElement("textarea");
+      textArea = document.createElement("textarea");
       textArea.value = text;
       // Prevent scrolling to bottom of screen in iOS / Safari / WebKit
       textArea.style.position = "fixed";
@@ -41,10 +42,11 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       textArea.focus();
       textArea.select();
       const successful = document.execCommand("copy");
-      document.body.removeChild(textArea);
       if (successful) return true;
     } catch (err) {
       console.error("[clipboard] document.execCommand('copy') failed:", err);
+    } finally {
+      textArea?.remove();
     }
   }
 

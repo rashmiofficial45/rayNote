@@ -10,6 +10,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { clearActiveNoteSnapshot } from "./storage";
 
 /**
  * Lightweight note summary representation used for drawer listing,
@@ -105,6 +106,16 @@ export async function createNote(): Promise<Note> {
 
 let saveQueue: Promise<unknown> = Promise.resolve();
 let activeEditorFlush: (() => Promise<void> | void) | null = null;
+let activeEditorDiscard: ((id: string) => void) | null = null;
+
+/** Registers synchronous invalidation after a note has been deliberately deleted. */
+export function registerEditorDiscard(discardFn: ((id: string) => void) | null): void {
+  activeEditorDiscard = discardFn;
+}
+
+export function discardEditorNote(id: string): void {
+  activeEditorDiscard?.(id);
+}
 
 /**
  * Registers an active editor debounce flush callback.
@@ -249,14 +260,9 @@ export function registerExitFlushHandler(flushPendingCallback?: () => void): Pro
  */
 export async function deleteNote(id: string): Promise<void> {
   const result = await invoke<void>("delete_note", { id });
+  clearActiveNoteSnapshot(id);
   try {
     if (typeof localStorage !== "undefined") {
-      if (localStorage.getItem("notefast_active_note_id") === id) {
-        localStorage.removeItem("notefast_active_note_id");
-        localStorage.removeItem("notefast_active_note_content");
-        localStorage.removeItem("notefast_active_note_base_updated_at");
-        localStorage.removeItem("notefast_active_note_unsaved");
-      }
       const cached = localStorage.getItem("notefast_cached_notes");
       if (cached) {
         try {

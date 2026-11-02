@@ -85,7 +85,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
       // Cancel/ignore in-flight searches when palette closes
       requestIdRef.current++;
     }
-  }, [isOpen, notes]);
+  }, [isOpen]);
 
   // Real-time query execution with 0ms instant local match + fast FTS5 backend
   useEffect(() => {
@@ -99,7 +99,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
 
     // Empty query -> show notes or cached recent documents immediately
     if (!trimmed) {
-      if (notes && notes.length > 0) {
+      if (notes) {
         const mapped = notes.slice(0, 30).map(noteToSearchResult);
         setResults(mapped);
         cachedRecentNotes = mapped;
@@ -112,11 +112,10 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
       flushSaveQueue().then(() => {
         getRecentSearchResults(30)
           .then((recentNotes) => {
-            if (recentNotes && recentNotes.length > 0) {
+            if (requestIdRef.current === reqId) {
               cachedRecentNotes = recentNotes;
-              if (requestIdRef.current === reqId) {
-                setResults(recentNotes);
-              }
+              setResults(recentNotes);
+              setSelectedIndex(0);
             }
           })
           .catch(console.error);

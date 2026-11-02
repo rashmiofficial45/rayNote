@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import DOMPurify from "dompurify";
 import {
   FileText,
   X,
@@ -14,6 +15,7 @@ import {
 import { markdownToTipTapHtml } from "../editor/markdownUtils";
 import { extractTitleFromMarkdown } from "../lib/utils";
 import { openSettingsWindow } from "../lib/db";
+import { copyToClipboard } from "../lib/clipboard";
 import { DocumentTickSlider } from "./DocumentTickSlider";
 
 export interface PreviewFileData {
@@ -65,7 +67,9 @@ export function MarkdownViewerModal({
 
   const renderedHtml = useMemo(() => {
     if (!fileData?.content) return "";
-    return markdownToTipTapHtml(fileData.content);
+    return DOMPurify.sanitize(markdownToTipTapHtml(fileData.content), {
+      USE_PROFILES: { html: true },
+    });
   }, [fileData?.content]);
 
   const docTitle = useMemo(() => {
@@ -75,12 +79,15 @@ export function MarkdownViewerModal({
 
   if (!fileData) return null;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(fileData.content).then(() => {
-      setCopied(true);
-      onShowToast?.("Copied Markdown content to clipboard", <Check size={14} />);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  const handleCopy = async () => {
+    const copied = await copyToClipboard(fileData.content);
+    if (!copied) {
+      onShowToast?.("Failed to copy Markdown content to clipboard");
+      return;
+    }
+    setCopied(true);
+    onShowToast?.("Copied Markdown content to clipboard", <Check size={14} />);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleImport = () => {

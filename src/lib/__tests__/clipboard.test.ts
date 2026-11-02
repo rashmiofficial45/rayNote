@@ -83,5 +83,6 @@ describe("Clipboard Fallback Chain Suite", () => {
 
     const success = await copyToClipboard("All failed");
     expect(success).toBe(false);
+    expect(document.querySelectorAll("textarea")).toHaveLength(0);
   });
 });

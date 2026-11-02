@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { reconcileSnapshotWithDb, NoteLRUCache } from "../noteCache";
 import { deleteNote } from "../db";
 
@@ -8,6 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 describe("Fast-Boot Snapshot Reconciliation Invariants", () => {
+  beforeEach(() => localStorage.clear());
   const t0 = "2026-10-23T10:00:00.000Z";
   const t1 = "2026-10-23T10:00:01.500Z";
 

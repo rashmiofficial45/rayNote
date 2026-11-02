@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   safeLocalStorageSetItem,
+  safeLocalStorageGetItem,
   safeLocalStorageRemoveItem,
   createCoalescedWriter,
   STORAGE_KEYS,
@@ -102,5 +103,37 @@ describe("Storage Quota Protection & Write Coalescing (Item 3)", () => {
 
     safeLocalStorageRemoveItem("notefast_recovered_note_id");
     expect(localStorage.getItem("notefast_recovered_note_id")).toBeNull();
+  });
+});
+
+
+describe('Storage failure and concurrency regressions', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); });
+  it('handles a SecurityError from the localStorage getter itself', () => {
+    vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Storage disabled', 'SecurityError');
+    });
+    expect(() => safeLocalStorageSetItem('key', 'value')).not.toThrow();
+    expect(safeLocalStorageSetItem('key', 'value')).toBe(false);
+    expect(safeLocalStorageGetItem('key')).toBeNull();
+    expect(() => safeLocalStorageRemoveItem('key')).not.toThrow();
+  });
+  it('serializes async writes and coalesces retriggers until completion', async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    const writer = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => {
+      finish = resolve;
+    })).mockResolvedValue(undefined);
+    const coalesced = createCoalescedWriter(writer);
+    const first = coalesced.flush();
+    coalesced.flush();
+    coalesced.schedule();
+    await vi.advanceTimersByTimeAsync(32);
+    expect(writer).toHaveBeenCalledTimes(1);
+    finish();
+    await first;
+    await vi.advanceTimersByTimeAsync(16);
+    expect(writer).toHaveBeenCalledTimes(2);
+    coalesced.cancel();
   });
 });

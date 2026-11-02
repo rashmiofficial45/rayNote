@@ -21,7 +21,7 @@ import { CommandPalette } from "./components/CommandPalette";
 import { NoteEditor } from "./components/NoteEditor";
 import { Toast, ToastData } from "./components/Toast";
 import { ShortcutsModal } from "./components/ShortcutsModal";
-import { SmartSearch } from "./components/SmartSearch";
+import { SmartSearch, clearCachedRecentSearchResults } from "./components/SmartSearch";
 import { SwitchConflictModal, SwitchConflictInfo } from "./components/SwitchConflictModal";
 import { saveStatusStore } from "./lib/saveStatusStore";
 import { copyToClipboard } from "./lib/clipboard";
@@ -31,7 +31,7 @@ const MarkdownViewerModal = lazy(() =>
 );
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { safeLocalStorageSetItem, safeLocalStorageRemoveItem, createCoalescedWriter } from "./lib/storage";
+import { safeLocalStorageSetItem, safeLocalStorageRemoveItem, createCoalescedWriter, readActiveNoteSnapshot, clearActiveNoteSnapshot } from "./lib/storage";
 import {
   getNoteTitle,
   getPreviewText,
@@ -43,11 +43,13 @@ import {
 import { ensureFirstLineHeading } from "./editor/markdownUtils";
 import {
   getRecentNotes,
+  getAllNotes,
   getAdjacentNote,
   getNote,
   createNote,
   updateNote,
   deleteNote,
+  discardEditorNote,
   togglePin,
   saveWindowSize,
   hideWindow,
@@ -62,6 +64,7 @@ import {
   NoteSummary,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
+import { registerClearAllNotesHandler } from "./lib/noteDeletion";
 import { noteCache } from "./lib/noteCache";
 import { titleStore } from "./lib/titleStore";
 import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
@@ -110,7 +113,7 @@ function App() {
    * Priority: 1. Previously active note from localStorage, 2. First note in cache, 3. null.
    */
   const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
-    const saved = localStorage.getItem("notefast_active_note_id");
+    const saved = readActiveNoteSnapshot()?.id || localStorage.getItem("notefast_active_note_id");
     if (saved) return saved;
     try {
       const cached = localStorage.getItem("notefast_cached_notes");
@@ -123,7 +126,10 @@ function App() {
   });
 
   // Active fetch tracker to guard against out-of-order SQLite responses
-  const activeFetchIdRef = useRef<string | null>(null);
+  const activeFetchIdRef = useRef(0);
+  const [isClearingNotes, setIsClearingNotes] = useState(false);
+  const clearingNotesRef = useRef<Promise<void> | null>(null);
+  const deletingNoteRef = useRef<string | null>(null);
 
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
@@ -240,9 +246,16 @@ function App() {
       },
       onCommandsConfigChange: (val) => setCommandsConfig(val || getStoredCommandsConfig()),
       onNotesCleared: () => {
+        activeFetchIdRef.current++;
+        const snapshot = readActiveNoteSnapshot();
+        if (snapshot) discardEditorNote(snapshot.id);
         setNotes([]);
         setActiveNoteId(null);
+        setActiveNoteSummary(null);
+        titleStore.reset();
         noteCache.clear();
+        clearCachedRecentSearchResults();
+        clearActiveNoteSnapshot();
       },
     });
   }, []);
@@ -310,7 +323,9 @@ function App() {
     (failedId: string, err: unknown) => {
       console.warn(`[switch] Note switch aborted because saving note ${failedId} failed:`, err);
       setActiveNoteId(failedId);
-      safeLocalStorageSetItem("notefast_active_note_id", failedId);
+      const cached = noteCache.get(failedId);
+      if (cached) noteCache.persistActiveToLocalStorage(failedId, cached.content, cached.baseUpdatedAt, cached.unsaved);
+      else safeLocalStorageSetItem("notefast_active_note_id", failedId);
       showToast(
         "Save failed. Staying on current note to protect unsaved changes.",
         <AlertTriangle size={14} className="text-amber-400" />
@@ -330,8 +345,8 @@ function App() {
    *    (`activeFetchIdRef`) to prevent out-of-order race conditions.
    */
   const handleSelectNote = useCallback((id: string, summaryHint?: NoteSummary, recordHistory = true) => {
+    const requestId = ++activeFetchIdRef.current;
     setActiveNoteId(id);
-    safeLocalStorageSetItem("notefast_active_note_id", id);
 
     // Apply summary hint or find in recents/cache without DB fetch
     if (summaryHint) {
@@ -366,13 +381,23 @@ function App() {
     }
 
     // Fast in-memory LRU cache check (0ms instantaneous switch)
-    const cached = noteCache.get(id);
+    let cached = noteCache.get(id);
     if (!cached) {
-      activeFetchIdRef.current = id;
+      const snapshot = readActiveNoteSnapshot();
+      if (snapshot?.id === id && snapshot.unsaved) {
+        noteCache.set(id, snapshot.content, snapshot.baseUpdatedAt, undefined, 0, true);
+        cached = noteCache.get(id);
+      }
+    }
+    if (!cached) {
+      // A pending load must not leave the previous note's recovery content under this ID.
+      noteCache.persistActiveToLocalStorage(id, "");
       // Single fetch: populates both noteCache and activeNoteSummary
       getNote(id)
         .then((fullNote) => {
-          if (activeFetchIdRef.current === id && fullNote) {
+          if (activeFetchIdRef.current === requestId && fullNote) {
+            // The editor may have accepted edits while this duplicate summary fetch was pending.
+            if (noteCache.peek(id)?.unsaved) return;
             noteCache.set(fullNote.id, fullNote.content, fullNote.updated_at, fullNote.title, 0);
             titleStore.setTitle(fullNote.title);
             setActiveNoteSummary({
@@ -383,13 +408,7 @@ function App() {
               updated_at: fullNote.updated_at,
               is_pinned: fullNote.is_pinned,
             });
-            try {
-              if (fullNote.content.length <= 65536) {
-                safeLocalStorageSetItem("notefast_active_note_content", fullNote.content);
-              } else {
-                localStorage.removeItem("notefast_active_note_content");
-              }
-            } catch { }
+            noteCache.persistActiveToLocalStorage(id, fullNote.content, fullNote.updated_at, false);
           }
         })
         .catch((err) => {
@@ -412,13 +431,7 @@ function App() {
           }));
         }
       }
-      try {
-        if (cached.content.length <= 65536) {
-          safeLocalStorageSetItem("notefast_active_note_content", cached.content);
-        } else {
-          localStorage.removeItem("notefast_active_note_content");
-        }
-      } catch { }
+      noteCache.persistActiveToLocalStorage(id, cached.content, cached.baseUpdatedAt, cached.unsaved);
     }
   }, [recentNotes]);
 
@@ -571,7 +584,7 @@ function App() {
     async (content: string, sourceId?: string) => {
       try {
         // Idempotent recovery check: was a recovery already started for THIS snapshot before a crash?
-        const currentSourceId = sourceId || localStorage.getItem("notefast_active_note_id") || "unknown";
+        const currentSourceId = sourceId || readActiveNoteSnapshot()?.id || localStorage.getItem("notefast_active_note_id") || "unknown";
         let existingRecoveredId: string | null = null;
         const rawRecovered = localStorage.getItem("notefast_recovered_note_id");
         if (rawRecovered) {
@@ -623,13 +636,14 @@ function App() {
         }
 
         // 2. Persist content to SQLite before clearing snapshot keys
-        await updateNote(note.id, title, content);
-        noteCache.set(note.id, content, new Date().toISOString(), title, 0, false);
+        const recoveredUpdatedAt = await updateNote(note.id, title, content);
+        noteCache.set(note.id, content, recoveredUpdatedAt, title, 0, false);
+
+        // The replacement row is durable; release the source recovery before publishing its replacement.
+        clearActiveNoteSnapshot(currentSourceId);
 
         // 3. Update localStorage pointers to point to the newly recovered note
-        safeLocalStorageSetItem("notefast_active_note_id", note.id);
-        safeLocalStorageSetItem("notefast_active_note_content", content);
-        safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+        noteCache.persistActiveToLocalStorage(note.id, content, recoveredUpdatedAt, false);
         safeLocalStorageRemoveItem("notefast_recovered_note_id");
 
         // 4. Switch active selection to the new note
@@ -669,9 +683,10 @@ function App() {
       setRecentNotes(recents);
       safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(recents.slice(0, 30)));
 
-      const savedId = localStorage.getItem("notefast_active_note_id");
-      const savedContent = localStorage.getItem("notefast_active_note_content");
-      const isUnsaved = localStorage.getItem("notefast_active_note_unsaved") === "true";
+      const snapshot = readActiveNoteSnapshot();
+      const savedId = snapshot?.id || localStorage.getItem("notefast_active_note_id");
+      const savedContent = snapshot?.content;
+      const isUnsaved = snapshot?.unsaved === true;
 
       if (savedId) {
         const inRecents = recents.find((n) => n.id === savedId);
@@ -711,8 +726,8 @@ function App() {
               const recoveredNote = await getNote(recoveredId).catch(() => null);
               if (recoveredNote) {
                 // The recovered note was already created and persisted in SQLite before previous crash
-                safeLocalStorageSetItem("notefast_active_note_id", recoveredNote.id);
-                safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+                clearActiveNoteSnapshot(savedId);
+                noteCache.persistActiveToLocalStorage(recoveredNote.id, recoveredNote.content, recoveredNote.updated_at, false);
                 safeLocalStorageRemoveItem("notefast_recovered_note_id");
                 handleSelectNote(recoveredNote.id, {
                   id: recoveredNote.id,
@@ -731,10 +746,7 @@ function App() {
               await handleRecoverOrphan(savedContent, savedId);
             } else {
               // Clean orphan: clear snapshot and select first recent note if any
-              safeLocalStorageRemoveItem("notefast_active_note_id");
-              safeLocalStorageRemoveItem("notefast_active_note_content");
-              safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
-              safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+              clearActiveNoteSnapshot();
               safeLocalStorageRemoveItem("notefast_recovered_note_id");
               if (recents.length > 0) {
                 handleSelectNote(recents[0].id, recents[0]);
@@ -1120,16 +1132,22 @@ function App() {
    */
   const handleDeleteNote = useCallback(
     async (id: string) => {
+      if (deletingNoteRef.current || clearingNotesRef.current) return;
+      deletingNoteRef.current = id;
+      setIsClearingNotes(true);
       try {
+        await flushEditorNow();
+        flushPendingTitle();
+        await flushSaveQueue();
         await deleteNote(id);
-        noteCache.delete(id);
-        const savedId = localStorage.getItem("notefast_active_note_id");
-        if (savedId === id) {
-          safeLocalStorageRemoveItem("notefast_active_note_id");
-          safeLocalStorageRemoveItem("notefast_active_note_content");
-          safeLocalStorageRemoveItem("notefast_active_note_base_updated_at");
-          safeLocalStorageRemoveItem("notefast_active_note_unsaved");
+        discardEditorNote(id);
+        if (activeNoteId === id) {
+          activeFetchIdRef.current++;
+          setDiscardedNoteId(id);
         }
+        noteCache.delete(id);
+        clearCachedRecentSearchResults();
+        clearActiveNoteSnapshot(id);
         // Refetch recents after every delete
         const freshRecents = await getRecentNotes(30);
         setRecentNotes(freshRecents);
@@ -1141,18 +1159,60 @@ function App() {
           } else {
             setActiveNoteId(null);
             setActiveNoteSummary(null);
-            try {
-              localStorage.removeItem("notefast_active_note_id");
-            } catch { }
+            clearActiveNoteSnapshot(id);
           }
         }
         showToast("Note deleted", <Trash2 size={14} />);
       } catch (err) {
         console.error("Failed to delete note:", err);
+      } finally {
+        deletingNoteRef.current = null;
+        setIsClearingNotes(false);
       }
     },
-    [activeNoteId, handleSelectNote, showToast]
+    [activeNoteId, handleSelectNote, showToast, flushPendingTitle]
   );
+
+  const handleClearAllNotes = useCallback((): Promise<void> => {
+    if (clearingNotesRef.current) return clearingNotesRef.current;
+    if (deletingNoteRef.current) return Promise.reject(new Error("A note is being deleted. Please try again."));
+    setIsClearingNotes(true);
+    const operation = (async () => {
+      await flushEditorNow();
+      flushPendingTitle();
+      await flushSaveQueue();
+      const allNotes = await getAllNotes();
+      await Promise.all(allNotes.map((n) => deleteNote(n.id)));
+      if (activeNoteId) discardEditorNote(activeNoteId);
+      activeFetchIdRef.current++;
+      setDiscardedNoteId(activeNoteId);
+      setNotes([]);
+      setActiveNoteId(null);
+      setActiveNoteSummary(null);
+      titleStore.reset();
+      noteCache.clear();
+      clearCachedRecentSearchResults();
+      cachedNotesWriterRef.current.cancel();
+      pendingCachedNotesJsonRef.current = null;
+      safeLocalStorageSetItem("notefast_cached_notes", "[]");
+      clearActiveNoteSnapshot();
+    })();
+    clearingNotesRef.current = operation.finally(() => {
+      clearingNotesRef.current = null;
+      setIsClearingNotes(false);
+    });
+    return clearingNotesRef.current;
+  }, [activeNoteId, flushPendingTitle]);
+
+  useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    registerClearAllNotesHandler(handleClearAllNotes).then((unlisten) => {
+      if (disposed) unlisten();
+      else stop = unlisten;
+    }).catch(console.error);
+    return () => { disposed = true; stop?.(); };
+  }, [handleClearAllNotes]);
 
   const handleConflictSaveAsNew = useCallback(async () => {
     if (!switchConflict) return;
@@ -1363,6 +1423,11 @@ function App() {
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (clearingNotesRef.current || deletingNoteRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       const isCmd = e.metaKey || e.ctrlKey;
 
       const getCmd = (id: string, defaultHotkey: string) => {
@@ -1643,6 +1708,8 @@ function App() {
   return (
     <div
       className={`app-shell ${isCursorInPage ? "is-cursor-in-page is-interactive" : "is-idle"}`}
+      inert={isClearingNotes}
+      aria-busy={isClearingNotes}
       onMouseEnter={() => setIsMouseOverApp(true)}
       onMouseLeave={() => setIsMouseOverApp(false)}
       onPointerMove={() => {
@@ -1841,18 +1908,14 @@ function App() {
             setZoomLevel(zoom);
             broadcastSync({ type: "zoom", value: zoom });
           }}
-          onPromptClearAllNotes={() => {
-            if (notes.length === 0) {
-              showToast("No notes to clear", <Check size={14} />);
-              return;
-            }
-            if (window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) {
-              Promise.all(notes.map((n) => deleteNote(n.id))).then(() => {
-                setNotes([]);
-                setActiveNoteId(null);
-                noteCache.clear();
-                showToast("All notes cleared", <Trash2 size={14} />);
-              }).catch(console.error);
+          onPromptClearAllNotes={async () => {
+            if (!window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) return;
+            try {
+              await handleClearAllNotes();
+              showToast("All notes cleared", <Trash2 size={14} />);
+            } catch (error) {
+              console.error("Failed to clear notes:", error);
+              showToast("Failed to clear all notes", <AlertTriangle size={14} />);
             }
           }}
           onOpenSmartSearch={handleOpenSmartSearch}

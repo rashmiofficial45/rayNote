@@ -1,5 +1,5 @@
 import { Extension, CommandProps } from "@tiptap/react";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 
@@ -41,120 +41,65 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
   },
 
   addCommands() {
+    const update = (tr: CommandProps["tr"], results: SearchMatch[], index: number) => {
+      this.storage.results = results;
+      this.storage.currentIndex = results.length ? index % results.length : 0;
+      const match = results[this.storage.currentIndex];
+      if (match) {
+        tr.setSelection(TextSelection.create(tr.doc, match.from, match.to));
+        tr.scrollIntoView();
+      }
+      tr.setMeta(searchPluginKey, { update: true });
+    };
+    const navigate = (step: number) => ({ tr, dispatch }: CommandProps) => {
+      const results = findMatches(tr.doc, this.storage.searchTerm);
+      if (!results.length) return false;
+      if (dispatch) {
+        const index = (this.storage.currentIndex + step + results.length) % results.length;
+        update(tr, results, index);
+      }
+      return true;
+    };
     return {
-      setSearchTerm:
-        (term: string) =>
-        ({ editor, tr, dispatch }: CommandProps) => {
+      setSearchTerm: (term: string) => ({ tr, dispatch }: CommandProps) => {
+        if (dispatch) {
           this.storage.searchTerm = term;
-          this.storage.currentIndex = 0;
-          this.storage.results = findMatches(editor.state.doc, term);
-
-          if (this.storage.results.length > 0) {
-            const match = this.storage.results[0];
-            editor.commands.setTextSelection({ from: match.from, to: match.to });
-            editor.commands.scrollIntoView();
-          }
-
-          if (dispatch) {
-            tr.setMeta(searchPluginKey, { update: true });
-          }
-          return true;
-        },
-
-      nextSearchResult:
-        () =>
-        ({ editor, tr, dispatch }: CommandProps) => {
-          const results = this.storage.results;
-          if (results.length === 0) return false;
-          this.storage.currentIndex = (this.storage.currentIndex + 1) % results.length;
-          const match = results[this.storage.currentIndex];
-
-          if (dispatch) {
-            tr.setMeta(searchPluginKey, { update: true });
-          }
-          editor.commands.setTextSelection({ from: match.from, to: match.to });
-          editor.commands.scrollIntoView();
-          return true;
-        },
-
-      previousSearchResult:
-        () =>
-        ({ editor, tr, dispatch }: CommandProps) => {
-          const results = this.storage.results;
-          if (results.length === 0) return false;
-          this.storage.currentIndex =
-            (this.storage.currentIndex - 1 + results.length) % results.length;
-          const match = results[this.storage.currentIndex];
-
-          if (dispatch) {
-            tr.setMeta(searchPluginKey, { update: true });
-          }
-          editor.commands.setTextSelection({ from: match.from, to: match.to });
-          editor.commands.scrollIntoView();
-          return true;
-        },
-
-      clearSearch:
-        () =>
-        ({ tr, dispatch }: CommandProps) => {
+          update(tr, findMatches(tr.doc, term), 0);
+        }
+        return true;
+      },
+      nextSearchResult: () => navigate(1),
+      previousSearchResult: () => navigate(-1),
+      clearSearch: () => ({ tr, dispatch }: CommandProps) => {
+        if (dispatch) {
           this.storage.searchTerm = "";
-          this.storage.currentIndex = 0;
-          this.storage.results = [];
-          if (dispatch) {
-            tr.setMeta(searchPluginKey, { update: true });
-          }
-          return true;
-        },
-
-      replaceCurrentResult:
-        (replacement: string) =>
-        ({ editor }: CommandProps) => {
-          const results = this.storage.results;
-          if (results.length === 0) return false;
-          const currentMatch = results[this.storage.currentIndex];
-          if (!currentMatch) return false;
-
-          editor
-            .chain()
-            .focus()
-            .insertContentAt({ from: currentMatch.from, to: currentMatch.to }, replacement)
-            .run();
-
-          // Refresh matches after replacement
-          this.storage.results = findMatches(editor.state.doc, this.storage.searchTerm);
-          if (this.storage.results.length === 0) {
-            this.storage.currentIndex = 0;
-          } else if (this.storage.currentIndex >= this.storage.results.length) {
-            this.storage.currentIndex = 0;
-            const match = this.storage.results[0];
-            editor.commands.setTextSelection({ from: match.from, to: match.to });
-            editor.commands.scrollIntoView();
-          } else {
-            const match = this.storage.results[this.storage.currentIndex];
-            editor.commands.setTextSelection({ from: match.from, to: match.to });
-            editor.commands.scrollIntoView();
-          }
-          return true;
-        },
-
-      replaceAllResults:
-        (replacement: string) =>
-        ({ editor }: CommandProps) => {
-          const results = this.storage.results;
-          if (results.length === 0) return false;
-
-          // Replace backwards to avoid position shift
-          const chain = editor.chain().focus();
+          update(tr, [], 0);
+        }
+        return true;
+      },
+      replaceCurrentResult: (replacement: string) => ({ tr, dispatch }: CommandProps) => {
+        // The view's rescan is debounced while typing; destructive commands must use fresh offsets.
+        const results = findMatches(tr.doc, this.storage.searchTerm);
+        if (!results.length) return false;
+        if (dispatch) {
+          const index = Math.min(this.storage.currentIndex, results.length - 1);
+          const match = results[index];
+          tr.insertText(replacement, match.from, match.to);
+          update(tr, findMatches(tr.doc, this.storage.searchTerm), index);
+        }
+        return true;
+      },
+      replaceAllResults: (replacement: string) => ({ tr, dispatch }: CommandProps) => {
+        const results = findMatches(tr.doc, this.storage.searchTerm);
+        if (!results.length) return false;
+        if (dispatch) {
           for (let i = results.length - 1; i >= 0; i--) {
-            const match = results[i];
-            chain.insertContentAt({ from: match.from, to: match.to }, replacement);
+            tr.insertText(replacement, results[i].from, results[i].to);
           }
-          chain.run();
-
-          this.storage.results = findMatches(editor.state.doc, this.storage.searchTerm);
-          this.storage.currentIndex = 0;
-          return true;
-        },
+          update(tr, findMatches(tr.doc, this.storage.searchTerm), 0);
+        }
+        return true;
+      },
     };
   },
 
@@ -177,7 +122,7 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
             const meta = tr.getMeta(searchPluginKey);
 
             // Document changed while search is active: pure O(1) decoration mapping
-            if (tr.docChanged) {
+            if (tr.docChanged && !meta?.update) {
               return oldSet.map(tr.mapping, tr.doc);
             }
 
@@ -258,21 +203,31 @@ export const SearchExtension = Extension.create<Record<string, never>, SearchSto
 function findMatches(doc: ProseMirrorNode, term: string): SearchMatch[] {
   if (!term || !term.trim()) return [];
   const matches: SearchMatch[] = [];
-  const lowerTerm = term.toLowerCase();
-
+  // Match contiguous text across marks, without joining across blocks or inline atoms.
+  // RegExp match offsets refer to the original string even when case folding changes its length.
+  const pattern = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "giu");
   doc.descendants((node: ProseMirrorNode, pos: number) => {
-    if (node.isText && node.text) {
-      const text = node.text.toLowerCase();
-      let index = text.indexOf(lowerTerm);
-      while (index !== -1) {
-        matches.push({
-          from: pos + index,
-          to: pos + index + term.length,
-        });
-        index = text.indexOf(lowerTerm, index + 1);
+    if (!node.isTextblock) return;
+    let text = "";
+    let start = pos + 1;
+    const collect = () => {
+      pattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = pattern.exec(text))) {
+        matches.push({ from: start + match.index, to: start + match.index + match[0].length });
       }
-    }
+      text = "";
+    };
+    node.forEach((child, offset) => {
+      if (child.isText) {
+        if (!text) start = pos + 1 + offset;
+        text += child.text;
+      } else {
+        collect();
+      }
+    });
+    collect();
+    return false;
   });
-
   return matches;
 }

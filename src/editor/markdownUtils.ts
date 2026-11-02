@@ -1,4 +1,5 @@
 import { marked } from "marked";
+import { markdownCodeBlock } from "../lib/utils";
 import type { Slice, Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/core";
 
@@ -328,13 +329,16 @@ export function sliceToMarkdown(slice: Slice, editorInstance?: Editor | null): s
       case "codeBlock": {
         const lang = node.attrs?.language || "";
         const code = node.textContent || "";
-        return `\`\`\`${lang}\n${code}\n\`\`\`\n\n`;
+        return markdownCodeBlock(code, lang);
       }
 
       case "blockquote": {
         const lines = childrenText.trim().split("\n");
         return lines.map((l) => `> ${l}`).join("\n") + "\n\n";
       }
+
+      case "hardBreak":
+        return "  \n";
 
       case "horizontalRule":
         return `---\n\n`;
