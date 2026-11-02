@@ -288,6 +288,9 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
 }
 
 /* ── Smooth Theme Cross-Fade View Transitions ─────────── */
@@ -371,6 +374,9 @@ body,
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
   color: var(--text-primary);
   transition: background-color 0.2s ease, border-color 0.2s ease;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
 }
 
 /* ── Scrollbar ────────────────────────────────────────── */
@@ -422,44 +428,22 @@ body,
   }
 }
 
-/* Progressive Frosted Glass Blend Zones (Top & Bottom) */
+/* Progressive Soft Blend Zones (Top & Bottom) — Butter-smooth, zero-flicker fade */
 .app-top-blend {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 64px;
+  height: 58px;
   pointer-events: none;
   z-index: 15;
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  will-change: transform;
   background: linear-gradient(
     180deg,
-    rgba(var(--app-bg-rgb), 0.98) 0%,
-    rgba(var(--app-bg-rgb), 0.92) 35%,
-    rgba(var(--app-bg-rgb), 0.75) 60%,
-    rgba(var(--app-bg-rgb), 0.35) 85%,
+    rgba(var(--app-bg-rgb), 1) 0%,
+    rgba(var(--app-bg-rgb), 0.96) 28%,
+    rgba(var(--app-bg-rgb), 0.72) 58%,
+    rgba(var(--app-bg-rgb), 0.28) 84%,
     rgba(var(--app-bg-rgb), 0) 100%
-  );
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    black 0%,
-    black 35%,
-    rgba(0, 0, 0, 0.8) 60%,
-    rgba(0, 0, 0, 0.3) 85%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    black 0%,
-    black 35%,
-    rgba(0, 0, 0, 0.8) 60%,
-    rgba(0, 0, 0, 0.3) 85%,
-    transparent 100%
   );
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
@@ -473,35 +457,13 @@ body,
   height: 52px;
   pointer-events: none;
   z-index: 15;
-  transform: translateZ(0);
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  will-change: transform;
   background: linear-gradient(
     0deg,
-    rgba(var(--app-bg-rgb), 0.96) 0%,
-    rgba(var(--app-bg-rgb), 0.90) 30%,
-    rgba(var(--app-bg-rgb), 0.72) 55%,
-    rgba(var(--app-bg-rgb), 0.35) 80%,
+    rgba(var(--app-bg-rgb), 1) 0%,
+    rgba(var(--app-bg-rgb), 0.96) 28%,
+    rgba(var(--app-bg-rgb), 0.72) 58%,
+    rgba(var(--app-bg-rgb), 0.28) 84%,
     rgba(var(--app-bg-rgb), 0) 100%
-  );
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  -webkit-mask-image: linear-gradient(
-    to top,
-    black 0%,
-    black 35%,
-    rgba(0, 0, 0, 0.8) 60%,
-    rgba(0, 0, 0, 0.3) 85%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to top,
-    black 0%,
-    black 35%,
-    rgba(0, 0, 0, 0.8) 60%,
-    rgba(0, 0, 0, 0.3) 85%,
-    transparent 100%
   );
   border-bottom-left-radius: 28px;
   border-bottom-right-radius: 28px;
@@ -2418,19 +2380,18 @@ body:has(.command-overlay) .editor-char-count {
 
 [data-scroll-container].is-block-dragging {
   overflow-x: hidden !important;
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
 }
 
-[data-scroll-container] {
+[data-scroll-container],
+.editor-wrapper,
+.tiptap {
   overflow-x: hidden !important;
-  overscroll-behavior: none;
-  overscroll-behavior-y: none;
-  overscroll-behavior-x: none;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  transform: translateZ(0);
+  overscroll-behavior: none !important;
+  overscroll-behavior-y: none !important;
+  overscroll-behavior-x: none !important;
 }
 
 /* Hide native text selection when blocks are selected */

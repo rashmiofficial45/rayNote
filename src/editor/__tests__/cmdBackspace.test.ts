@@ -3,7 +3,7 @@ import { Schema } from '@tiptap/pm/model';
 import { EditorState, TextSelection } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import { findBlockAtPos, deleteSelectedBlocks } from '../../extensions/BlockSelection';
-import { handleDeleteLineOrBlock } from '../shortcutsExtension';
+import { handleDeleteLineOrBlock, handleBackspaceAtStart } from '../shortcutsExtension';
 
 describe('Command + Backspace (Line & Formglatting Deletion) Tests', () => {
   const schema = new Schema({
@@ -486,6 +486,107 @@ describe('Command + Backspace (Line & Formglatting Deletion) Tests', () => {
 
       // Paragraph 3 remains
       expect(view.state.doc.textContent).toContain('Paragraph 3');
+    });
+  });
+
+  describe('handleBackspaceAtStart (Single Backspace Line Merge & Empty Line Deletion)', () => {
+    it('merges paragraph with text into preceding bulletList listItem', () => {
+      const item = schema.nodes.listItem.create(null, [
+        schema.nodes.paragraph.create(null, [schema.text('the')]),
+      ]);
+      const list = schema.nodes.bulletList.create(null, [item]);
+      const paragraph = schema.nodes.paragraph.create(null, [schema.text('ation typing burst')]);
+      const doc = schema.nodes.doc.create(null, [list, paragraph]);
+
+      // Position at start of paragraph: list.nodeSize is length of list block
+      const paraPos = list.nodeSize; // Pos right before the paragraph
+      let state = EditorState.create({ schema, doc });
+      // Pos inside paragraph at parentOffset 0 is paraPos + 1
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, paraPos + 1)));
+
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleBackspaceAtStart(mockEditor as any);
+      expect(handled).toBe(true);
+
+      // Paragraph is gone, merged into the list item!
+      expect(view.state.doc.childCount).toBe(1);
+      const remainingList = view.state.doc.child(0);
+      expect(remainingList.type.name).toBe('bulletList');
+      expect(remainingList.child(0).textContent).toBe('theation typing burst');
+
+      // Cursor placed at the merge boundary (after 'the', which is pos 6 inside doc)
+      expect(view.state.selection.from).toBe(6);
+    });
+
+    it('deletes empty paragraph and places cursor at end of preceding bulletList listItem', () => {
+      const item = schema.nodes.listItem.create(null, [
+        schema.nodes.paragraph.create(null, [schema.text('the')]),
+      ]);
+      const list = schema.nodes.bulletList.create(null, [item]);
+      const emptyParagraph = schema.nodes.paragraph.create(null, []);
+      const doc = schema.nodes.doc.create(null, [list, emptyParagraph]);
+
+      const paraPos = list.nodeSize;
+      let state = EditorState.create({ schema, doc });
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, paraPos + 1)));
+
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleBackspaceAtStart(mockEditor as any);
+      expect(handled).toBe(true);
+
+      // Empty paragraph deleted, only list remains
+      expect(view.state.doc.childCount).toBe(1);
+      const remainingList = view.state.doc.child(0);
+      expect(remainingList.type.name).toBe('bulletList');
+      expect(remainingList.child(0).textContent).toBe('the');
+      // Cursor is at end of 'the' (pos 6)
+      expect(view.state.selection.from).toBe(6);
+    });
+
+    it('merges paragraph with text into preceding heading', () => {
+      const heading = schema.nodes.heading.create({ level: 1 }, [schema.text('Title')]);
+      const paragraph = schema.nodes.paragraph.create(null, [schema.text('Body text')]);
+      const doc = schema.nodes.doc.create(null, [heading, paragraph]);
+
+      const paraPos = heading.nodeSize;
+      let state = EditorState.create({ schema, doc });
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, paraPos + 1)));
+
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleBackspaceAtStart(mockEditor as any);
+      expect(handled).toBe(true);
+
+      expect(view.state.doc.childCount).toBe(1);
+      expect(view.state.doc.child(0).type.name).toBe('heading');
+      expect(view.state.doc.child(0).textContent).toBe('TitleBody text');
+      expect(view.state.selection.from).toBe(6); // right after 'Title'
+    });
+
+    it('deletes empty paragraph following heading', () => {
+      const heading = schema.nodes.heading.create({ level: 1 }, [schema.text('Title')]);
+      const emptyParagraph = schema.nodes.paragraph.create(null, []);
+      const doc = schema.nodes.doc.create(null, [heading, emptyParagraph]);
+
+      const paraPos = heading.nodeSize;
+      let state = EditorState.create({ schema, doc });
+      state = state.apply(state.tr.setSelection(TextSelection.create(doc, paraPos + 1)));
+
+      const view = createMockView(state);
+      const mockEditor = { view };
+
+      const handled = handleBackspaceAtStart(mockEditor as any);
+      expect(handled).toBe(true);
+
+      expect(view.state.doc.childCount).toBe(1);
+      expect(view.state.doc.child(0).type.name).toBe('heading');
+      expect(view.state.doc.child(0).textContent).toBe('Title');
+      expect(view.state.selection.from).toBe(6);
     });
   });
 });

@@ -289,28 +289,10 @@ export const ShortcutsExtension = Extension.create({
           }
         }
 
-        // 6. Empty paragraph directly following a list container: delete the empty paragraph
-        if ($from.parent.type.name === "paragraph" && $from.parent.textContent.length === 0) {
-          const beforePos = $from.before();
-          if (beforePos > 0) {
-            const $before = state.doc.resolve(beforePos);
-            const nodeBefore = $before.nodeBefore;
-            if (
-              nodeBefore &&
-              (nodeBefore.type.name === "bulletList" ||
-                nodeBefore.type.name === "orderedList" ||
-                nodeBefore.type.name === "taskList")
-            ) {
-              let tr = state.tr.delete($from.before(), $from.after());
-              const newTargetPos = beforePos - 1;
-              try {
-                tr = tr.setSelection(Selection.near(tr.doc.resolve(newTargetPos), -1));
-              } catch {
-                tr = tr.setSelection(TextSelection.create(tr.doc, Math.max(1, newTargetPos)));
-              }
-              dispatch(tr);
-              return true;
-            }
+        // 6. Paragraph at offset 0: merge into previous line or delete empty line
+        if ($from.parent.type.name === "paragraph") {
+          if (handleBackspaceAtStart(this.editor)) {
+            return true;
           }
         }
 
@@ -423,6 +405,98 @@ export const ShortcutsExtension = Extension.create({
     };
   },
 });
+
+/**
+ * Handles Backspace when cursor is at the very beginning of a paragraph ($from.parentOffset === 0).
+ * Merges the paragraph's content into the preceding block/line, or deletes the empty line
+ * and places the cursor on the previous line.
+ */
+export function handleBackspaceAtStart(editor: { view: EditorView }): boolean {
+  const { state, dispatch } = editor.view;
+  const { selection } = state;
+  if (!selection.empty) return false;
+
+  const { $from } = selection;
+  if ($from.parentOffset !== 0) return false;
+  if ($from.parent.type.name !== "paragraph") return false;
+
+  const beforePos = $from.before();
+  if (beforePos <= 0) return false;
+
+  const $before = state.doc.resolve(beforePos);
+  const nodeBefore = $before.nodeBefore;
+  if (!nodeBefore) return false;
+
+  // Case 1: Preceding node is an atom (e.g. horizontalRule)
+  if (nodeBefore.isAtom) {
+    const tr = state.tr.delete(beforePos - nodeBefore.nodeSize, beforePos);
+    dispatch(tr);
+    return true;
+  }
+
+  // Case 2: Preceding node is a container or textblock
+  try {
+    const prevSel = Selection.near(state.doc.resolve(beforePos - 1), -1);
+    if (!prevSel) return false;
+
+    const prevEndPos = prevSel.from;
+
+    // Subcase 2A: Current paragraph is completely empty
+    if ($from.parent.content.size === 0) {
+      let tr = state.tr.delete($from.before(), $from.after());
+      try {
+        const mappedTarget = Math.min(prevEndPos, tr.doc.content.size);
+        tr = tr.setSelection(Selection.near(tr.doc.resolve(mappedTarget), -1));
+      } catch {
+        tr = tr.setSelection(
+          TextSelection.create(
+            tr.doc,
+            Math.max(1, Math.min(prevEndPos, tr.doc.content.size))
+          )
+        );
+      }
+      dispatch(tr);
+      return true;
+    }
+
+    // Subcase 2B: Current paragraph has content (merge content into preceding block)
+    const slice = $from.parent.content;
+    const currentStart = $from.before();
+    const currentEnd = $from.after();
+
+    if (prevSel.$from.parent.type.name === "codeBlock") {
+      const textContent = $from.parent.textContent;
+      let tr = state.tr.insertText(textContent, prevEndPos);
+      const shiftedStart = currentStart + textContent.length;
+      const shiftedEnd = currentEnd + textContent.length;
+      tr = tr.delete(shiftedStart, shiftedEnd);
+      tr = tr.setSelection(TextSelection.create(tr.doc, prevEndPos));
+      dispatch(tr);
+      return true;
+    }
+
+    let tr = state.tr;
+    try {
+      tr = tr.insert(prevEndPos, slice);
+      const shiftedStart = currentStart + slice.size;
+      const shiftedEnd = currentEnd + slice.size;
+      tr = tr.delete(shiftedStart, shiftedEnd);
+      tr = tr.setSelection(TextSelection.create(tr.doc, prevEndPos));
+    } catch {
+      const textContent = $from.parent.textContent;
+      tr = state.tr.insertText(textContent, prevEndPos);
+      const shiftedStart = currentStart + textContent.length;
+      const shiftedEnd = currentEnd + textContent.length;
+      tr = tr.delete(shiftedStart, shiftedEnd);
+      tr = tr.setSelection(TextSelection.create(tr.doc, prevEndPos));
+    }
+    dispatch(tr);
+    return true;
+  } catch (err) {
+    console.error("Backspace merge backward error:", err);
+    return false;
+  }
+}
 
 /**
  * Deletes the current line/block including all formatting and content.

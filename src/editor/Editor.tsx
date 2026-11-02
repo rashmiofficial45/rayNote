@@ -1068,6 +1068,29 @@ export function Editor({
     };
   }, [saveNow]);
 
+  // Prevent overscroll rubber-band bounce when scrolling past top or bottom
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (el.scrollTop <= 0 && e.deltaY < 0) {
+        e.preventDefault();
+      } else if (
+        el.scrollHeight > el.clientHeight &&
+        el.scrollTop + el.clientHeight >= el.scrollHeight &&
+        e.deltaY > 0
+      ) {
+        e.preventDefault();
+      }
+    };
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
+
   const handleWrapperClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const target = e.target as HTMLElement | null;
