@@ -49,13 +49,21 @@ for (let i = 0; i < args.length; i++) {
 
 const wantsDmg = !bundlesValue || bundlesValue.includes('dmg');
 
-// If bundles specifically only requested 'dmg', change it to 'app' for Tauri
-// so Tauri produces rayNote.app and does NOT delete it upon finish.
+// Force Tauri to ONLY build 'app' bundle so it never runs its legacy create-dmg script
 const tauriArgs = [...args];
-if (bundlesArgIndex !== -1 && bundlesValue === 'dmg') {
-  tauriArgs[bundlesArgIndex + 1] = 'app';
-} else if (bundlesArgIndex !== -1 && bundlesValue.startsWith('--bundles=dmg')) {
-  tauriArgs[bundlesArgIndex] = '--bundles=app';
+if (bundlesArgIndex !== -1) {
+  if (bundlesValue === 'dmg') {
+    tauriArgs[bundlesArgIndex + 1] = 'app';
+  } else if (bundlesValue.startsWith('--bundles=dmg')) {
+    tauriArgs[bundlesArgIndex] = '--bundles=app';
+  } else if (bundlesValue.includes('dmg')) {
+    const list = bundlesValue.split(',').filter(b => b !== 'dmg');
+    if (!list.includes('app')) list.push('app');
+    tauriArgs[bundlesArgIndex + 1] = list.join(',');
+  }
+} else {
+  // If no --bundles flag was specified, explicitly restrict Tauri to 'app'
+  tauriArgs.push('--bundles', 'app');
 }
 
 const tauriCliBin = path.join(rootDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js');

@@ -95,7 +95,8 @@ PRIMARY_DMG="${DMG_AARCH_DIR}/rayNote_0.1.0_aarch64.dmg"
 mkdir -p "${DMG_RELEASE_DIR}" "${DMG_AARCH_DIR}"
 rm -f "${PRIMARY_DMG}"
 
-# Unmount any existing volume named rayNote
+# Unmount and eject any existing volume named rayNote
+diskutil unmountDisk force /Volumes/rayNote* 2>/dev/null || true
 hdiutil detach "/Volumes/rayNote" 2>/dev/null || true
 
 # 5. Build DMG using dmgbuild
