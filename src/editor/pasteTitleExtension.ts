@@ -11,8 +11,7 @@
  *   - Strips leading Markdown heading marks (`#`, `##`, ...)
  *   - Strips inline Markdown (**bold**, *italic*, `code`, [text](url) -> text)
  *   - Trims whitespace & caps at 120 characters
- * - Moves the first line to the title bar. It does NOT remain in the body and does NOT become an H1.
- * - Parses remaining text as Markdown into rich ProseMirror nodes.
+ * - Keeps the complete pasted text in the body, preserving its Markdown formatting.
  * - Undo (Cmd+Z) reverts the paste in ONE step (body goes back to empty AND title restored).
  */
 
@@ -83,7 +82,7 @@ export function isDefaultTitle(title: string | undefined | null): boolean {
 
 /**
  * Extracts and cleans the first non-empty line for the title bar,
- * and extracts the remaining text for the body.
+ * while retaining the pasted text for the body.
  */
 export function extractAutoTitleAndBody(rawText: string): {
   title: string;
@@ -123,23 +122,16 @@ export function extractAutoTitleAndBody(rawText: string): {
   cleanTitle = cleanTitle.trim();
 
   // 4. Cap at about 120 characters
-  const titleWasTruncated = cleanTitle.length > 120;
-  if (titleWasTruncated) {
+  if (cleanTitle.length > 120) {
     cleanTitle = cleanTitle.slice(0, 120).trim();
   }
 
   // 5. If result is empty, do nothing special
   if (!cleanTitle) return null;
 
-  // 6. Remove first line and blank lines immediately following it
-  const remainingLines = lines.slice(firstLineIdx + (titleWasTruncated ? 0 : 1));
-  while (remainingLines.length > 0 && remainingLines[0].trim().length === 0) {
-    remainingLines.shift();
-  }
-
   return {
     title: cleanTitle,
-    bodyMarkdown: remainingLines.join("\n"),
+    bodyMarkdown: lines.slice(firstLineIdx).join("\n"),
   };
 }
 
@@ -210,8 +202,7 @@ export const PasteTitleExtension = Extension.create<PasteTitleOptions>({
 
             const tr = view.state.tr;
 
-            // Move first line to title bar ONLY: it is NOT inserted into the body and does NOT become an H1.
-            // Only bodyMarkdown is inserted into the body.
+            // Preserve the first line in the body as well as using it for the title.
             const nodesToInsert: any[] = [];
 
             if (bodyMarkdown.trim().length > 0) {

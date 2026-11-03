@@ -45,79 +45,71 @@ describe("Auto-Title on Paste (First Line to H1) Test Suite", () => {
     };
   }
 
-  // 1. "# My Note\n\nBody": title is "My Note", first pasted line is MOVED to title bar and removed from body (no H1 in body)
-  it("1. # My Note\\n\\nBody: title 'My Note', body starts with 'Body' with NO H1 and body does NOT contain title", () => {
+  it("Markdown heading is retained and used as the title", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("# My Note\n\nBody");
 
     expect(handled).toBe(true);
     expect(getTitle()).toBe("My Note");
 
-    // First block in body is paragraph with "Body" (NO H1 heading)
-    expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("Body");
-    // Body does NOT contain title text
-    expect(editor.getText()).not.toContain("My Note");
+    expect(editor.state.doc.child(0).type.name).toBe("heading");
+    expect(editor.state.doc.child(0).textContent).toBe("My Note");
+    expect(editor.getText()).toContain("My Note");
     editor.destroy();
   });
 
-  // 2. "Plain first line\nsecond line": first line is moved to title bar, body starts with second line
-  it("2. Plain first line\\nsecond line: first line moved to title bar, body starts with 'second line' and does NOT contain title", () => {
+  it("Plain first line remains in the note and sets the title", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("Plain first line\nsecond line");
 
     expect(handled).toBe(true);
     expect(getTitle()).toBe("Plain first line");
 
-    // First block in body is paragraph "second line" (NO H1)
     expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("second line");
-    // Body does NOT contain title text
-    expect(editor.getText()).not.toContain("Plain first line");
+    expect(editor.state.doc.child(0).textContent).toContain("Plain first line");
+    expect(editor.getText()).toContain("Plain first line");
     editor.destroy();
   });
 
   // 3. Leading blank lines before the first line: skipped, first content line is title
-  it("3. Leading blank lines before the first line: skipped, title extracted, body starts at subsequent content", () => {
+  it("Leading blank lines do not hide the first heading", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("\n\n   \n# Real First Line\n\nBody text");
 
     expect(handled).toBe(true);
     expect(getTitle()).toBe("Real First Line");
-    expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("Body text");
-    expect(editor.getText()).not.toContain("Real First Line");
+    expect(editor.state.doc.child(0).type.name).toBe("heading");
+    expect(editor.state.doc.child(0).textContent).toBe("Real First Line");
+    expect(editor.getText()).toContain("Real First Line");
     editor.destroy();
   });
 
-  // 4. Blank lines between the first line and the rest: skipped, body starts at first real content
-  it("4. Blank lines between the first line and the rest: skipped, body starts at first real content", () => {
+  it("Blank lines after the title are preserved as Markdown", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("My Header\n\n\n\n\nFirst real paragraph");
 
     expect(handled).toBe(true);
     expect(getTitle()).toBe("My Header");
     expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("First real paragraph");
-    expect(editor.getText()).not.toContain("My Header");
+    expect(editor.state.doc.child(0).textContent).toBe("My Header");
+    expect(editor.getText()).toContain("My Header");
     editor.destroy();
   });
 
   // 5. "**Bold** title": formatted title becomes clean title in title bar
-  it("5. **Bold** title: formatted title becomes clean title bar title, body contains only subsequent lines", () => {
+  it("Formatted title remains formatted in the note", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("**Bold** title\n\nBody after bold");
 
     expect(handled).toBe(true);
     expect(getTitle()).toBe("Bold title");
     expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("Body after bold");
-    expect(editor.getText()).not.toContain("Bold title");
+    expect(editor.state.doc.child(0).textContent).toBe("Bold title");
+    expect(editor.getText()).toContain("Bold title");
     editor.destroy();
   });
 
-  // 6. Single-line paste: first line is moved to title bar, body contains empty paragraph, body does NOT contain title
-  it("6. Single-line paste: first line moved to title bar, body contains empty paragraph with no title text", () => {
+  it("Single-line paste remains in the note", () => {
     const { editor, getTitle, paste } = createTestEditor();
     const handled = paste("Only one line");
 
@@ -125,9 +117,8 @@ describe("Auto-Title on Paste (First Line to H1) Test Suite", () => {
     expect(getTitle()).toBe("Only one line");
     expect(editor.state.doc.childCount).toBe(1);
     expect(editor.state.doc.child(0).type.name).toBe("paragraph");
-    expect(editor.state.doc.child(0).textContent).toBe("");
-    expect(editor.getText().trim()).toBe("");
-    expect(editor.getText()).not.toContain("Only one line");
+    expect(editor.state.doc.child(0).textContent).toBe("Only one line");
+    expect(editor.getText()).toContain("Only one line");
     editor.destroy();
   });
 
@@ -167,13 +158,13 @@ describe("Auto-Title on Paste (First Line to H1) Test Suite", () => {
   });
 
   // 10. Undo: body empty again and title restored in one step
-  it("10. Undo: body empty again and title restored in one step", () => {
+  it("Undo and redo restore the title and complete body", () => {
     const { editor, getTitle, paste } = createTestEditor("Untitled");
     paste("# My Note\n\nBody content");
 
     expect(getTitle()).toBe("My Note");
-    expect(editor.state.doc.child(0).textContent).toBe("Body content");
-    expect(editor.getText()).not.toContain("My Note");
+    expect(editor.state.doc.child(0).textContent).toBe("My Note");
+    expect(editor.getText()).toContain("My Note");
 
     // Perform Undo
     editor.commands.undo();
@@ -185,13 +176,12 @@ describe("Auto-Title on Paste (First Line to H1) Test Suite", () => {
     editor.commands.redo();
 
     expect(getTitle()).toBe("My Note");
-    expect(editor.state.doc.child(0).textContent).toBe("Body content");
-    expect(editor.getText()).not.toContain("My Note");
+    expect(editor.state.doc.child(0).textContent).toBe("My Note");
+    expect(editor.getText()).toContain("My Note");
     editor.destroy();
   });
 
-  // 11. Pasted list/table/code fence parse into real nodes with NO H1 in body
-  it("11. Pasted list/table/code fence parse into real nodes with NO H1 in body", () => {
+  it("Title, list, table, and code parse into real nodes", () => {
     const { editor, getTitle, paste } = createTestEditor("Untitled");
     const complexMd = `Plain Title Line
 
@@ -211,8 +201,7 @@ const answer = 42;
     expect(handled).toBe(true);
     expect(getTitle()).toBe("Plain Title Line");
 
-    // Body does NOT contain title text and has NO H1
-    expect(editor.getText()).not.toContain("Plain Title Line");
+    expect(editor.getText()).toContain("Plain Title Line");
 
     let hasBulletList = false;
     let hasTable = false;
@@ -234,30 +223,26 @@ const answer = 42;
     editor.destroy();
   });
 
-  // 12. Explicit spec check: Body does NOT contain title text, and Cmd+Z restores both body AND title in one step
-  it("12. Body does NOT contain the title text, and Cmd+Z restores body AND title in one step", () => {
+  it("Heading remains in the body through editing and undo", () => {
     const { editor, getTitle, paste } = createTestEditor("Untitled");
     const handled = paste("# Secret Project Title\n\nFirst paragraph of secret project.\nSecond paragraph.");
     expect(handled).toBe(true);
 
-    // Title is moved to title bar
     expect(getTitle()).toBe("Secret Project Title");
 
-    // Body does NOT contain title text
-    expect(editor.getText()).not.toContain("Secret Project Title");
+    expect(editor.getText()).toContain("Secret Project Title");
     expect(editor.getText()).toContain("First paragraph of secret project.");
     expect(editor.getText()).toContain("Second paragraph.");
 
-    // No H1 in body
     for (let i = 0; i < editor.state.doc.childCount; i++) {
       const child = editor.state.doc.child(i);
-      expect(child.type.name === "heading" && child.attrs.level === 1).toBe(false);
+      if (i === 0) expect(child.type.name === "heading" && child.attrs.level === 1).toBe(true);
     }
 
     // Typing more into the paragraph body does NOT overwrite title
     editor.commands.insertContent("Extra typed text. ");
     expect(getTitle()).toBe("Secret Project Title");
-    expect(editor.getText()).not.toContain("Secret Project Title");
+    expect(editor.getText()).toContain("Secret Project Title");
 
     // Perform Undo back before the typing
     editor.commands.undo();
@@ -271,7 +256,7 @@ const answer = 42;
   });
 
   // 13. Purity & Undo/Redo Lockstep: plugin view update handles title side-effects; Undo and Redo restore title and body in lockstep
-  it("13. Purity & Undo/Redo Lockstep: Undo and Redo restore both title and body in lockstep in one step", () => {
+  it("Undo and redo keep title and body in lockstep", () => {
     const { editor, getTitle, paste } = createTestEditor("Untitled");
     const pasteResult = paste("# Original Header\n\nLine 1 of body.\nLine 2 of body.");
     expect(pasteResult).toBe(true);
@@ -279,7 +264,7 @@ const answer = 42;
     // Initial paste state
     expect(getTitle()).toBe("Original Header");
     expect(editor.getText()).toContain("Line 1 of body.");
-    expect(editor.getText()).not.toContain("Original Header");
+    expect(editor.getText()).toContain("Original Header");
 
     // 1 step Undo: Reverts both body AND title back to initial empty state
     const undoSuccess = editor.commands.undo();
@@ -292,7 +277,7 @@ const answer = 42;
     expect(redoSuccess).toBe(true);
     expect(getTitle()).toBe("Original Header");
     expect(editor.getText()).toContain("Line 1 of body.");
-    expect(editor.getText()).not.toContain("Original Header");
+    expect(editor.getText()).toContain("Original Header");
 
     // Another Undo to verify repeatability
     editor.commands.undo();
@@ -310,7 +295,7 @@ const answer = 42;
       );
       expect(res).not.toBeNull();
       expect(res?.title).toBe("Check out Google with italics and code");
-      expect(res?.bodyMarkdown).toBe("Remaining line");
+      expect(res?.bodyMarkdown).toBe("## Check out [Google](https://google.com) with *italics* and `code`\n\nRemaining line");
     });
 
     it("caps long titles at 120 characters", () => {

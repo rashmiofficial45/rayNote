@@ -2,6 +2,7 @@ import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "../lib/storage
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Editor } from "@tiptap/react";
 import { blockSelectionPluginKey } from "../extensions/BlockSelection";
+import { TextSelection } from "@tiptap/pm/state";
 
 interface SmoothCaretProps {
   editor: Editor | null;
@@ -43,6 +44,25 @@ export interface CaretCoords {
   top: number;
   bottom: number;
   right?: number;
+}
+
+/** Preserve the browser's visual line affinity at wraps and inline boundaries. */
+export function getSelectionCaretCoords(view: Editor["view"], from: number, side: number): CaretCoords {
+  const selection = view.dom.ownerDocument.getSelection();
+  if (selection?.isCollapsed && selection.rangeCount && selection.anchorNode &&
+      view.dom.contains(selection.anchorNode)) {
+    try {
+      // Ignore a stale DOM selection while ProseMirror is updating its selection.
+      if (view.posAtDOM(selection.anchorNode, selection.anchorOffset) === from) {
+        const range = selection.getRangeAt(0);
+        const rect = Array.from(range.getClientRects()).find(rect => rect.height > 0);
+        if (rect) return rect;
+      }
+    } catch {
+      // Empty blocks and transient node views may have no measurable DOM range.
+    }
+  }
+  return view.coordsAtPos(from, side);
 }
 
 export function isInvalidCoords(coords: CaretCoords | null | undefined): boolean {
@@ -129,7 +149,7 @@ export function SmoothCaret({
     // Check visibility states
     const blockState = blockSelectionPluginKey.getState(state);
     const hasBlockSelection = Boolean(blockState && blockState.selectedPositions.length > 0);
-    if (!isEnabled || !view.hasFocus() || !state.selection.empty || hasBlockSelection || document.hidden) {
+    if (!isEnabled || !view.hasFocus() || !state.selection.empty || !(state.selection instanceof TextSelection) || hasBlockSelection || document.hidden) {
       if (caret.style.opacity !== "0") {
         caret.style.opacity = "0";
       }
@@ -146,7 +166,7 @@ export function SmoothCaret({
     try {
       const from = state.selection.from;
       const side = state.selection.$from.parentOffset === 0 ? 1 : -1;
-      const coords = view.coordsAtPos(from, side);
+      const coords = getSelectionCaretCoords(view, from, side);
       const parent = caret.parentElement;
       if (!parent || !coords) return;
 
@@ -285,6 +305,11 @@ export function SmoothCaret({
       dom.addEventListener("compositionend", handleComposition);
       dom.addEventListener("load", handleComposition, { capture: true });
     }
+    // Mouse selection may change its visual affinity without changing the PM offset.
+    const handleSelectionChange = () => scheduleCaretUpdate(isMouseDownRef.current);
+    dom?.ownerDocument.addEventListener("selectionchange", handleSelectionChange);
+    const scrollContainer = _scrollContainerRef?.current;
+    scrollContainer?.addEventListener("scroll", handleComposition, { passive: true });
 
     // Zero layout reads inside transaction handlers: only mark dirty & schedule 1 rAF
     const handleTransaction = () => {
@@ -369,6 +394,8 @@ export function SmoothCaret({
         dom.removeEventListener("compositionend", handleComposition);
         dom.removeEventListener("load", handleComposition, { capture: true });
       }
+      dom?.ownerDocument.removeEventListener("selectionchange", handleSelectionChange);
+      scrollContainer?.removeEventListener("scroll", handleComposition);
       editor.off("transaction", handleTransaction);
       editor.off("selectionUpdate", handleTransaction);
       editor.off("focus", handleFocus);
@@ -390,7 +417,7 @@ export function SmoothCaret({
         clearTimeout(blinkStopTimeoutRef.current);
       }
     };
-  }, [editor, scheduleCaretUpdate, isEnabled]);
+  }, [editor, scheduleCaretUpdate, isEnabled, _scrollContainerRef]);
 
   // Update on zoom change
   useEffect(() => {

@@ -150,6 +150,13 @@ export const ClickSelectionExtension = Extension.create({
     return [
       new Plugin({
         key: clickSelectionPluginKey,
+        appendTransaction(_transactions, _oldState, state) {
+          const selection = state.selection;
+          if (selection instanceof TextSelection && selection.empty && !selection.$from.parent.inlineContent) {
+            return state.tr.setSelection(TextSelection.near(selection.$from, -1));
+          }
+          return null;
+        },
         props: {
           handleDOMEvents: {
             mousedown(view, event) {

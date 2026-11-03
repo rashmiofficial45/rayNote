@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, Root } from "react-dom/client";
-import { SmoothCaret } from "../SmoothCaret";
+import { SmoothCaret, getSelectionCaretCoords } from "../SmoothCaret";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -54,6 +54,33 @@ describe("Phase 5: SmoothCaret & GPU Loop Cancellation Tests", () => {
     });
     container.remove();
     vi.restoreAllMocks();
+  });
+
+  it("uses the browser's visual caret at a wrapped line instead of the reconstructed position", () => {
+    const text = document.createTextNode("wrapped heading");
+    mockEditor.view.dom.append(text);
+    const rect = { left: 180, top: 60, bottom: 90, height: 30 };
+    vi.spyOn(document, "getSelection").mockReturnValue({
+      isCollapsed: true, rangeCount: 1, anchorNode: text, anchorOffset: 8,
+      getRangeAt: () => ({ getClientRects: () => [rect] }),
+    } as any);
+    mockEditor.view.posAtDOM = vi.fn().mockReturnValue(10);
+    expect(getSelectionCaretCoords(mockEditor.view, 10, -1)).toBe(rect);
+    expect(mockEditor.view.coordsAtPos).not.toHaveBeenCalled();
+  });
+
+  it("falls back for stale selections and empty blocks without measurable ranges", () => {
+    const text = document.createTextNode("text");
+    mockEditor.view.dom.append(text);
+    vi.spyOn(document, "getSelection").mockReturnValue({
+      isCollapsed: true, rangeCount: 1, anchorNode: text, anchorOffset: 0,
+      getRangeAt: () => ({ getClientRects: () => [] }),
+    } as any);
+    mockEditor.view.posAtDOM = vi.fn().mockReturnValue(11);
+    getSelectionCaretCoords(mockEditor.view, 10, -1);
+    mockEditor.view.posAtDOM.mockReturnValue(10);
+    getSelectionCaretCoords(mockEditor.view, 10, 1);
+    expect(mockEditor.view.coordsAtPos.mock.calls).toEqual([[10, -1], [10, 1]]);
   });
 
   it("does not call coordsAtPos synchronously in transaction handler; coalesces multiple transactions into 1 rAF read", () => {

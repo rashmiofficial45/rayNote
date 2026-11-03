@@ -822,8 +822,10 @@ describe("App onUpdate Save Wiring & IPC Invariants", () => {
     expect(savedNoteId).toBe("note-paste-target");
     expect(savedTitle).toBe("Auto Extracted Title");
     expect(savedContent).toContain("Body paragraph text here");
-    // Explicit check: body does NOT contain the title text
-    expect(savedContent).not.toContain("Auto Extracted Title");
+    // The pasted heading is saved in the body as well as the note title.
+    const savedDocument = JSON.parse(savedContent);
+    expect(savedDocument.content[0].type).toBe("heading");
+    expect(savedDocument.content[0].content[0].text).toBe("Auto Extracted Title");
   });
 
   it("Item 2: Switch-failure trap: presents choices modal ('Save as new note', 'Copy text', 'Discard and switch') and does not trap user", async () => {
