@@ -89,4 +89,14 @@ describe('Packaging audit regressions with mocked side effects', () => {
   it('names the planned installer using package version and requested architecture (B39)', () => {
     expect(inspectPlan(true).stdout).toMatch(/PLANNED_DMG=.*\/rayNote_2\.7\.1_x86_64\.dmg\n/);
   });
+  it('forwards --debug flag to package-dmg script when debug build requested (R20)', () => {
+    const calls = runWrapper(['build', '--debug', '--bundles=dmg', '--target', 'x86_64-apple-darwin']);
+    expect(calls[0][1].slice(1)).toEqual(['build', '--debug', '--bundles=app', '--target', 'x86_64-apple-darwin']);
+    expect(calls[1][1].slice(1)).toEqual(['--target', 'x86_64-apple-darwin', '--debug']);
+  });
+  it('does not append --bundles app or trigger DMG packaging when --no-bundle is passed (R21)', () => {
+    const calls = runWrapper(['build', '--no-bundle']);
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1].slice(1)).toEqual(['build', '--no-bundle']);
+  });
 });

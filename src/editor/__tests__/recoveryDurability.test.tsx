@@ -97,4 +97,42 @@ describe('Recovery durability and document ownership', () => {
     await act(async () => { finishC(); await Promise.resolve(); });
     expect(editor.getText()).toBe('c'); expect(editor.isEditable).toBe(true);
   });
+
+  it('preserves edits made while orphan recovery is in flight (R01)', async () => {
+    const update = vi.fn().mockResolvedValue('2026-11-03T00:00:00Z');
+    noteCache.set('orphan', doc('Original text'), version, 'Original text', 0, true);
+    noteCache.persistActiveToLocalStorage('orphan', doc('Original text'), version, true);
+
+    let resolveRecovery!: (newId: string) => void;
+    const recover = vi.fn().mockImplementation(() => new Promise<string>(resolve => {
+      resolveRecovery = resolve;
+    }));
+
+    await act(async () => root.render(
+      <Editor
+        noteId="orphan"
+        noteTitle="Original text"
+        onUpdate={update}
+        onRecoverOrphan={recover}
+        onEditorReady={e => { editor = e; }}
+      />
+    ));
+
+    expect(recover).toHaveBeenCalledWith(doc('Original text'), 'orphan');
+
+    // User types newer text while recovery is still pending!
+    act(() => editor.commands.insertContentAt(editor.state.doc.content.size - 1, ' + newer typing'));
+
+    // Now recovery completes with new note ID 'recovered-123'
+    await act(async () => {
+      resolveRecovery('recovered-123');
+      await Promise.resolve();
+    });
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
+
+    // The newer edits must be persisted under 'recovered-123', never discarded!
+    expect(update).toHaveBeenCalledWith('recovered-123', expect.stringContaining('+ newer typing'), expect.any(String));
+    expect(editor.getText()).toContain('+ newer typing');
+  });
 });

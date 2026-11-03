@@ -136,4 +136,31 @@ describe("FindBar In-Note Search & Replace UI Component", () => {
 
     expect(container.querySelector(".replace-row")).toBeNull();
   });
+
+  it("pressing Enter in replace input does not bubble and skip the next match (R16)", () => {
+    editor.commands.setContent("<p>fox fox fox</p>");
+    editor.commands.setSearchTerm("fox");
+    expect((editor.storage as any).search?.results).toHaveLength(3);
+
+    act(() => {
+      root.render(<FindBar isOpen={true} onClose={vi.fn()} editor={editor} />);
+    });
+
+    const replaceToggleBtn = container.querySelector("button[title='Toggle Replace']") as HTMLButtonElement;
+    act(() => {
+      replaceToggleBtn.click();
+    });
+
+    const replaceInput = container.querySelector(".replace-row .find-bar-input") as HTMLInputElement;
+    const keydownEvent = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    act(() => {
+      replaceInput.dispatchEvent(keydownEvent);
+    });
+
+    // After single replace-on-Enter:
+    // It should replace 1 instance of 'fox', leaving 2 matches
+    expect((editor.storage as any).search?.results).toHaveLength(2);
+    // And current index should be 0 (the first remaining match), NOT skipped to 1
+    expect((editor.storage as any).search?.currentIndex).toBe(0);
+  });
 });

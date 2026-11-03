@@ -73,6 +73,7 @@ export function DocumentTickSlider({
   useEffect(() => {
     let cancelled = false;
     let observer: ResizeObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
     let activeContainer: HTMLElement | null = null;
 
     const onScroll = () => {
@@ -97,6 +98,20 @@ export function DocumentTickSlider({
         updateScrollProgress();
       });
       observer.observe(container);
+      if (container.firstElementChild) {
+        observer.observe(container.firstElementChild);
+      }
+
+      mutationObserver = new MutationObserver(() => {
+        if (container.firstElementChild && observer) {
+          try {
+            observer.observe(container.firstElementChild);
+          } catch {}
+        }
+        updateTrackHeight();
+        updateScrollProgress();
+      });
+      mutationObserver.observe(container, { childList: true, subtree: false });
 
       updateTrackHeight();
       updateScrollProgress();
@@ -139,6 +154,9 @@ export function DocumentTickSlider({
       }
       if (observer) {
         observer.disconnect();
+      }
+      if (mutationObserver) {
+        mutationObserver.disconnect();
       }
       document.removeEventListener("visibilitychange", handleVisibilityOrHide);
       window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);

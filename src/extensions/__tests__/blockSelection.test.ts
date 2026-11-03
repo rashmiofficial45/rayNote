@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import {
   getIntersectingBlockIndices,
@@ -6,7 +7,13 @@ import {
   getBlockContentRects,
   type CachedBlockRect,
 } from '../useBlockDrag';
-import { getAllBlocks } from '../BlockSelection';
+import { Editor } from '@tiptap/core';
+import { getExtensions } from '../../editor/extensions';
+import {
+  getAllBlocks,
+  deleteSelectedBlocks,
+  serializeSelectedBlocks,
+} from '../BlockSelection';
 import { calculateAutoScrollSpeed } from '../useAutoScroll';
 import {
   registerClick,
@@ -395,6 +402,54 @@ describe('BlockSelection Geometry & Collision Tests', () => {
       expect(speed2).toBe(18);
 
       expect(speed2).toBeGreaterThan(speed1);
+    });
+  });
+
+  describe('Nested list block selection and deletion (R02)', () => {
+    it('deleting a selected parent paragraph does not delete uncopied nested child lists', () => {
+      const editor = new Editor({
+        extensions: getExtensions(),
+        content: '<ul><li><p>parent</p><ul><li><p>child</p></li></ul></li></ul><p>after</p>',
+      });
+
+      // Select position 2 (the parent paragraph)
+      editor.commands.setBlockSelection?.(2, 10, [2]);
+
+      const deleted = deleteSelectedBlocks(editor.view);
+      expect(deleted).toBe(true);
+
+      const text = editor.getText();
+      expect(text).toContain('child');
+      expect(text).not.toContain('parent');
+      editor.destroy();
+    });
+
+    it('serializes selected ordered list items to rich HTML with ol start attribute (R12)', () => {
+      const editor = new Editor({
+        extensions: getExtensions(),
+        content: '<ol><li><p>Item 1</p></li><li><p>Item 2</p></li><li><p>Item 3</p></li></ol>',
+      });
+
+      // Find the positions of item 2 and item 3
+      let pos2 = -1;
+      let pos3 = -1;
+      let count = 0;
+      editor.state.doc.descendants((node, pos) => {
+        if (node.type.name === 'listItem') {
+          count++;
+          if (count === 2) pos2 = pos;
+          if (count === 3) pos3 = pos;
+        }
+      });
+
+      editor.commands.setBlockSelection?.(pos2, pos3, [pos2, pos3]);
+      const serialized = serializeSelectedBlocks(editor.state);
+      expect(serialized).not.toBeNull();
+      expect(serialized?.htmlText).toContain('<ol');
+      expect(serialized?.htmlText).toContain('start="2"');
+      expect(serialized?.htmlText).toContain('Item 2');
+      expect(serialized?.htmlText).toContain('Item 3');
+      editor.destroy();
     });
   });
 });

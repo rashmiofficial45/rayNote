@@ -106,6 +106,20 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
       expect(editor.state.doc.child(1).type.name).toBe("paragraph");
       editor.destroy();
     });
+
+    it("Shift-Tab unindents empty spaces in code block without throwing RangeError (R09)", () => {
+      const editor = createTestEditor("<pre><code>  </code></pre>");
+      editor.commands.setTextSelection({ from: 1, to: 3 });
+      const shortcuts = editor.extensionManager.extensions.find(
+        (ext) => ext.name === "shortcutsExtension"
+      );
+      const shiftTabHandler = (shortcuts as any)?.config?.addKeyboardShortcuts?.call({ editor })?.["Shift-Tab"];
+      expect(typeof shiftTabHandler).toBe("function");
+
+      expect(() => shiftTabHandler()).not.toThrow();
+      expect(editor.getText()).toBe("");
+      editor.destroy();
+    });
   });
 
   describe("2. Headings Formatting & Shortcuts", () => {

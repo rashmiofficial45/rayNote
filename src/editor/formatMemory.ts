@@ -1,7 +1,8 @@
 import { Extension } from "@tiptap/core";
 import { Editor } from "@tiptap/react";
+import { Mapping } from "@tiptap/pm/transform";
 import { TextSelection } from "@tiptap/pm/state";
-import { blockSelectionPluginKey } from "../extensions/BlockSelection";
+import { blockSelectionPluginKey, getAllBlocks } from "../extensions/BlockSelection";
 
 export type FormatKind =
   | "heading1"
@@ -133,18 +134,47 @@ function restoreFormat(editor: Editor, format: FormatKind) {
  */
 export function smartToggleBlockFormat(editor: Editor, target: FormatKind): boolean {
   const { state } = editor;
+  const selected = blockSelectionPluginKey.getState(state)?.selectedPositions || [];
+  if (!selected.length) return toggleBlockFormatAtSelection(editor, target);
 
-  // ── Block selection mode support ──
-  const blockState = blockSelectionPluginKey.getState(state);
-  const isBlockMode = Boolean(blockState && blockState.selectedPositions.length > 0);
-
-  if (isBlockMode && blockState) {
-    // Sync selection to first block position so tiptap block commands target it
-    const firstPos = blockState.selectedPositions[0];
-    const $pos = state.doc.resolve(Math.min(firstPos + 1, state.doc.content.size));
-    editor.view.dispatch(state.tr.setSelection(TextSelection.near($pos)));
+  const ranges = [...new Set(selected)].sort((a, b) => a - b)
+    .map(pos => ({ pos, end: pos + (state.doc.nodeAt(pos)?.nodeSize || 0) }))
+    .filter((range, index, all) => range.end > range.pos &&
+      !all.some((parent, i) => i < index && parent.pos < range.pos && parent.end >= range.end));
+  const mapping = new Mapping();
+  const track = ({ transaction }: { transaction: import("@tiptap/pm/state").Transaction }) => {
+    mapping.appendMapping(transaction.mapping);
+  };
+  const select = (range: typeof ranges[number]) => {
+    const doc = editor.state.doc;
+    const from = Math.max(1, Math.min(mapping.map(range.pos + 1, 1), doc.content.size));
+    const to = Math.max(from, Math.min(mapping.map(range.end - 1, -1), doc.content.size));
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.between(doc.resolve(from), doc.resolve(to))));
+  };
+  const allActive = ranges.every(range => { select(range); return isFormatActive(editor, target); });
+  let success = true;
+  editor.on("transaction", track);
+  try {
+    for (const range of [...ranges].reverse()) {
+      select(range);
+      if (allActive || !isFormatActive(editor, target)) {
+        success = toggleBlockFormatAtSelection(editor, target) && success;
+      }
+    }
+    const blocks = getAllBlocks(editor.state.doc);
+    const positions = [...new Set(ranges.map(range => {
+      const point = mapping.map(range.pos + 1, 1);
+      return blocks.find(block => point >= block.pos && point < block.pos + block.nodeSize)?.pos
+        ?? mapping.map(range.pos, -1);
+    }))];
+    editor.commands.setBlockSelection?.(positions[0], positions[positions.length - 1] ?? positions[0], positions);
+    return success;
+  } finally {
+    editor.off("transaction", track);
   }
+}
 
+function toggleBlockFormatAtSelection(editor: Editor, target: FormatKind): boolean {
   const currentlyActive = isFormatActive(editor, target);
   const memKey = getBlockMemoryKey(editor);
   let fallbackFormatMemory = formatMemoryByEditor.get(editor);
@@ -177,6 +207,17 @@ export function smartToggleBlockFormat(editor: Editor, target: FormatKind): bool
     }
 
     fallbackFormatMemory.delete(memKey);
+
+    // Changing the textblock type alone does not unwrap its list container.
+    const unwrap = target === "bulletList" ? () => editor.chain().focus().toggleBulletList().run()
+      : target === "orderedList" ? () => editor.chain().focus().toggleOrderedList().run()
+      : target === "taskList" ? () => editor.chain().focus().toggleTaskList().run()
+      : target === "blockquote" ? () => editor.chain().focus().toggleBlockquote().run()
+      : null;
+    if (unwrap) {
+      const success = unwrap();
+      return prev && prev !== target && prev !== "paragraph" ? restoreFormat(editor, prev) : success;
+    }
 
     if (prev && prev !== target && prev !== "paragraph") {
       return restoreFormat(editor, prev);

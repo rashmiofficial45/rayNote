@@ -43,6 +43,72 @@ describe('remaining serialization regressions', () => {
     expect(html.querySelector('p')?.textContent).toBe('Before bold after');
   });
 
+  it('converts hard break inside table cell into <br> rather than splitting the row (R13)', () => {
+    const tableDoc = JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableHeader',
+                content: [{ type: 'paragraph', content: [text('Col 1')] }],
+              },
+            ],
+          },
+          {
+            type: 'tableRow',
+            content: [
+              {
+                type: 'tableCell',
+                content: [{ type: 'paragraph', content: [text('first'), { type: 'hardBreak' }, text('second')] }],
+              },
+            ],
+          },
+        ],
+      }],
+    });
+    const md = noteContentToMarkdown(tableDoc);
+    expect(md).toContain('first<br>second');
+    const html = rendered(md);
+    expect(html.querySelectorAll('tr')).toHaveLength(2);
+    expect(html.querySelector('td')?.innerHTML).toContain('first<br>second');
+  });
+
+  it('preserves multiple paragraphs inside a list item with blank line (R14)', () => {
+    const listDoc = JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'bulletList',
+        content: [{
+          type: 'listItem',
+          content: [
+            { type: 'paragraph', content: [text('first paragraph')] },
+            { type: 'paragraph', content: [text('second paragraph')] },
+          ],
+        }],
+      }],
+    });
+    const md = noteContentToMarkdown(listDoc);
+    const html = rendered(md);
+    expect(html.querySelectorAll('li p')).toHaveLength(2);
+  });
+
+  it('handles large inline-code spans with many backtick runs without stack overflow (R15)', () => {
+    const largeCode = '`x'.repeat(200000);
+    const docWithLargeCode = JSON.stringify({
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [text(largeCode, [{ type: 'code' }])],
+      }],
+    });
+    const md = noteContentToMarkdown(docWithLargeCode);
+    expect(md).not.toBe(docWithLargeCode);
+    expect(md.startsWith('`` ')).toBe(true);
+  });
 });
 
 describe('selected Markdown structure', () => {

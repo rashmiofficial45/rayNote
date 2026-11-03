@@ -7,6 +7,11 @@ import {getExtensions} from '../../editor/extensions';
 import {FindBar} from '../FindBar';
 import {MarkdownViewerModal} from '../MarkdownViewerModal';
 import {SwitchConflictModal} from '../SwitchConflictModal';
+import {WindowResizeHandles} from '../WindowResizeHandles';
+import {invoke} from '@tauri-apps/api/core';
+const resize=vi.hoisted(()=>({start:vi.fn().mockResolvedValue(undefined)}));
+vi.mock('@tauri-apps/api/window',()=>({getCurrentWindow:()=>({startResizeDragging:resize.start})}));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../DocumentTickSlider',()=>({DocumentTickSlider:()=>null}));
 vi.mock('@tauri-apps/api/event',()=>({listen:vi.fn().mockResolvedValue(()=>{}),emit:vi.fn().mockResolvedValue(undefined)}));
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
@@ -36,4 +41,38 @@ describe('remaining async UI contracts',()=>{
   const button=Array.from(host.querySelectorAll('button')).find(b=>b.textContent?.includes('Copy text'))!;
   await act(async()=>button.click());expect(copy).toHaveBeenCalled();expect(host.textContent).not.toContain('Copied to clipboard!');
  });
+ it('does not start window resize drag if pointer was released before frame resolved (R18)', async () => {
+  let resolveFrame!: (frame: any) => void;
+  vi.mocked(invoke).mockImplementation((cmd: string) => {
+    if (cmd === 'get_native_window_frame') {
+      return new Promise(res => { resolveFrame = res; });
+    }
+    return Promise.resolve();
+  });
+  await act(async () => root.render(<WindowResizeHandles />));
+  const handle = host.querySelector('.window-resize-handle') as HTMLElement;
+  expect(handle).not.toBeNull();
+  act(() => {
+    handle.dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 1, bubbles: true }));
+  });
+  act(() => {
+    handle.dispatchEvent(new PointerEvent('pointerup', { button: 0, pointerId: 1, bubbles: true }));
+  });
+  await act(async () => {
+    resolveFrame({ x: 0, y: 0, width: 400, height: 600 });
+  });
+  act(() => {
+    handle.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, screenX: 100, screenY: 100, bubbles: true }));
+  });
+  expect(invoke).not.toHaveBeenCalledWith('set_native_window_frame', expect.anything());
+ });
+});
+
+it('never starts native fallback after a released frame lookup rejects',async()=>{
+ let reject!:(e:Error)=>void;resize.start.mockClear();
+ vi.mocked(invoke).mockImplementation(()=>new Promise((_resolve,rej)=>{reject=rej}));
+ await act(async()=>root.render(<WindowResizeHandles/>));const edge=host.querySelector('.window-resize-handle')!;
+ act(()=>edge.dispatchEvent(new PointerEvent('pointerdown',{button:0,pointerId:1,bubbles:true})));
+ act(()=>edge.dispatchEvent(new PointerEvent('pointerup',{pointerId:1,bubbles:true})));
+ await act(async()=>reject(new Error('frame unavailable')));expect(resize.start).not.toHaveBeenCalled();
 });

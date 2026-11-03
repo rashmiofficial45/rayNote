@@ -290,7 +290,9 @@ export function deleteSelectedBlocks(view: EditorView, explicitPositions?: numbe
 
         for (let j = 0; j < child.childCount; j++) {
           const item = child.child(j);
-          const isSelected = positionsSet.has(itemOffset) || positionsSet.has(itemOffset + 1);
+          const isItemWhole = positionsSet.has(itemOffset);
+          const isFirstChild = positionsSet.has(itemOffset + 1);
+          const isSelected = isItemWhole || (isFirstChild && item.childCount === 1);
           if (isSelected) {
             hasAnySelected = true;
           } else {
@@ -302,13 +304,23 @@ export function deleteSelectedBlocks(view: EditorView, explicitPositions?: numbe
         if (allItemsSelected && hasAnySelected) {
           // Delete the entire list container so no ghost empty list items remain
           rangesToDelete.push({ from: childPos, to: childPos + child.nodeSize });
-        } else if (hasAnySelected) {
-          // Delete only the individual selected items
+        } else {
+          // Delete only the individual selected items or matching child blocks
           itemOffset = childPos + 1;
           for (let j = 0; j < child.childCount; j++) {
             const item = child.child(j);
-            if (positionsSet.has(itemOffset) || positionsSet.has(itemOffset + 1)) {
+            const isItemWhole = positionsSet.has(itemOffset);
+            const isFirstChild = positionsSet.has(itemOffset + 1);
+            if (isItemWhole) {
               rangesToDelete.push({ from: itemOffset, to: itemOffset + item.nodeSize });
+            } else if (isFirstChild) {
+              if (item.childCount > 1) {
+                // Delete ONLY the selected child paragraph so uncopied nested list is preserved
+                const firstChild = item.child(0);
+                rangesToDelete.push({ from: itemOffset + 1, to: itemOffset + 1 + firstChild.nodeSize });
+              } else {
+                rangesToDelete.push({ from: itemOffset, to: itemOffset + item.nodeSize });
+              }
             }
             itemOffset += item.nodeSize;
           }
@@ -450,8 +462,6 @@ export function serializeSelectedBlocks(state: EditorState): { markdownText: str
 
   if (nodes.length === 0) return null;
 
-  const fragment = Fragment.fromArray(nodes);
-
   // Serialize to Markdown
   // A block selection can contain list items without their parent list node.
   // Carry the source parent/start so ordered items retain their actual numbering.
@@ -468,7 +478,59 @@ export function serializeSelectedBlocks(state: EditorState): { markdownText: str
   // Serialize to HTML
   let htmlText = "";
   try {
-    const dom = DOMSerializer.fromSchema(state.schema).serializeFragment(fragment);
+    const wrappedNodes: ProseMirrorNode[] = [];
+    let currentListGroup: { kind: string; attrs: any; items: ProseMirrorNode[] } | null = null;
+
+    const flushListGroup = () => {
+      if (!currentListGroup) return;
+      const { kind, attrs, items } = currentListGroup;
+      if (state.schema.nodes[kind]) {
+        wrappedNodes.push(state.schema.nodes[kind].create(attrs, Fragment.fromArray(items)));
+      } else {
+        wrappedNodes.push(...items);
+      }
+      currentListGroup = null;
+    };
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      if (node.type.name === "listItem" || node.type.name === "taskItem") {
+        const resolved = state.doc.resolve(sortedPositions[i]);
+        const parent = resolved.parent;
+        const kind =
+          parent.type.name === "orderedList"
+            ? "orderedList"
+            : parent.type.name === "taskList"
+            ? "taskList"
+            : "bulletList";
+        const startAttr =
+          kind === "orderedList"
+            ? (parent.attrs.start || 1) + resolved.index()
+            : undefined;
+
+        if (
+          currentListGroup &&
+          currentListGroup.kind === kind &&
+          (kind !== "orderedList" ||
+            currentListGroup.attrs.start + currentListGroup.items.length === startAttr)
+        ) {
+          currentListGroup.items.push(node);
+        } else {
+          flushListGroup();
+          currentListGroup = {
+            kind,
+            attrs: kind === "orderedList" ? { ...parent.attrs, start: startAttr } : parent.attrs,
+            items: [node],
+          };
+        }
+      } else {
+        flushListGroup();
+        wrappedNodes.push(node);
+      }
+    }
+    flushListGroup();
+
+    const dom = DOMSerializer.fromSchema(state.schema).serializeFragment(Fragment.fromArray(wrappedNodes));
     const div = document.createElement("div");
     div.appendChild(dom);
     htmlText = div.innerHTML;

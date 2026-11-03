@@ -365,8 +365,13 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
                     if let Some(ns_panel) = (ptr as *mut AnyObject).as_ref() {
                         let behavior: usize = (1 << 0) | (1 << 6) | (1 << 8);
                         let _: () = msg_send![ns_panel, setCollectionBehavior: behavior];
-                        let level: isize = 1000;
+                        let is_always_on_top = manager
+                            .try_state::<commands::AlwaysOnTopState>()
+                            .map(|s| s.0.load(std::sync::atomic::Ordering::SeqCst))
+                            .unwrap_or(true);
+                        let level: isize = if is_always_on_top { 1000 } else { 0 };
                         let _: () = msg_send![ns_panel, setLevel: level];
+                        let _: () = msg_send![ns_panel, setFloatingPanel: is_always_on_top];
                         let _: () = msg_send![ns_panel, orderFrontRegardless];
                         let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
                         let content_view: *mut AnyObject = msg_send![ns_panel, contentView];
@@ -525,6 +530,7 @@ pub fn run() {
             let defaults = vec!["Shift+CommandOrControl+Space".to_string(), "CommandOrControl+Shift+N".to_string()];
             for shortcut in &defaults { let _ = app.global_shortcut().register(shortcut.as_str()); }
             app.manage(commands::ToggleShortcuts(std::sync::Mutex::new(defaults)));
+            app.manage(commands::AlwaysOnTopState(std::sync::atomic::AtomicBool::new(true)));
             for arg in std::env::args() { commands::route_note_link(app.handle(), &arg); }
 
             // Set macOS-specific window behavior and subclass to NSPanel

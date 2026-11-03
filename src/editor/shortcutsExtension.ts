@@ -196,7 +196,11 @@ export const ShortcutsExtension = Extension.create({
             const text = state.doc.textBetween(from, to, "\n", "\n");
             const lines = text.split("\n");
             const unindented = lines.map((line) => line.replace(/^ {1,2}/, "")).join("\n");
-            tr.replaceWith(from, to, state.schema.text(unindented));
+            if (unindented) {
+              tr.replaceWith(from, to, state.schema.text(unindented));
+            } else {
+              tr.delete(from, to);
+            }
             return true;
           });
         }

@@ -35,6 +35,7 @@ const MIN_HEIGHT = 400;
 
 export function WindowResizeHandles() {
   const activeDragRef = useRef<ActiveDrag | null>(null);
+  const pendingDownRef = useRef<{ pointerId: number; released: boolean } | null>(null);
 
   const computeNewFrame = useCallback(
     (direction: ResizeDirection, startFrame: NativeWindowFrame, deltaX: number, deltaY: number): NativeWindowFrame => {
@@ -116,6 +117,8 @@ export function WindowResizeHandles() {
 
       const el = e.currentTarget;
       const pointerId = e.pointerId;
+      const pending = { pointerId, released: false };
+      pendingDownRef.current = pending;
 
       try {
         el.setPointerCapture(pointerId);
@@ -129,6 +132,13 @@ export function WindowResizeHandles() {
       try {
         // Query current native frame from Cocoa
         const startFrame = await invoke<NativeWindowFrame>("get_native_window_frame");
+        // If pointer was released before native call resolved, abort (R18)
+        if (
+          pendingDownRef.current !== pending || pending.released
+        ) {
+          return;
+        }
+
         activeDragRef.current = {
           direction,
           startScreenX,
@@ -139,9 +149,10 @@ export function WindowResizeHandles() {
           rafId: null,
         };
       } catch {
-        // Non-macOS or fallback: call standard Tauri resize dragging
+        // A failed lookup must not revive a released or superseded drag.
+        if (pendingDownRef.current !== pending || pending.released) return;
         try {
-          getCurrentWindow().startResizeDragging(direction);
+          await getCurrentWindow().startResizeDragging(direction);
         } catch {
           // Ignored
         }
@@ -154,6 +165,14 @@ export function WindowResizeHandles() {
     (e: React.PointerEvent<HTMLDivElement>) => {
       const drag = activeDragRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
+
+      // If mouse button was released without pointerUp firing, cancel drag (R18)
+      if (e.buttons === 0) {
+        if (drag.rafId !== null) cancelAnimationFrame(drag.rafId);
+        activeDragRef.current = null;
+        pendingDownRef.current = null;
+        return;
+      }
 
       e.preventDefault();
       e.stopPropagation();
@@ -184,6 +203,10 @@ export function WindowResizeHandles() {
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
+      if (pendingDownRef.current && pendingDownRef.current.pointerId === e.pointerId) {
+        pendingDownRef.current.released = true;
+      }
+
       const drag = activeDragRef.current;
       if (!drag || drag.pointerId !== e.pointerId) return;
 

@@ -177,6 +177,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
+                e.stopPropagation();
                 handleReplaceCurrent();
               }
             }}

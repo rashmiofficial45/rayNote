@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import { sliceToMarkdown, isMarkdownContent, markdownToTipTapHtml } from '../markdownUtils';
 
@@ -36,6 +37,29 @@ describe('Markdown Serialization & Clipboard Utilities (Test C)', () => {
       expect(html).toContain('data-type="taskItem"');
       expect(html).toContain('data-checked="true"');
       expect(html).toContain('data-checked="false"');
+    });
+
+    it('does not mark unchecked task as checked when text contains unchecked (R10)', () => {
+      const md = '- [ ] unchecked word\n- [ ] checked keyword';
+      const html = markdownToTipTapHtml(md);
+      expect(html).not.toContain('data-checked="true"');
+      expect(html).toContain('data-checked="false"');
+    });
+
+    it('preserves nested and loose task structures (R11)', () => {
+      const nestedMd = '- [ ] parent\n  - [ ] child';
+      const nestedHtml = markdownToTipTapHtml(nestedMd);
+      const container = document.createElement('div');
+      container.innerHTML = nestedHtml;
+      const tasks = container.querySelectorAll('li[data-type="taskItem"]');
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].querySelector('li[data-type="taskItem"]')?.textContent).toContain('child');
+
+      const looseMd = '- [ ] item\n\n  second paragraph';
+      const looseHtml = markdownToTipTapHtml(looseMd);
+      container.innerHTML = looseHtml;
+      expect(container.querySelectorAll('li[data-type="taskItem"]')).toHaveLength(1);
+      expect(container.querySelectorAll('li[data-type="taskItem"] p')).toHaveLength(2);
     });
 
     it('converts markdown headings and bold into HTML elements', () => {

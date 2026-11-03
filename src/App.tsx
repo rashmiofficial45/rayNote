@@ -53,6 +53,9 @@ import {
   updateNote,
   deleteNote,
   discardEditorNote,
+  readEditorRecoverySnapshot,
+  getEditorNoteId,
+  handoffEditorRecovery,
   togglePin,
   saveWindowSize,
   hideWindow,
@@ -64,12 +67,15 @@ import {
   registerPanelHideHandler,
   flushEditorNow,
   flushSaveQueue,
+  type Note,
   NoteSummary,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
+import { registerEditorFlushHandler } from "./lib/editorFlush";
 import { registerClearAllNotesHandler } from "./lib/noteDeletion";
 import { noteCache } from "./lib/noteCache";
 import { titleStore } from "./lib/titleStore";
+import { blockSelectionPluginKey } from "./extensions/BlockSelection";
 import { broadcastSync, listenToSettingsSync, matchesEvent, nativeShortcut } from "./lib/settingsSync";
 import { getStoredCommandsConfig, CommandRow } from "./lib/commandsConfig";
 import {
@@ -263,6 +269,9 @@ function App() {
         clearCachedRecentSearchResults();
         clearActiveNoteSnapshot();
       },
+      onFlushRequested: () => {
+        flushEditorNow().then(() => flushSaveQueue()).catch(console.error);
+      },
     });
   }, []);
 
@@ -308,6 +317,8 @@ function App() {
 
   // History stack for navigating back/forward
   const navigationHistoryRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: -1 });
+  const pendingNavigationRef = useRef<{ sourceId: string | null; requestId: number; history: { ids: string[]; index: number } } | null>(null);
+  const selectedNoteIdRef = useRef(activeNoteId);
   const pruneHistory = useCallback((deleted: Set<string>) => {
     const history = navigationHistoryRef.current;
     const index = history.ids.slice(0, history.index + 1).filter(id => !deleted.has(id)).length - 1;
@@ -331,17 +342,62 @@ function App() {
 
   const handleSwitchFailed = useCallback(
     (failedId: string, err: unknown) => {
-      console.warn(`[switch] Note switch aborted because saving note ${failedId} failed:`, err);
+      console.warn(`[switch] Note switch aborted:`, err);
       setActiveNoteId(failedId);
+
+      // Restore title and summary of the retained note (R05)
+      const inRecents = recentNotes.find((n) => n.id === failedId);
       const cached = noteCache.get(failedId);
-      if (cached) noteCache.persistActiveToLocalStorage(failedId, cached.content, cached.baseUpdatedAt, cached.unsaved);
-      else safeLocalStorageSetItem("notefast_active_note_id", failedId);
+      if (inRecents) {
+        setActiveNoteSummary(inRecents);
+        titleStore.setTitle(inRecents.title);
+      } else if (cached) {
+        const title = cached.title || extractTitleFromMarkdown(cached.content) || "Untitled";
+        titleStore.setTitle(title);
+        const iso = new Date(cached.updatedAt).toISOString();
+        setActiveNoteSummary({
+          id: failedId,
+          title,
+          preview: getPreviewText(cached.content),
+          created_at: iso,
+          updated_at: iso,
+          is_pinned: false,
+        });
+      } else {
+        const fallbackNote = notes.find((n) => n.id === failedId);
+        if (fallbackNote) {
+          setActiveNoteSummary(fallbackNote);
+          titleStore.setTitle(fallbackNote.title);
+        } else {
+          titleStore.reset();
+        }
+      }
+
+      if (cached) {
+        noteCache.persistActiveToLocalStorage(failedId, cached.content, cached.baseUpdatedAt, cached.unsaved);
+      } else {
+        safeLocalStorageSetItem("notefast_active_note_id", failedId);
+      }
+
+      const pendingNavigation = pendingNavigationRef.current;
+      if (pendingNavigation?.sourceId === failedId && pendingNavigation.requestId === activeFetchIdRef.current) {
+        navigationHistoryRef.current = pendingNavigation.history;
+        pendingNavigationRef.current = null;
+      }
+      selectedNoteIdRef.current = failedId;
+
+      const isTargetLoadError =
+        err instanceof Error &&
+        (err.message.includes("could not be loaded") || err.message.includes("Failed to load"));
+
       showToast(
-        "Save failed. Staying on current note to protect unsaved changes.",
+        isTargetLoadError
+          ? "Failed to open note. Staying on current note."
+          : "Save failed. Staying on current note to protect unsaved changes.",
         <AlertTriangle size={14} className="text-amber-400" />
       );
     },
-    [showToast]
+    [notes, recentNotes, showToast]
   );
 
   /**
@@ -354,8 +410,19 @@ function App() {
    * 5. Dispatches asynchronous `getNote(id)` to SQLite with concurrency check
    *    (`activeFetchIdRef`) to prevent out-of-order race conditions.
    */
-  const handleSelectNote = useCallback((id: string, summaryHint?: NoteSummary, recordHistory = true) => {
+  const handleSelectNote = useCallback((id: string, summaryHint?: NoteSummary, recordHistory = true, historyIndex?: number) => {
     const requestId = ++activeFetchIdRef.current;
+    if (recordHistory || historyIndex !== undefined) {
+      const history = navigationHistoryRef.current;
+      const previousPending = pendingNavigationRef.current;
+      const liveId = getEditorNoteId();
+      const supersedesPending = liveId !== null && previousPending && liveId === previousPending.sourceId && liveId !== selectedNoteIdRef.current;
+      pendingNavigationRef.current = {
+        sourceId: supersedesPending ? previousPending.sourceId : selectedNoteIdRef.current, requestId,
+        history: supersedesPending ? previousPending.history : { ids: [...history.ids], index: history.index },
+      };
+    }
+    selectedNoteIdRef.current = id;
     setActiveNoteId(id);
 
     // Apply summary hint or find in recents/cache without DB fetch
@@ -382,6 +449,8 @@ function App() {
       const history = navigationHistoryRef.current;
       const ids = [...history.ids.slice(0, history.index + 1), id].slice(-50);
       navigationHistoryRef.current = { ids, index: ids.length - 1 };
+    } else if (historyIndex !== undefined) {
+      navigationHistoryRef.current = { ...navigationHistoryRef.current, index: historyIndex };
     }
 
     // Fast in-memory LRU cache check (0ms instantaneous switch)
@@ -587,7 +656,7 @@ function App() {
   const pendingRecoveriesRef = useRef(new Map<string, Promise<string>>());
   const handleRecoverOrphan = useCallback(
     (content: string, sourceId?: string): Promise<string> => {
-      const recoveryKey = `${sourceId || readActiveNoteSnapshot()?.id || "unknown"}:${content}`;
+      const recoveryKey = sourceId || readActiveNoteSnapshot()?.id || "unknown";
       const pending = pendingRecoveriesRef.current.get(recoveryKey);
       if (pending) return pending;
       const operation = (async () => {
@@ -609,11 +678,8 @@ function App() {
 
         let note: any = null;
         if (existingRecoveredId) {
-          try {
-            note = await getNote(existingRecoveredId);
-          } catch {
-            note = null;
-          }
+          // Canonical absence is null. Read failures must retain the recovery marker.
+          note = await getNote(existingRecoveredId);
         }
 
         let title = "Recovered Note";
@@ -644,9 +710,31 @@ function App() {
           );
         }
 
-        // 2. Persist content to SQLite before clearing snapshot keys
-        const recoveredUpdatedAt = await updateNote(note.id, title, content);
-        noteCache.set(note.id, content, recoveredUpdatedAt, title, 0, false);
+        const readLatest = (fallback = content) => readEditorRecoverySnapshot(currentSourceId)?.content
+          ?? noteCache.peek(currentSourceId)?.content ?? fallback;
+        const recoveryTitle = (value: string): string => {
+          try {
+            const doc = JSON.parse(value);
+            for (const node of doc.content || []) {
+              const text = (node.content || []).map((child: { text?: string }) => child.text || "").join("").trim();
+              if (text) return text;
+            }
+            return title;
+          } catch { return extractTitleFromMarkdown(value, title); }
+        };
+        let finalContent = readLatest();
+        let finalUpdatedAt: string;
+        // Recheck the live editor after every awaited write. The synchronous handoff
+        // closes the last race and keeps its document/undo state intact.
+        for (;;) {
+          const finalTitle = recoveryTitle(finalContent);
+          finalUpdatedAt = await updateNote(note.id, finalTitle, finalContent);
+          noteCache.set(note.id, finalContent, finalUpdatedAt, finalTitle, 0, false);
+          const latest = readLatest(finalContent);
+          if (latest !== finalContent) { finalContent = latest; continue; }
+          if (handoffEditorRecovery(currentSourceId, note.id, finalContent, finalTitle)) break;
+          finalContent = readLatest(finalContent);
+        }
 
         // The replacement is durable. Stop the old editor from saving/recovering its missing ID again.
         discardEditorNote(currentSourceId);
@@ -655,14 +743,18 @@ function App() {
         clearActiveNoteSnapshot(currentSourceId);
 
         // 3. Update localStorage pointers to point to the newly recovered note
-        noteCache.persistActiveToLocalStorage(note.id, content, recoveredUpdatedAt, false);
+        noteCache.persistActiveToLocalStorage(note.id, finalContent, finalUpdatedAt, false);
         safeLocalStorageRemoveItem("notefast_recovered_note_id");
 
         // 4. Switch active selection to the new note
         handleSelectNote(note.id);
-        const freshRecents = await getRecentNotes(30);
-        setRecentNotes(freshRecents);
-        safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+        try {
+          const freshRecents = await getRecentNotes(30);
+          setRecentNotes(freshRecents);
+          safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+        } catch {
+          // Failure to refresh recents must not reject an already durable recovery (R04)
+        }
 
         showToast("Recovered unsaved note into a new document", <Check size={14} />);
         return note.id;
@@ -715,8 +807,24 @@ function App() {
           }
         } else {
           // Check if it exists beyond top 30 in DB
-          const inDb = await getNote(savedId).catch(() => null);
-          if (inDb) {
+          let inDb: Note | null = null;
+          let dbCheckFailed = false;
+          try {
+            inDb = await getNote(savedId);
+          } catch (e: any) {
+            const msg = String(e?.message || e || "");
+            if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("does not exist")) {
+              inDb = null;
+            } else {
+              dbCheckFailed = true;
+              console.warn("Failed to check note existence in DB:", e);
+            }
+          }
+
+          if (dbCheckFailed) {
+            // Read failed, NOT absent! Do not treat as missing note or recover orphan (R03).
+            handleSelectNote(savedId);
+          } else if (inDb) {
             handleSelectNote(inDb.id, {
               id: inDb.id,
               title: inDb.title,
@@ -726,7 +834,7 @@ function App() {
               is_pinned: inDb.is_pinned,
             }, false);
           } else {
-            // Note row is MISSING from DB!
+            // Note row is cleanly MISSING from DB!
             let recoveredId: string | null = null;
             const rawRecovered = safeLocalStorageGetItem("notefast_recovered_note_id");
             if (rawRecovered) {
@@ -740,7 +848,24 @@ function App() {
               }
             }
             if (recoveredId) {
-              const recoveredNote = await getNote(recoveredId).catch(() => null);
+              let recoveredNote: Note | null = null;
+              let recoveredCheckFailed = false;
+              try {
+                recoveredNote = await getNote(recoveredId);
+              } catch (e: any) {
+                const msg = String(e?.message || e || "");
+                if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("does not exist")) {
+                  recoveredNote = null;
+                } else {
+                  recoveredCheckFailed = true;
+                  console.warn("Failed to lookup recovered note:", e);
+                }
+              }
+              if (recoveredCheckFailed) {
+                // Read failed for recovered note - do not assume absent or re-clone
+                handleSelectNote(recoveredId);
+                return;
+              }
               if (recoveredNote && isUnsaved && savedContent) {
                 await handleRecoverOrphan(savedContent, savedId);
                 return;
@@ -763,7 +888,7 @@ function App() {
             }
 
             if (isUnsaved && savedContent) {
-              // Unsaved snapshot whose note is missing from DB: create new note with content, switch to it, clear snapshot
+              // Unsaved snapshot whose note is genuinely missing from DB: create new note with content, switch to it, clear snapshot
               await handleRecoverOrphan(savedContent, savedId);
             } else {
               // Clean orphan: clear snapshot and select first recent note if any
@@ -792,8 +917,8 @@ function App() {
   const handleGoBack = useCallback(() => {
     const history = navigationHistoryRef.current;
     if (history.index > 0) {
-      history.index--;
-      handleSelectNote(history.ids[history.index], undefined, false);
+      const index = history.index - 1;
+      handleSelectNote(history.ids[index], undefined, false, index);
       showToast("Navigated Back");
     }
   }, [handleSelectNote, showToast]);
@@ -801,8 +926,8 @@ function App() {
   const handleGoForward = useCallback(() => {
     const history = navigationHistoryRef.current;
     if (history.index < history.ids.length - 1) {
-      history.index++;
-      handleSelectNote(history.ids[history.index], undefined, false);
+      const index = history.index + 1;
+      handleSelectNote(history.ids[index], undefined, false, index);
       showToast("Navigated Forward");
     }
   }, [handleSelectNote, showToast]);
@@ -1293,6 +1418,16 @@ function App() {
     return () => { disposed = true; stop?.(); };
   }, [handleClearAllNotes]);
 
+  useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    registerEditorFlushHandler(async () => {
+      await flushEditorNow();
+      await flushSaveQueue();
+    }).then(unlisten => { if (disposed) unlisten(); else stop = unlisten; }).catch(console.error);
+    return () => { disposed = true; stop?.(); };
+  }, []);
+
   const handleConflictSaveAsNew = useCallback(async () => {
     if (!switchConflict) return;
     await handleRecoverOrphan(switchConflict.content, switchConflict.failedNoteId);
@@ -1475,11 +1610,13 @@ function App() {
       return;
     }
     try {
+      await flushEditorNow();
+      await flushSaveQueue();
       const resultMsg = await exportAllNotesFromDb();
       showToast(resultMsg || `Exported ${notes.length} note${notes.length > 1 ? "s" : ""}`, <FileDown size={14} />);
     } catch (err) {
       console.error("Export all failed:", err);
-      showToast("Export failed", <Trash2 size={14} />);
+      showToast("Changes could not be saved. Export aborted to protect unwritten edits.", <AlertTriangle size={14} className="text-amber-400" />);
     }
   }, [notes.length, showToast]);
 
@@ -1593,7 +1730,11 @@ function App() {
       }
 
       // Duplicate Note
-      if (isTriggered("duplicate", "⌘D") && !(window as any).__RAYNOTE_EDITOR__?.storage?.blockSelection?.selectedPositions?.length) {
+      const editor = (window as any).__RAYNOTE_EDITOR__;
+      const hasBlockSelection = Boolean(
+        editor?.state && blockSelectionPluginKey.getState(editor.state)?.selectedPositions?.length
+      );
+      if (isTriggered("duplicate", "⌘D") && !hasBlockSelection) {
         e.preventDefault();
         handleDuplicateNote();
         return;

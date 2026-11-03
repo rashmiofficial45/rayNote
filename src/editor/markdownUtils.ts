@@ -124,6 +124,12 @@ export function ensureFirstLineHeading(md: string, fallbackTitle?: string): stri
   return text;
 }
 
+function getDocument(): Document | null {
+  // Native webviews provide document. Node callers use the non-DOM fallback
+  // below, keeping server-only DOM packages out of the client bundle.
+  return typeof document !== "undefined" ? document : null;
+}
+
 /**
  * Converts Markdown text into TipTap-compatible HTML with full task list,
  * link, and heading support.
@@ -151,18 +157,76 @@ export function markdownToTipTapHtml(
   // marked outputs <li><input disabled="" type="checkbox"> or <input checked="" ...>
   // TipTap requires <ul data-type="taskList"><li data-type="taskItem" data-checked="true|false"><p>...</p></li></ul>
   
-  // Transform task list items
+  const doc = getDocument();
+  if (doc) {
+    const container = doc.createElement("div");
+    container.innerHTML = html;
+
+    const checkboxes = container.querySelectorAll(
+      'li > input[type="checkbox"], li > p:first-child > input[type="checkbox"]'
+    );
+    for (const cb of Array.from(checkboxes)) {
+      const isChecked = (cb as HTMLInputElement).checked || cb.hasAttribute("checked");
+      const li = cb.closest("li");
+      if (!li) continue;
+      li.setAttribute("data-type", "taskItem");
+      li.setAttribute("data-checked", String(isChecked));
+      cb.remove();
+
+      const label = doc.createElement("label");
+      label.setAttribute("contenteditable", "false");
+      const newCb = doc.createElement("input");
+      newCb.type = "checkbox";
+      newCb.disabled = true;
+      if (isChecked) newCb.setAttribute("checked", "checked");
+      label.appendChild(newCb);
+
+      const div = doc.createElement("div");
+      let paragraph: HTMLParagraphElement | null = null;
+      // TaskItem parses only this div. Keep nested blocks and following paragraphs
+      // inside it, in source order, wrapping only direct inline runs.
+      while (li.firstChild) {
+        const child = li.firstChild;
+        if (child.nodeType === 1 && /^(P|UL|OL|PRE|BLOCKQUOTE|H[1-6]|TABLE|DIV|HR)$/.test(child.nodeName)) {
+          paragraph = null;
+          div.appendChild(child);
+        } else if (!paragraph && child.nodeType === 3 && !child.textContent?.trim()) {
+          child.remove();
+        } else {
+          if (!paragraph) {
+            paragraph = doc.createElement("p");
+            div.appendChild(paragraph);
+          }
+          paragraph.appendChild(child);
+        }
+      }
+      if (!div.firstChild) div.appendChild(doc.createElement("p"));
+      li.appendChild(label);
+      li.appendChild(div);
+    }
+
+    const taskLis = container.querySelectorAll('li[data-type="taskItem"]');
+    for (const tli of Array.from(taskLis)) {
+      const parent = tli.parentElement;
+      if (parent && (parent.tagName === "UL" || parent.tagName === "OL")) {
+        parent.setAttribute("data-type", "taskList");
+      }
+    }
+
+    return container.innerHTML;
+  }
+
+  // Fallback for non-DOM environments
   html = html.replace(
-    /<li>\s*<input(?:\s+checked(?:="")?)?[^>]*type="checkbox"[^>]*>([\s\S]*?)<\/li>/gis,
-    (match, innerContent) => {
-      const isChecked = /checked/i.test(match);
+    /<li>(\s*(?:<p>)?\s*<input([^>]*type="checkbox"[^>]*)>\s*)([\s\S]*?)<\/li>/gis,
+    (_match, _prefix, inputAttrs, innerContent) => {
+      const isChecked = /\bchecked\b/i.test(inputAttrs);
       const clean = innerContent.trim();
       const formattedBody = clean.startsWith("<p>") ? clean : `<p>${clean}</p>`;
       return `<li data-type="taskItem" data-checked="${isChecked}"><label contenteditable="false"><input type="checkbox" ${isChecked ? 'checked="checked"' : ""} disabled="disabled"></label><div>${formattedBody}</div></li>`;
     }
   );
 
-  // Wrap consecutive taskItems in <ul data-type="taskList">
   html = html.replace(
     /<ul[^>]*>(\s*<li data-type="taskItem"[^>]*>[\s\S]*?<\/li>\s*)<\/ul>/gi,
     '<ul data-type="taskList">$1</ul>'

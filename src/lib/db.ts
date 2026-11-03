@@ -109,6 +109,21 @@ let saveQueue: Promise<unknown> = Promise.resolve();
 let activeEditorFlush: (() => Promise<void> | void) | null = null;
 let activeEditorDiscard: ((id: string) => void) | null = null;
 
+interface EditorRecoveryBridge {
+  getNoteId: () => string | null;
+  read: (id: string) => { content: string } | null;
+  handoff: (sourceId: string, targetId: string, content: string, title: string) => boolean;
+}
+let editorRecoveryBridge: EditorRecoveryBridge | null = null;
+export function registerEditorRecovery(bridge: EditorRecoveryBridge | null): void { editorRecoveryBridge = bridge; }
+export function getEditorNoteId(): string | null { return editorRecoveryBridge?.getNoteId() ?? null; }
+export function readEditorRecoverySnapshot(id: string): { content: string } | null {
+  return editorRecoveryBridge?.read(id) ?? null;
+}
+export function handoffEditorRecovery(sourceId: string, targetId: string, content: string, title: string): boolean {
+  return editorRecoveryBridge?.handoff(sourceId, targetId, content, title) ?? true;
+}
+
 /** Registers synchronous invalidation after a note has been deliberately deleted. */
 export function registerEditorDiscard(discardFn: ((id: string) => void) | null): void {
   activeEditorDiscard = discardFn;

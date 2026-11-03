@@ -169,7 +169,10 @@ export function escapeMarkdownText(value: string): string {
 }
 
 export function markdownInlineCode(value: string): string {
-  const longest = Math.max(0, ...Array.from(value.matchAll(/`+/g), m => m[0].length));
+  let longest = 0;
+  for (const m of value.matchAll(/`+/g)) {
+    if (m[0].length > longest) longest = m[0].length;
+  }
   const fence = "`".repeat(longest + 1);
   const padding = value.startsWith("`") || value.endsWith("`") || (/^ .* $/.test(value) && /\S/.test(value)) ? " " : "";
   return `${fence}${padding}${value}${padding}${fence}`;
@@ -180,8 +183,8 @@ function wrapMarkdownMark(text: string, delimiter: string): string {
   return match ? `${match[1]}${delimiter}${match[2]}${delimiter}${match[3]}` : text;
 }
 
-export function serializeMarkdownInline(node: any): string {
-  if (node?.type === "hardBreak") return "  \n";
+export function serializeMarkdownInline(node: any, options?: { inTable?: boolean }): string {
+  if (node?.type === "hardBreak") return options?.inTable ? "<br>" : "  \n";
   if (!node?.text) return "";
   const marks = node.marks || [];
   let text = marks.some((m: any) => m.type === "code") ? markdownInlineCode(node.text) : escapeMarkdownText(node.text);
@@ -232,6 +235,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
                 if (idx === 0) {
                   lines.push(`${indent}- ${text}`);
                 } else {
+                  lines.push("");
                   lines.push(`${indent}  ${text}`);
                 }
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
@@ -256,6 +260,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
                 if (cIdx === 0) {
                   lines.push(`${indent}${prefix}${text}`);
                 } else {
+                  lines.push("");
                   lines.push(`${indent}${indentPrefix}${text}`);
                 }
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
@@ -279,6 +284,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
                 if (idx === 0) {
                   lines.push(`${indent}${prefix}${text}`);
                 } else {
+                  lines.push("");
                   lines.push(`${indent}  ${text}`);
                 }
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
@@ -296,14 +302,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
           return serializeNode({ type: "bulletList", content: [node] }, indent);
         }
         case "taskItem": {
-          const checked = node.attrs?.checked ? "[x]" : "[ ]";
-          const text = (node.content || []).map((p: any) => {
-            if (p.type === "paragraph") {
-              return (p.content || []).map(serializeInline).join("");
-            }
-            return serializeNode(p, indent).trim();
-          }).join(" ");
-          return `${indent}- ${checked} ${text}\n`;
+          return serializeNode({ type: "taskList", content: [node] }, indent);
         }
         case "blockquote": {
           const text = (node.content || [])
@@ -330,7 +329,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
               const cellText = (cell.content || [])
                 .map((p: any) => {
                   if (p.type === "paragraph") {
-                    return (p.content || []).map(serializeInline).join("");
+                    return (p.content || []).map((n: any) => serializeMarkdownInline(n, { inTable: true })).join("");
                   }
                   return serializeNode(p).trim();
                 })

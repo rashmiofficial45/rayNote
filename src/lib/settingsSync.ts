@@ -18,7 +18,8 @@ export type SettingsSyncPayload =
   | { type: "commands_config"; value: any }
   | { type: "aliases_config"; value: Record<string, string> }
   | { type: "notes_cleared" }
-  | { type: "notes_updated" };
+  | { type: "notes_updated" }
+  | { type: "flush_requested" };
 
 const TAURI_EVENT_NAME = "notefast://settings-sync";
 const BROADCAST_CHANNEL_NAME = "notefast_settings_channel";
@@ -74,6 +75,7 @@ export interface SettingsSyncCallbacks {
   onAliasesConfigChange?: (aliases: Record<string, string>) => void;
   onNotesCleared?: () => void;
   onNotesUpdated?: () => void;
+  onFlushRequested?: () => void;
 }
 
 /**
@@ -126,6 +128,9 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
         break;
       case "notes_updated":
         callbacks?.onNotesUpdated?.();
+        break;
+      case "flush_requested":
+        callbacks?.onFlushRequested?.();
         break;
     }
   };

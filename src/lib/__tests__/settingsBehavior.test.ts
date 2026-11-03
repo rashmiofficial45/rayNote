@@ -11,6 +11,11 @@ describe('recorded shortcut and extension preferences',()=>{
   expect(nativeShortcut('⌃⌥N')).toBe('Control+Alt+N');
   expect(()=>nativeShortcut('A')).toThrow();
  });
+ it('rejects bare keys and invalid shortcuts without modifiers for global toggle (R19)', () => {
+  expect(() => nativeShortcut('A')).toThrow('Global shortcuts need a modifier and a key');
+  expect(() => nativeShortcut('Space')).toThrow('Global shortcuts need a modifier and a key');
+  expect(() => nativeShortcut('')).toThrow();
+ });
  it('disables slash insertion without removing schema support',()=>{
   localStorage.setItem('notefast_commands_config',JSON.stringify([{id:'slash',enabled:false},{id:'tables',enabled:false}]));
   const e=new Editor({extensions:getExtensions(SlashCommand)});

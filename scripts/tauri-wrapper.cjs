@@ -47,11 +47,16 @@ for (let i = 0; i < args.length; i++) {
   }
 }
 
-const wantsDmg = !bundlesValue || bundlesValue.includes('dmg');
+const hasNoBundle = args.includes('--no-bundle');
+const isDebug = args.includes('--debug');
+
+const wantsDmg = !hasNoBundle && (!bundlesValue || bundlesValue.includes('dmg'));
 
 // Force Tauri to ONLY build 'app' bundle so it never runs its legacy create-dmg script
 const tauriArgs = [...args];
-if (bundlesArgIndex !== -1) {
+if (hasNoBundle) {
+  // Do not append --bundles app if --no-bundle is requested
+} else if (bundlesArgIndex !== -1) {
   const list = bundlesValue.split(',').filter(b => b !== 'dmg');
   if (wantsDmg && !list.includes('app')) list.push('app');
   if (args[bundlesArgIndex].startsWith('--bundles=')) {
@@ -80,7 +85,9 @@ if (buildRes.status !== 0) {
 if (wantsDmg) {
   console.log('\n🎨 [rayNote Build Hook] Generating stylized high-DPI Retina DMG with custom onboarding window...');
   const packageDmgScript = path.join(rootDir, 'scripts', 'package-dmg.sh');
-  const dmgArgs = target ? ['--target', target] : [];
+  const dmgArgs = [];
+  if (target) dmgArgs.push('--target', target);
+  if (isDebug) dmgArgs.push('--debug');
   
   const dmgRes = spawnSync('bash', [packageDmgScript, ...dmgArgs], {
     cwd: rootDir,

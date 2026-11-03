@@ -5,11 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 TARGET_ARG=""
+DEBUG_FLAG=""
+PROFILE="release"
 while [[ $# -gt 0 ]]; do
   case $1 in
     --target)
       TARGET_ARG="$2"
       shift 2
+      ;;
+    --debug)
+      DEBUG_FLAG="--debug"
+      PROFILE="debug"
+      shift
       ;;
     *)
       if [[ -z "${TARGET_ARG}" && "$1" != -* ]]; then
@@ -36,18 +43,19 @@ fi
 # 2. Select exactly the requested build. Never splice executables into a bundle.
 TARGET_ROOT="${CARGO_TARGET_DIR:-${ROOT_DIR}/src-tauri/target}"
 if [[ -n "${TARGET_ARG}" ]]; then
-  RELEASE_DIR="${TARGET_ROOT}/${TARGET_ARG}/release"
+  BUNDLE_DIR="${TARGET_ROOT}/${TARGET_ARG}/${PROFILE}"
 else
-  RELEASE_DIR="${TARGET_ROOT}/release"
+  BUNDLE_DIR="${TARGET_ROOT}/${PROFILE}"
 fi
-APP_SRC="${RELEASE_DIR}/bundle/macos/rayNote.app"
+RELEASE_DIR="${BUNDLE_DIR}"
+APP_SRC="${BUNDLE_DIR}/bundle/macos/rayNote.app"
 if [[ ! -d "${APP_SRC}" ]]; then
   echo "📦 Requested app bundle not found. Building it with Tauri..."
-  if [[ -n "${TARGET_ARG}" ]]; then
-    pnpm exec tauri build --target "${TARGET_ARG}" --bundles app
-  else
-    pnpm exec tauri build --bundles app
-  fi
+  BUILD_CMD=(pnpm exec tauri build)
+  [[ -n "${TARGET_ARG}" ]] && BUILD_CMD+=(--target "${TARGET_ARG}")
+  [[ -n "${DEBUG_FLAG}" ]] && BUILD_CMD+=("${DEBUG_FLAG}")
+  BUILD_CMD+=(--bundles app)
+  "${BUILD_CMD[@]}"
 fi
 if [[ ! -d "${APP_SRC}" ]]; then
   echo "❌ Requested bundle does not exist: ${APP_SRC}"

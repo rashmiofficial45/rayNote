@@ -139,4 +139,105 @@ describe('Remaining App data-integrity and command regressions', () => {
     await act(async () => state.palette.onGoBack());
     expect(state.editor.noteId).toBeNull();
   });
+
+  it('does not trigger orphan recovery when startup DB read fails transiently (R03)', async () => {
+    const precious = doc('Precious title', 'precious unsaved body');
+    writeActiveNoteSnapshot({ id: 'saved-outside-recents', content: precious, baseUpdatedAt: version, unsaved: true });
+    vi.mocked(db.getRecentNotes).mockResolvedValue([summary('a')]);
+    vi.mocked(db.getNote).mockRejectedValue(new Error('transient sqlite error'));
+    await mount();
+    expect(db.createNote).not.toHaveBeenCalled();
+    expect(readActiveNoteSnapshot()?.content).toContain('precious unsaved body');
+  });
+
+  it('restores title and summary of source note when note switch fails (R05)', async () => {
+    await mount();
+    expect(state.editor.noteId).toBe('a');
+    expect(titleStore.getTitle()).toBe('a');
+    // Start switch to b
+    await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('b', summary('b')));
+    expect(titleStore.getTitle()).toBe('b');
+    // Simulate switch failure back to a
+    await act(async () => state.editor.onSwitchFailed('a', new Error('Note could not be loaded')));
+    expect(state.editor.noteId).toBe('a');
+    expect(titleStore.getTitle()).toBe('a');
+  });
+
+  it('Export All flushes editor and save queue before exporting from DB (R06)', async () => {
+    const exportSpy = vi.spyOn(db, 'exportAllNotesFromDb').mockResolvedValue('Exported 2 notes');
+    await mount();
+    await palette();
+    const calls: string[] = [];
+    vi.mocked(db.flushEditorNow).mockImplementation(async () => { calls.push('flushEditor'); });
+    vi.mocked(db.flushSaveQueue).mockImplementation(async () => { calls.push('flushQueue'); });
+    exportSpy.mockImplementation(async () => { calls.push('exportDb'); return 'ok'; });
+    await act(async () => { await state.palette.onExportAllNotes(); });
+    expect(calls).toEqual(['flushEditor', 'flushQueue', 'exportDb']);
+  });
+  it('retains every cached revision during recovery and saves a real heading title',async()=>{
+    await mount();const old=doc('Original','old'),first=doc('First title','first new'),last=doc('Last title','LAST TYPING');
+    noteCache.set('a',old,version,'Original',0,true);
+    const writes=[deferred<string>(),deferred<string>()];let count=0;
+    vi.mocked(db.updateNote).mockImplementation(async()=>count<2?writes[count++].promise:version);
+    let operation!:Promise<string>;await act(async()=>{operation=state.editor.onRecoverOrphan(old,'a')});
+    noteCache.updateContent('a',first,'First title');
+    await act(async()=>writes[0].resolve(version));
+    noteCache.updateContent('a',last,'Last title');
+    await act(async()=>{writes[1].resolve(version);await operation});
+    expect(readActiveNoteSnapshot()?.content).toBe(last);
+    expect(vi.mocked(db.updateNote).mock.calls[vi.mocked(db.updateNote).mock.calls.length - 1]).toEqual(['copy','Last title',last]);
+  });
+  it('keeps interrupted recovery on lookup error instead of creating a duplicate',async()=>{
+    await mount();localStorage.setItem('notefast_recovered_note_id',JSON.stringify({sourceId:'a',recoveredId:'existing'}));
+    vi.mocked(db.getNote).mockRejectedValue(new Error('temporarily unavailable'));
+    await act(async()=>{await expect(state.editor.onRecoverOrphan(doc('Draft'),'a')).rejects.toThrow('temporarily unavailable')});
+    expect(db.createNote).not.toHaveBeenCalled();
+    expect(localStorage.getItem('notefast_recovered_note_id')).toContain('existing');
+  });
+  it('restores the history cursor after failed Back without deleting visited notes',async()=>{
+    await mount();
+    await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('b',summary('b')));
+    await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('c',summary('c')));
+    await palette();await act(async()=>state.palette.onGoBack());
+    await act(async()=>state.editor.onSwitchFailed('c',new Error('Note could not be loaded')));
+    await act(async()=>state.palette.onGoBack());expect(state.editor.noteId).toBe('b');
+  });
+
+  it('restores forward history when a fresh branch fails',async()=>{
+    await mount();await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('b',summary('b')));
+    await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('c',summary('c')));await palette();
+    await act(async()=>state.palette.onGoBack());expect(state.editor.noteId).toBe('b');
+    await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('d',summary('d')));
+    await act(async()=>state.editor.onSwitchFailed('b',new Error('Note could not be loaded')));
+    await act(async()=>state.palette.onGoForward());expect(state.editor.noteId).toBe('c');
+  });
+
+  it('never regresses the retained recovery revision if replacement caching evicts its source',async()=>{
+    await mount();const latest=doc('Latest','precious');noteCache.set('a',latest,version,'Latest',0,true);
+    const original=noteCache.set.bind(noteCache);
+    vi.spyOn(noteCache,'set').mockImplementation((...args)=>{original(...args);if(args[0]==='copy')noteCache.delete('a')});
+    await act(async()=>{await state.editor.onRecoverOrphan(doc('Old','outdated'),'a')});
+    expect(readActiveNoteSnapshot()?.content).toBe(latest);
+    expect(vi.mocked(db.updateNote).mock.calls.every(c=>!c[2].includes('outdated'))).toBe(true);
+  });
+
+  it('coalesces recovery requests for different revisions of the same source',async()=>{
+    await mount();const pending=deferred<string>();vi.mocked(db.updateNote).mockReturnValueOnce(pending.promise);
+    const older=doc('Old'),latest=doc('Latest');noteCache.set('a',older,version,'Old',0,true);
+    let first!:Promise<string>,second!:Promise<string>;
+    await act(async()=>{first=state.editor.onRecoverOrphan(older,'a')});
+    noteCache.updateContent('a',latest,'Latest');
+    await act(async()=>{second=state.editor.onRecoverOrphan(latest,'a')});
+    await act(async()=>{pending.resolve(version);expect(await first).toBe('copy');expect(await second).toBe('copy')});
+    expect(db.createNote).toHaveBeenCalledOnce();expect(readActiveNoteSnapshot()?.content).toBe(latest);
+  });
+
+  it('preserves a failed Forward entry so navigation can be retried',async()=>{
+    await mount();await act(async()=>(window as any).__RAYNOTE_SELECT_NOTE__('b',summary('b')));
+    await palette();await act(async()=>state.palette.onGoBack());expect(state.editor.noteId).toBe('a');
+    await act(async()=>state.palette.onGoForward());
+    await act(async()=>state.editor.onSwitchFailed('a',new Error('Note could not be loaded')));
+    await act(async()=>state.palette.onGoForward());expect(state.editor.noteId).toBe('b');
+  });
+
 });

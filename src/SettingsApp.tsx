@@ -1,4 +1,5 @@
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
+import { requestEditorFlush } from "./lib/editorFlush";
 import { requestClearAllNotes } from "./lib/noteDeletion";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -47,6 +48,7 @@ import {
   listenToSettingsSync,
   formatKeystrokeFromEvent,
   getKeystrokeModifierString,
+  nativeShortcut,
 } from "./lib/settingsSync";
 import {
   ALL_PALETTE_COMMANDS,
@@ -209,14 +211,29 @@ export default function SettingsApp() {
     setRecordedModifiers("");
   };
 
-  const handleUpdateHotkey = useCallback((id: string, newHotkey: string) => {
+  const shortcutChangePendingRef = useRef(false);
+  const handleUpdateHotkey = useCallback(async (id: string, newHotkey: string) => {
+    if (shortcutChangePendingRef.current) return;
+    if (id === "toggle") {
+      shortcutChangePendingRef.current = true;
+      try {
+        const native = nativeShortcut(newHotkey);
+        const enabled = commands.find(c => c.id === id)?.enabled !== false;
+        await invoke("set_toggle_shortcut", { shortcut: enabled ? native : null });
+      } catch (err) {
+        console.warn("Invalid global shortcut:", err);
+        setActionMessage(err instanceof Error ? err.message : "Invalid global shortcut");
+        setTimeout(() => setActionMessage(null), 3000);
+        return;
+      } finally { shortcutChangePendingRef.current = false; }
+    }
     setCommands((prev) => {
       const updated = prev.map((c) => (c.id === id ? { ...c, hotkey: newHotkey } : c));
       safeLocalStorageSetItem("notefast_commands_config", JSON.stringify(updated));
       broadcastSync({ type: "commands_config", value: updated });
       return updated;
     });
-  }, []);
+  }, [commands]);
 
   const handleResetHotkey = useCallback((id: string) => {
     const defaultCmd = DEFAULT_COMMANDS.find((c) => c.id === id);
@@ -428,18 +445,30 @@ export default function SettingsApp() {
 
 
   // Toggle command row enabled
-  const handleToggleCommand = (id: string) => {
-    setCommands((prev) => {
-      const next = prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c));
-      safeLocalStorageSetItem("notefast_commands_config", JSON.stringify(next));
-      broadcastSync({ type: "commands_config", value: next });
-      return next;
-    });
+  const handleToggleCommand = async (id: string) => {
+    if (shortcutChangePendingRef.current) return;
+    const command = commands.find(c => c.id === id);
+    if (!command) return;
+    const enabled = !command.enabled;
+    if (id === "toggle") {
+      shortcutChangePendingRef.current = true;
+      try {
+        await invoke("set_toggle_shortcut", { shortcut: enabled ? nativeShortcut(command.hotkey) : null });
+      } catch (error) {
+        setActionMessage(error instanceof Error ? error.message : "Unable to change global shortcut");
+        return;
+      } finally { shortcutChangePendingRef.current = false; }
+    }
+    const next = commands.map(c => c.id === id ? { ...c, enabled } : c);
+    setCommands(next);
+    safeLocalStorageSetItem("notefast_commands_config", JSON.stringify(next));
+    broadcastSync({ type: "commands_config", value: next });
   };
 
   // Export All Notes
   const handleExportAll = async () => {
     try {
+      await requestEditorFlush();
       const stats = await getStorageStats();
       if (stats.notes_count === 0) {
         setActionMessage("No notes to export.");

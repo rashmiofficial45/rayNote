@@ -26,6 +26,7 @@ pub fn wait_for_flush_done(timeout: std::time::Duration) -> bool {
 }
 
 pub struct ToggleShortcuts(pub std::sync::Mutex<Vec<String>>);
+pub struct AlwaysOnTopState(pub std::sync::atomic::AtomicBool);
 
 #[tauri::command]
 pub fn set_toggle_shortcut(app: tauri::AppHandle, shortcut: Option<String>) -> Result<(), String> {
@@ -583,6 +584,9 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn set_always_on_top(app: tauri::AppHandle, always_on_top: bool) -> Result<(), String> {
     use tauri::Manager;
+    if let Some(state) = app.try_state::<AlwaysOnTopState>() {
+        state.0.store(always_on_top, std::sync::atomic::Ordering::SeqCst);
+    }
     #[cfg(target_os = "macos")]
     {
         use tauri_nspanel::ManagerExt;

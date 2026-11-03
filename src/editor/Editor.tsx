@@ -33,7 +33,7 @@ import {
   sliceToMarkdown,
 } from "./markdownUtils";
 import { noteCache, reconcileSnapshotWithDb } from "../lib/noteCache";
-import { getNote, registerEditorFlush, registerEditorDiscard } from "../lib/db";
+import { getNote, registerEditorFlush, registerEditorDiscard, registerEditorRecovery } from "../lib/db";
 import { titleStore } from "../lib/titleStore";
 import { saveStatusStore } from "../lib/saveStatusStore";
 import { SwitchConflictInfo } from "../components/SwitchConflictModal";
@@ -398,6 +398,9 @@ export function Editor({
               console.error("Failed follow-up saveNow:", err);
             }
           }
+        } else if (currentNoteIdRef.current && isDirtyRef.current && consecutiveSaveFailuresRef.current < 5) {
+          saveAgainRef.current = false;
+          await saveNow();
         }
       }
     };
@@ -798,8 +801,21 @@ export function Editor({
                 const reconciliation = reconcileSnapshotWithDb(cached, fullNote);
                 if (reconciliation.action === "recover_orphan_as_new") {
                   if (onRecoverOrphan) {
+                    const recoveryDoc = editor.state.doc;
                     Promise.resolve(onRecoverOrphan(reconciliation.content, noteId))
-                      .then(() => {
+                      .then(async (newNoteId) => {
+                        if (currentNoteIdRef.current === noteId && !editor.isDestroyed) {
+                          if (newNoteId && (!editor.state.doc.eq(recoveryDoc) || isDirtyRef.current)) {
+                            // User typed edits while recovery was in flight!
+                            // Transfer ownership to newNoteId so edits persist to the replacement row
+                            currentNoteIdRef.current = newNoteId;
+                            noteCache.delete(noteId);
+                            clearActiveNoteSnapshot(noteId);
+                            isDirtyRef.current = true;
+                            await saveNow();
+                            return;
+                          }
+                        }
                         noteCache.delete(noteId);
                         clearActiveNoteSnapshot(noteId);
                       })
@@ -1058,6 +1074,31 @@ export function Editor({
         throw lastSaveErrorRef.current || new Error("Unsaved changes could not be persisted");
       }
     });
+    registerEditorRecovery({
+      getNoteId: () => currentNoteIdRef.current,
+      read: id => currentNoteIdRef.current === id && editorRef.current && !editorRef.current.isDestroyed
+        ? { content: JSON.stringify(editorRef.current.getJSON()) } : null,
+      handoff: (sourceId, targetId, content, title) => {
+        const live = editorRef.current;
+        if (currentNoteIdRef.current !== sourceId || !live || live.isDestroyed) return true;
+        if (JSON.stringify(live.getJSON()) !== content) return false;
+        currentNoteIdRef.current = targetId;
+        noteSwitchGenerationRef.current += 1;
+        currentTitleRef.current = title;
+        titleStore.setTitle(title);
+        lastSavedDocRef.current = live.state.doc;
+        isDirtyRef.current = false;
+        discardedNoteIdRef.current = null;
+        saveAgainRef.current = false;
+        lastSaveErrorRef.current = null;
+        consecutiveSaveFailuresRef.current = 0;
+        isHalfOpenAttemptRef.current = false;
+        if (debounceTimer.current) { clearTimeout(debounceTimer.current); debounceTimer.current = null; }
+        if (halfOpenRetryTimerRef.current) { clearTimeout(halfOpenRetryTimerRef.current); halfOpenRetryTimerRef.current = null; }
+        saveStatusStore.setSaved();
+        return true;
+      },
+    });
     registerEditorDiscard((id) => {
       if (currentNoteIdRef.current !== id) return;
       discardedNoteIdRef.current = id;
@@ -1076,6 +1117,7 @@ export function Editor({
     return () => {
       registerEditorFlush(null);
       registerEditorDiscard(null);
+      registerEditorRecovery(null);
     };
   }, [saveNow]);
 

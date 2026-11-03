@@ -171,5 +171,27 @@ describe("Format Memory & Smart Toggle Engine", () => {
       smartToggleMark(editor, "highlight");
       expect(editor.isActive("highlight")).toBe(false);
     });
+
+    it("formats all selected blocks when toggling format in block selection mode (R08)", () => {
+      const multiBlockEditor = createEditor("<p>First line</p><p>Second line</p>");
+      const pos1 = 0;
+      let pos2 = -1;
+      multiBlockEditor.state.doc.descendants((node, pos) => {
+        if (node.type.name === "paragraph" && pos > 0) {
+          pos2 = pos;
+        }
+      });
+      multiBlockEditor.commands.setBlockSelection?.(pos1, pos2, [pos1, pos2]);
+      smartToggleBlockFormat(multiBlockEditor, "heading2");
+
+      const headings: any[] = [];
+      multiBlockEditor.state.doc.descendants((node) => {
+        if (node.type.name === "heading") headings.push(node);
+      });
+      expect(headings).toHaveLength(2);
+      expect(headings[0].attrs.level).toBe(2);
+      expect(headings[1].attrs.level).toBe(2);
+      multiBlockEditor.destroy();
+    });
   });
 });
