@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
 /**
  * Command Palette Aliases Management
  * Allows assigning custom shorthand alias triggers (e.g., 'imp', 'md', 'exp') to any command.
@@ -61,7 +62,7 @@ const ALIASES_STORAGE_KEY = "notefast_command_aliases";
 export function getStoredAliases(): Record<string, string> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem(ALIASES_STORAGE_KEY);
+    const raw = safeLocalStorageGetItem(ALIASES_STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw);
   } catch (err) {
@@ -73,7 +74,7 @@ export function getStoredAliases(): Record<string, string> {
 export function setStoredAliases(aliases: Record<string, string>): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(ALIASES_STORAGE_KEY, JSON.stringify(aliases));
+    safeLocalStorageSetItem(ALIASES_STORAGE_KEY, JSON.stringify(aliases));
   } catch (err) {
     console.error("Failed to store aliases:", err);
   }

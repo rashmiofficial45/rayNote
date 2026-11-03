@@ -33,51 +33,26 @@ else
   echo "🎨 Using high-DPI Retina DMG background: ${BG_IMG}"
 fi
 
-# 2. Locate newest rayNote.app
-CANDIDATE_PATHS=()
+# 2. Select exactly the requested build. Never splice executables into a bundle.
+TARGET_ROOT="${CARGO_TARGET_DIR:-${ROOT_DIR}/src-tauri/target}"
 if [[ -n "${TARGET_ARG}" ]]; then
-  CANDIDATE_PATHS+=("${ROOT_DIR}/src-tauri/target/${TARGET_ARG}/release/bundle/macos/rayNote.app")
+  RELEASE_DIR="${TARGET_ROOT}/${TARGET_ARG}/release"
+else
+  RELEASE_DIR="${TARGET_ROOT}/release"
 fi
-CANDIDATE_PATHS+=(
-  "${ROOT_DIR}/src-tauri/target/release/bundle/macos/rayNote.app"
-  "${ROOT_DIR}/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/rayNote.app"
-)
-
-APP_SRC=""
-for p in "${CANDIDATE_PATHS[@]}"; do
-  if [[ -d "$p" ]]; then
-    if [[ -z "${APP_SRC}" || "$p" -nt "${APP_SRC}" ]]; then
-      APP_SRC="$p"
-    fi
-  fi
-done
-
-if [[ -z "${APP_SRC}" || ! -d "${APP_SRC}" ]]; then
-  echo "📦 rayNote.app not found. Building release bundle with Tauri..."
+APP_SRC="${RELEASE_DIR}/bundle/macos/rayNote.app"
+if [[ ! -d "${APP_SRC}" ]]; then
+  echo "📦 Requested app bundle not found. Building it with Tauri..."
   if [[ -n "${TARGET_ARG}" ]]; then
     pnpm exec tauri build --target "${TARGET_ARG}" --bundles app
   else
     pnpm exec tauri build --bundles app
   fi
-  for p in "${CANDIDATE_PATHS[@]}"; do
-    if [[ -d "$p" ]]; then
-      if [[ -z "${APP_SRC}" || "$p" -nt "${APP_SRC}" ]]; then
-        APP_SRC="$p"
-      fi
-    fi
-  done
 fi
-
-if [[ -z "${APP_SRC}" || ! -d "${APP_SRC}" ]]; then
-  echo "❌ Error: Could not locate rayNote.app"
+if [[ ! -d "${APP_SRC}" ]]; then
+  echo "❌ Requested bundle does not exist: ${APP_SRC}"
   exit 1
 fi
-
-# Ensure latest compiled binary is synced into the app bundle
-if [[ -f "${ROOT_DIR}/src-tauri/target/release/raynote" && -d "${APP_SRC}/Contents/MacOS" ]]; then
-  cp -f "${ROOT_DIR}/src-tauri/target/release/raynote" "${APP_SRC}/Contents/MacOS/raynote"
-fi
-
 echo "📦 Bundling application: ${APP_SRC}"
 export RAYNOTE_APP_PATH="${APP_SRC}"
 
@@ -87,25 +62,26 @@ if ! command -v dmgbuild &> /dev/null; then
   pip3 install dmgbuild --break-system-packages -q
 fi
 
-# 4. Prepare output directories and paths
-DMG_RELEASE_DIR="${ROOT_DIR}/src-tauri/target/release/bundle/dmg"
-DMG_AARCH_DIR="${ROOT_DIR}/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
-PRIMARY_DMG="${DMG_AARCH_DIR}/rayNote_0.1.0_aarch64.dmg"
-
-mkdir -p "${DMG_RELEASE_DIR}" "${DMG_AARCH_DIR}"
+# 4. Derive output identity from the version and selected architecture.
+APP_VERSION="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).version)' "${ROOT_DIR}/src-tauri/tauri.conf.json")"
+BUILD_TARGET="${TARGET_ARG}"
+if [[ -z "${BUILD_TARGET}" ]]; then
+  BUILD_TARGET="$(rustc -vV | sed -n 's/^host: //p')"
+fi
+BUILD_ARCH="${BUILD_TARGET%%-apple-*}"
+DMG_NAME="rayNote_${APP_VERSION}_${BUILD_ARCH}.dmg"
+DMG_RELEASE_DIR="${RELEASE_DIR}/bundle/dmg"
+PRIMARY_DMG="${DMG_RELEASE_DIR}/${DMG_NAME}"
+mkdir -p "${DMG_RELEASE_DIR}"
 rm -f "${PRIMARY_DMG}"
 
-# Unmount and eject any existing volume named rayNote
-diskutil unmountDisk force /Volumes/rayNote* 2>/dev/null || true
+# Only detach the exact installer volume; do not force-unmount matching user volumes.
 hdiutil detach "/Volumes/rayNote" 2>/dev/null || true
 
 # 5. Build DMG using dmgbuild
 echo "💿 Building stylized DMG with native layout (dmgbuild)..."
 cd "${ROOT_DIR}"
 dmgbuild -s "${SCRIPT_DIR}/dmg_settings.py" "rayNote" "${PRIMARY_DMG}" 2> >(grep -v "hdiutil: WARNING:" >&2)
-
-# Duplicate to target/release/bundle/dmg for standard Tauri paths
-cp -f "${PRIMARY_DMG}" "${DMG_RELEASE_DIR}/rayNote_0.1.0_aarch64.dmg"
 
 FINAL_SIZE=$(du -h "${PRIMARY_DMG}" | awk '{print $1}')
 echo "══════════════════════════════════════════════════════════"
@@ -116,8 +92,8 @@ echo "════════════════════════�
 # 6. Copy to Desktop
 if [[ -d "$HOME/Desktop" ]]; then
   echo "📋 Copying installer to Desktop..."
-  cp -f "${PRIMARY_DMG}" "$HOME/Desktop/rayNote_0.1.0_aarch64.dmg"
-  echo "  🖥️  Available at: $HOME/Desktop/rayNote_0.1.0_aarch64.dmg"
+  cp -f "${PRIMARY_DMG}" "$HOME/Desktop/${DMG_NAME}"
+  echo "  🖥️  Available at: $HOME/Desktop/${DMG_NAME}"
 fi
 
 # 7. Update /Applications/rayNote.app if accessible

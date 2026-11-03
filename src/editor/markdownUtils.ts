@@ -1,6 +1,6 @@
 import { marked } from "marked";
-import { markdownCodeBlock } from "../lib/utils";
-import type { Slice, Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { noteContentToMarkdown } from "../lib/utils";
+import type { Slice } from "@tiptap/pm/model";
 import type { Editor } from "@tiptap/core";
 
 /**
@@ -68,14 +68,14 @@ export function ensureFirstLineHeading(md: string, fallbackTitle?: string): stri
   }
 
   if (frontmatterTitle) {
-    if (/^#\s+/m.test(text)) {
+    if (/^#\s+/.test(text)) {
       return text;
     }
     return `# ${frontmatterTitle}\n\n${text}`;
   }
 
   // 2. If it already starts with H1: e.g. '# Title'
-  if (/^#\s+\S+/m.test(text)) {
+  if (/^#\s+\S+/.test(text)) {
     return text;
   }
 
@@ -176,225 +176,13 @@ export function markdownToTipTapHtml(
  * Preserves headings, bold, italic, strikethrough, underline, links, code blocks,
  * bullet lists, ordered lists, and task lists without breaking format.
  */
-export function sliceToMarkdown(slice: Slice, editorInstance?: Editor | null): string {
-  if (!slice || !slice.content || slice.content.size === 0) {
-    return "";
-  }
-
-  // If editor has @tiptap/markdown registered, try its serializer first
-  try {
-    const manager = (editorInstance?.storage as { markdown?: { manager?: { serialize: (doc: unknown) => string } } })?.markdown?.manager;
-    if (manager && typeof manager.serialize === "function") {
-      const jsonContent = slice.content.toJSON();
-      if (jsonContent) {
-        const docJson = {
-          type: "doc",
-          content: Array.isArray(jsonContent) ? jsonContent : [jsonContent],
-        };
-        const md = manager.serialize(docJson);
-        if (typeof md === "string" && md.trim()) {
-          return md.trim();
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("TipTap markdown manager serialize fallback:", err);
-  }
-
-  // Custom high-fidelity ProseMirror Node-to-Markdown serializer
-  const serializeNode = (node: ProseMirrorNode, indent = ""): string => {
-    if (!node) return "";
-
-    if (node.isText) {
-      let text = node.text || "";
-      if (node.marks && node.marks.length > 0) {
-        for (const mark of node.marks) {
-          const type = mark.type?.name;
-          if (type === "code") {
-            text = `\`${text}\``;
-          } else if (type === "bold") {
-            text = `**${text}**`;
-          } else if (type === "italic") {
-            text = `*${text}*`;
-          } else if (type === "strike") {
-            text = `~~${text}~~`;
-          } else if (type === "link") {
-            const href = mark.attrs?.href || "";
-            text = `[${text}](${href})`;
-          } else if (type === "underline") {
-            text = `<u>${text}</u>`;
-          } else if (type === "highlight") {
-            text = `==${text}==`;
-          }
-        }
-      }
-      return text;
-    }
-
-    const type = node.type?.name;
-    const childNodes: ProseMirrorNode[] = [];
-    if (node.content && node.content.childCount > 0) {
-      for (let i = 0; i < node.content.childCount; i++) {
-        childNodes.push(node.content.child(i));
-      }
-    }
-    const childrenText = childNodes.map((c) => serializeNode(c, indent)).join("");
-
-    switch (type) {
-      case "paragraph":
-        return `${childrenText}\n\n`;
-
-      case "heading": {
-        const level = node.attrs?.level || 1;
-        return `${"#".repeat(level)} ${childrenText}\n\n`;
-      }
-
-      case "bulletList": {
-        let out = "";
-        for (const item of childNodes) {
-          const lines: string[] = [];
-          if (item.content) {
-            for (let i = 0; i < item.content.childCount; i++) {
-              const child = item.content.child(i);
-              if (child.type?.name === "paragraph") {
-                const text = serializeNode(child, "").trim();
-                lines.push(i === 0 ? `${indent}- ${text}` : `${indent}  ${text}`);
-              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
-                lines.push(serializeNode(child, indent + "  ").trimEnd());
-              } else {
-                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
-              }
-            }
-          }
-          out += lines.join("\n") + "\n";
-        }
-        return `${out}\n`;
-      }
-
-      case "orderedList": {
-        let out = "";
-        let idx = 1;
-        for (const item of childNodes) {
-          const prefix = `${idx}. `;
-          const indentPrefix = " ".repeat(prefix.length);
-          const lines: string[] = [];
-          if (item.content) {
-            for (let i = 0; i < item.content.childCount; i++) {
-              const child = item.content.child(i);
-              if (child.type?.name === "paragraph") {
-                const text = serializeNode(child, "").trim();
-                lines.push(i === 0 ? `${indent}${prefix}${text}` : `${indent}${indentPrefix}${text}`);
-              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
-                lines.push(serializeNode(child, indent + indentPrefix).trimEnd());
-              } else {
-                lines.push(`${indent}${indentPrefix}${serializeNode(child, indent + indentPrefix).trim()}`);
-              }
-            }
-          }
-          out += lines.join("\n") + "\n";
-          idx++;
-        }
-        return `${out}\n`;
-      }
-
-      case "taskList": {
-        let out = "";
-        for (const item of childNodes) {
-          const checked = item.attrs?.checked;
-          const prefix = `- [${checked ? "x" : " "}] `;
-          const lines: string[] = [];
-          if (item.content) {
-            for (let i = 0; i < item.content.childCount; i++) {
-              const child = item.content.child(i);
-              if (child.type?.name === "paragraph") {
-                const text = serializeNode(child, "").trim();
-                lines.push(i === 0 ? `${indent}${prefix}${text}` : `${indent}  ${text}`);
-              } else if (["bulletList", "orderedList", "taskList"].includes(child.type?.name)) {
-                lines.push(serializeNode(child, indent + "  ").trimEnd());
-              } else {
-                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
-              }
-            }
-          }
-          out += lines.join("\n") + "\n";
-        }
-        return `${out}\n`;
-      }
-
-      case "taskItem": {
-        const checked = node.attrs?.checked;
-        return `${indent}- [${checked ? "x" : " "}] ${childrenText.trim()}\n`;
-      }
-
-      case "codeBlock": {
-        const lang = node.attrs?.language || "";
-        const code = node.textContent || "";
-        return markdownCodeBlock(code, lang);
-      }
-
-      case "blockquote": {
-        const lines = childrenText.trim().split("\n");
-        return lines.map((l) => `> ${l}`).join("\n") + "\n\n";
-      }
-
-      case "hardBreak":
-        return "  \n";
-
-      case "horizontalRule":
-        return `---\n\n`;
-
-      case "table": {
-        let tableOut = "";
-        const rows = childNodes;
-        if (rows.length === 0) return "";
-
-        const firstRow = rows[0];
-        const firstRowCells = firstRow.content
-          ? Array.from({ length: firstRow.content.childCount }, (_, i) =>
-              serializeNode(firstRow.content.child(i)).trim()
-            )
-          : [];
-        tableOut += `| ${firstRowCells.join(" | ")} |\n`;
-        tableOut += `| ${firstRowCells.map(() => "---").join(" | ")} |\n`;
-
-        for (let r = 1; r < rows.length; r++) {
-          const row = rows[r];
-          const cells = row.content
-            ? Array.from({ length: row.content.childCount }, (_, i) =>
-                serializeNode(row.content.child(i)).trim()
-              )
-            : [];
-          tableOut += `| ${cells.join(" | ")} |\n`;
-        }
-        return `${tableOut}\n`;
-      }
-
-      case "tableRow":
-      case "tableHeader":
-      case "tableCell":
-        return childrenText;
-
-      case "iframe": {
-        const src = node.attrs?.src || "";
-        const w = node.attrs?.width || "100%";
-        const h = node.attrs?.height || 315;
-        return `<iframe src="${src}" width="${w}" height="${h}" allowfullscreen></iframe>\n\n`;
-      }
-
-      case "youtube": {
-        const src = node.attrs?.src || "";
-        return `${src}\n\n`;
-      }
-
-      default:
-        return childrenText;
-    }
+export function sliceToMarkdown(slice: Slice, _editorInstance?: Editor | null): string {
+  if (!slice?.content?.size) return "";
+  const toJSON = (node: any): any => {
+    if (typeof node.toJSON === "function") return node.toJSON();
+    const content = node.content?.childCount ? Array.from({ length: node.content.childCount }, (_, i) => toJSON(node.content.child(i))) : undefined;
+    return { type: node.isText ? "text" : node.type?.name, attrs: node.attrs, text: node.text, marks: node.marks?.map((m: any) => ({ type: m.type?.name, attrs: m.attrs })), ...(content ? { content } : node.type?.name === "codeBlock" && node.textContent ? { content: [{ type: "text", text: node.textContent }] } : {}) };
   };
-
-  const results: string[] = [];
-  for (let i = 0; i < slice.content.childCount; i++) {
-    results.push(serializeNode(slice.content.child(i)));
-  }
-
-  return results.join("").trim();
+  const content = typeof slice.content.toJSON === "function" ? slice.content.toJSON() : Array.from({ length: slice.content.childCount }, (_, i) => toJSON(slice.content.child(i)));
+  return noteContentToMarkdown(JSON.stringify({ type: "doc", content }), "").trim();
 }

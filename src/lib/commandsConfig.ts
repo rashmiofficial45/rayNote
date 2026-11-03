@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem } from "./storage";
 /**
  * commandsConfig.ts - Centralized Command & Shortcut Configuration Engine
  *
@@ -48,7 +49,7 @@ export const DEFAULT_COMMANDS: CommandRow[] = [
  */
 export function getStoredCommandsConfig(): CommandRow[] {
   if (typeof window === "undefined") return DEFAULT_COMMANDS;
-  const saved = localStorage.getItem("notefast_commands_config");
+  const saved = safeLocalStorageGetItem("notefast_commands_config");
   if (!saved) return DEFAULT_COMMANDS;
   try {
     const parsed = JSON.parse(saved);

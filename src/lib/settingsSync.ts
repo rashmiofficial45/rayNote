@@ -14,6 +14,7 @@ export type SettingsSyncPayload =
   | { type: "zoom"; value: number }
   | { type: "esc_loses_focus"; value: boolean }
   | { type: "always_on_top"; value: boolean }
+  | { type: "menu_bar"; value: boolean }
   | { type: "commands_config"; value: any }
   | { type: "aliases_config"; value: Record<string, string> }
   | { type: "notes_cleared" }
@@ -67,6 +68,7 @@ export interface SettingsSyncCallbacks {
   onFontChange?: (fontId: string) => void;
   onZoomChange?: (zoom: number) => void;
   onEscLosesFocusChange?: (val: boolean) => void;
+  onMenuBarChange?: (value: boolean) => void;
   onAlwaysOnTopChange?: (val: boolean) => void;
   onCommandsConfigChange?: (commands: any) => void;
   onAliasesConfigChange?: (aliases: Record<string, string>) => void;
@@ -106,6 +108,9 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
         break;
       case "esc_loses_focus":
         callbacks?.onEscLosesFocusChange?.(payload.value);
+        break;
+      case "menu_bar":
+        callbacks?.onMenuBarChange?.(payload.value);
         break;
       case "always_on_top":
         callbacks?.onAlwaysOnTopChange?.(payload.value);
@@ -174,6 +179,8 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
       if (!isNaN(parsed)) handlePayload({ type: "zoom", value: parsed });
     } else if (e.key === "notefast_esc_loses_focus" && e.newValue) {
       handlePayload({ type: "esc_loses_focus", value: e.newValue === "true" });
+    } else if (e.key === "notefast_show_menubar" && e.newValue) {
+      handlePayload({ type: "menu_bar", value: e.newValue === "true" });
     } else if (e.key === "notefast_always_on_top" && e.newValue) {
       handlePayload({ type: "always_on_top", value: e.newValue === "true" });
     } else if (e.key === "notefast_commands_config" && e.newValue) {
@@ -315,3 +322,11 @@ export function formatKeystrokeFromEvent(e: KeyboardEvent): { isModifierOnly: bo
   return { isModifierOnly: false, result: mods ? `${mods}${keySymbol}` : keySymbol };
 }
 
+
+/** Convert a recorded UI hotkey into the native shortcut parser format. */
+export function nativeShortcut(hotkey: string): string {
+  const parsed = parseHotkey(hotkey);
+  if (!parsed?.key || !(parsed.meta || parsed.ctrl || parsed.alt)) throw new Error("Global shortcuts need a modifier and a key");
+  const keys: Record<string, string> = { " ": "Space", arrowup: "Up", arrowdown: "Down", arrowleft: "Left", arrowright: "Right", backspace: "Backspace", enter: "Enter", escape: "Escape" };
+  return [parsed.ctrl && "Control", parsed.alt && "Alt", parsed.shift && "Shift", parsed.meta && "CommandOrControl", keys[parsed.key] || parsed.key.toUpperCase()].filter(Boolean).join("+");
+}

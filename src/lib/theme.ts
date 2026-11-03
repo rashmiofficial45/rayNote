@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
 /**
  * NoteFast Design System & Theme Engine (theme.ts)
  *
@@ -62,7 +63,7 @@ export const THEME_OPTIONS: ThemeOption[] = [
  */
 export function getStoredThemeMode(): ThemeMode {
   if (typeof window === "undefined") return "dark";
-  const stored = localStorage.getItem("notefast_theme_mode") as ThemeMode | null;
+  const stored = safeLocalStorageGetItem("notefast_theme_mode") as ThemeMode | null;
   if (stored === "light" || stored === "dark" || stored === "system") {
     return stored;
   }
@@ -107,7 +108,7 @@ export function applyThemeMode(mode: ThemeMode, useTransition = false): void {
  */
 export function setStoredThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem("notefast_theme_mode", mode);
+  safeLocalStorageSetItem("notefast_theme_mode", mode);
   applyThemeMode(mode, true);
   broadcastSync({ type: "theme_mode", value: mode });
   window.dispatchEvent(new CustomEvent("notefast_theme_changed", { detail: { mode } }));
@@ -118,7 +119,7 @@ export function setStoredThemeMode(mode: ThemeMode): void {
  */
 export function getStoredAccent(): AccentColor {
   if (typeof window === "undefined") return "violet";
-  const stored = localStorage.getItem("notefast_accent_color") as AccentColor | null;
+  const stored = safeLocalStorageGetItem("notefast_accent_color") as AccentColor | null;
   if (stored && ACCENT_OPTIONS.some((a) => a.id === stored)) {
     return stored;
   }
@@ -138,7 +139,7 @@ export function applyAccent(accent: AccentColor): void {
  */
 export function setStoredAccent(accent: AccentColor): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem("notefast_accent_color", accent);
+  safeLocalStorageSetItem("notefast_accent_color", accent);
   applyAccent(accent);
   broadcastSync({ type: "accent", value: accent });
   window.dispatchEvent(new CustomEvent("notefast_accent_changed", { detail: { accent } }));
@@ -149,7 +150,7 @@ export function setStoredAccent(accent: AccentColor): void {
  */
 export function getStoredFont(): string {
   if (typeof window === "undefined") return "inter";
-  const stored = localStorage.getItem("notefast_font");
+  const stored = safeLocalStorageGetItem("notefast_font");
   if (stored && FONT_OPTIONS.some((f) => f.id === stored)) {
     return stored;
   }
@@ -172,7 +173,7 @@ export function applyFont(fontId: string): void {
 export function setStoredFont(fontId: string): void {
   if (typeof window === "undefined") return;
   const font = FONT_OPTIONS.find((f) => f.id === fontId) || FONT_OPTIONS[0];
-  localStorage.setItem("notefast_font", font.id);
+  safeLocalStorageSetItem("notefast_font", font.id);
   applyFont(font.id);
   broadcastSync({ type: "font", value: font.id });
   window.dispatchEvent(new CustomEvent("notefast_font_changed", { detail: { fontId: font.id } }));
@@ -184,19 +185,15 @@ export function setStoredFont(fontId: string): void {
  * - Listens for macOS system dark mode preference changes (`prefers-color-scheme`)
  *   when in 'system' mode to dynamically switch themes without reload.
  */
-export function initTheme(): void {
-  if (typeof window === "undefined") return;
-
+export function initTheme(): () => void {
+  if (typeof window === "undefined") return () => {};
   applyThemeMode(getStoredThemeMode());
   applyAccent(getStoredAccent());
   applyFont(getStoredFont());
-
   try {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    media.addEventListener("change", () => {
-      if (getStoredThemeMode() === "system") {
-        applyThemeMode("system");
-      }
-    });
-  } catch { }
+    const handleChange = () => { if (getStoredThemeMode() === "system") applyThemeMode("system"); };
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  } catch { return () => {}; }
 }

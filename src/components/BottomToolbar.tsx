@@ -1,3 +1,5 @@
+import { listenToSettingsSync } from "../lib/settingsSync";
+import { getStoredCommandsConfig } from "../lib/commandsConfig";
 import { Editor, useEditorState } from "@tiptap/react";
 import "@tiptap/extension-underline";
 import { useState, useEffect, useRef } from "react";
@@ -56,6 +58,8 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
 
   useEffect(() => {
+    const stopSettings = listenToSettingsSync({ onThemeModeChange: setCurrentThemeMode, onAccentChange: setCurrentAccent, onFontChange: setCurrentFont });
+    let disposed = false;
     const handleAccent = (e: Event) => {
       const customEvent = e as CustomEvent<{ accent?: AccentColor }>;
       if (customEvent.detail?.accent) setCurrentAccent(customEvent.detail.accent);
@@ -83,7 +87,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
         }
       })
       .then((fn) => {
-        unlistenFocus = fn;
+        if (disposed) fn(); else unlistenFocus = fn;
       })
       .catch(() => {});
 
@@ -127,6 +131,8 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
 
     return () => {
+      disposed = true;
+      stopSettings();
       window.removeEventListener("notefast_accent_changed", handleAccent);
       window.removeEventListener("notefast_font_changed", handleFont);
       window.removeEventListener("notefast_theme_changed", handleTheme);
@@ -388,7 +394,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+              onClick={() => { if (getStoredCommandsConfig().find(c => c.id === "tables")?.enabled !== false) editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
               className="toolbar-btn liquid-btn"
               title="Insert Table (3x3)"
             >

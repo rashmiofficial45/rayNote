@@ -1,3 +1,4 @@
+import { clearFormatMemory } from "./formatMemory";
 /**
  * TipTap Note Editor Engine (Editor.tsx)
  *
@@ -627,8 +628,12 @@ export function Editor({
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     const prevId = currentNoteIdRef.current;
-    if (prevId === noteId) return; // Same note, no-op
+    if (prevId === noteId) {
+      editor.setEditable(true, false);
+      return;
+    }
     noteSwitchGenerationRef.current += 1;
+    editor.setEditable(false, false);
 
     let cancelled = false;
 
@@ -719,8 +724,7 @@ export function Editor({
         }
 
         // 2. ONLY AFTER full flush chain resolves, update active note reference
-        currentNoteIdRef.current = noteId;
-        lastSavedDocRef.current = editor.state.doc;
+        // Document identity is published only when its content is ready to apply.
         isDirtyRef.current = false;
         saveAgainRef.current = false;
         activeSavePromiseRef.current = null;
@@ -729,7 +733,10 @@ export function Editor({
         // Clears prosemirror-history undo stack and detaches old document nodes,
         // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
         const applyDocumentInPlace = (docData: any) => {
-          editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false });
+          clearFormatMemory(editor);
+          const applied = editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false, errorOnInvalidContent: true });
+          if (!applied) throw new Error("Note content could not be applied");
+          currentNoteIdRef.current = noteId;
           lastSavedDocRef.current = editor.state.doc;
           isDirtyRef.current = false;
           // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
@@ -746,7 +753,7 @@ export function Editor({
         const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number, expectedDoc?: ProseMirrorNode) => {
           // Pre-scan and await all code block languages before setContent so lowlight decorates on first render
           await preloadLanguagesForContent(rawContent);
-          if (cancelled || currentNoteIdRef.current !== targetId || editor.isDestroyed ||
+          if (cancelled || editor.isDestroyed ||
               (expectedDoc && editor.state.doc !== expectedDoc)) {
             return;
           }
@@ -770,10 +777,16 @@ export function Editor({
         };
 
         // 4. Retrieve incoming note from in-memory LRU cache
-        const cached = noteCache.get(noteId);
+        const cached = noteCache.get(noteId) ?? (!prevId && (initialContent || content) ? {
+          content: initialContent || content || "", scrollTop: 0, baseUpdatedAt: "", unsaved: false,
+        } : undefined);
         if (cached) {
           const applied = await loadAndApplyDoc(cached.content, noteId, cached.scrollTop);
           if (!applied) return;
+          if (cached.unsaved) {
+            lastSavedDocRef.current = null;
+            isDirtyRef.current = true;
+          }
           noteCache.persistActiveToLocalStorage(noteId, cached.content, cached.baseUpdatedAt, cached.unsaved);
 
           const revalidationDoc = editor.state.doc;
@@ -784,10 +797,10 @@ export function Editor({
                   !editor.isDestroyed && editor.state.doc === revalidationDoc) {
                 const reconciliation = reconcileSnapshotWithDb(cached, fullNote);
                 if (reconciliation.action === "recover_orphan_as_new") {
-                  noteCache.delete(noteId);
                   if (onRecoverOrphan) {
                     Promise.resolve(onRecoverOrphan(reconciliation.content, noteId))
                       .then(() => {
+                        noteCache.delete(noteId);
                         clearActiveNoteSnapshot(noteId);
                       })
                       .catch((err) => {
@@ -815,7 +828,8 @@ export function Editor({
           // CACHE MISS: fetch from SQLite asynchronously
           try {
             const fullNote = await getNote(noteId);
-            if (fullNote && currentNoteIdRef.current === noteId && !cancelled) {
+            if (!fullNote) throw new Error("Note could not be loaded");
+            if (!cancelled && !editor.isDestroyed) {
               noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0, false);
               const applied = await loadAndApplyDoc(fullNote.content, noteId, 0);
               if (applied) {
@@ -824,11 +838,15 @@ export function Editor({
             }
           } catch (err) {
             console.error("Failed to load note from SQLite:", err);
+            if (!cancelled && prevId) onSwitchFailedRef.current?.(prevId, err);
           }
         }
+      } catch (error) {
+        console.error("Could not apply note document", error);
+        if (!cancelled && prevId) onSwitchFailedRef.current?.(prevId, error);
       } finally {
-        if (editor && !editor.isDestroyed) {
-          editor.setEditable(true, false);
+        if (!cancelled && editor && !editor.isDestroyed) {
+          editor.setEditable(Boolean(currentNoteIdRef.current), false);
         }
         if ((import.meta as any).env?.DEV) {
           const switchDuration = performance.now() - switchStart;
@@ -882,6 +900,10 @@ export function Editor({
         getMountedCodeBlocksCount: () => document.querySelectorAll(".code-block-wrapper").length,
       };
     }
+    return () => {
+      delete (window as any).__RAYNOTE_EDITOR__;
+      delete (window as any).__RAYNOTE_DIAGNOSTICS__;
+    };
   }, []);
 
   const selectionBoxRef = useRef<HTMLDivElement>(null);
@@ -1030,7 +1052,12 @@ export function Editor({
 
   // Register editor flush handler so exit and blur handlers can synchronously commit dirty state
   useEffect(() => {
-    registerEditorFlush(saveNow);
+    registerEditorFlush(async () => {
+      await saveNow();
+      if (isDirtyRef.current && discardedNoteIdRef.current !== currentNoteIdRef.current) {
+        throw lastSaveErrorRef.current || new Error("Unsaved changes could not be persisted");
+      }
+    });
     registerEditorDiscard((id) => {
       if (currentNoteIdRef.current !== id) return;
       discardedNoteIdRef.current = id;

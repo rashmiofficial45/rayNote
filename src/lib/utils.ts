@@ -162,7 +162,47 @@ export function markdownCodeBlock(code: string, language = ""): string {
   return `${fence}${info}\n${code}\n${fence}\n\n`;
 }
 
-export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled"): string {
+export function escapeMarkdownText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/[\\`*_~\[\]:]/g, "\\$&")
+    .replace(/(^|\n)([ \t]*)(#{1,6}|[+>-]|\d+[.)])(?=\s)/g, "$1$2\\$3");
+}
+
+export function markdownInlineCode(value: string): string {
+  const longest = Math.max(0, ...Array.from(value.matchAll(/`+/g), m => m[0].length));
+  const fence = "`".repeat(longest + 1);
+  const padding = value.startsWith("`") || value.endsWith("`") || (/^ .* $/.test(value) && /\S/.test(value)) ? " " : "";
+  return `${fence}${padding}${value}${padding}${fence}`;
+}
+
+function wrapMarkdownMark(text: string, delimiter: string): string {
+  const match = text.match(/^(\s*)([\s\S]*?\S)(\s*)$/);
+  return match ? `${match[1]}${delimiter}${match[2]}${delimiter}${match[3]}` : text;
+}
+
+export function serializeMarkdownInline(node: any): string {
+  if (node?.type === "hardBreak") return "  \n";
+  if (!node?.text) return "";
+  const marks = node.marks || [];
+  let text = marks.some((m: any) => m.type === "code") ? markdownInlineCode(node.text) : escapeMarkdownText(node.text);
+  for (const mark of marks) {
+    switch (mark.type) {
+      case "bold": text = wrapMarkdownMark(text, "**"); break;
+      case "italic": text = wrapMarkdownMark(text, "*"); break;
+      case "strike": text = wrapMarkdownMark(text, "~~"); break;
+      case "underline": text = `<u>${text}</u>`; break;
+      case "highlight": text = `<mark>${text}</mark>`; break;
+      case "link": {
+        const href = String(mark.attrs?.href || "").replace(/[\s()<>\\]/g, c => c === "(" ? "%28" : c === ")" ? "%29" : encodeURIComponent(c));
+        text = `[${text}](${href})`;
+        break;
+      }
+    }
+  }
+  return text;
+}
+
+export function noteContentToMarkdown(content: string, fallbackTitle = ""): string {
   if (!content) return `# ${fallbackTitle}\n\n`;
   try {
     const doc = typeof content === "string" ? JSON.parse(content) : content;
@@ -251,6 +291,10 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
           });
           return items.join("\n") + "\n\n";
         }
+        case "listItem": {
+          // Bare selected list items keep a list marker when their parent is outside the Slice.
+          return serializeNode({ type: "bulletList", content: [node] }, indent);
+        }
         case "taskItem": {
           const checked = node.attrs?.checked ? "[x]" : "[ ]";
           const text = (node.content || []).map((p: any) => {
@@ -264,7 +308,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
         case "blockquote": {
           const text = (node.content || [])
             .map((p: any) => serializeNode(p).trim())
-            .join("\n");
+            .join("\n\n");
           return (
             text
               .split("\n")
@@ -330,41 +374,12 @@ export function noteContentToMarkdown(content: string, fallbackTitle = "Untitled
       }
     }
 
-    function serializeInline(node: any): string {
-      if (!node) return "";
-      if (node.type === "hardBreak") {
-        return "  \n";
-      }
-      if (!node.text) return "";
-      let text = node.text;
-      if (!node.marks || node.marks.length === 0) return text;
+    const serializeInline = serializeMarkdownInline;
 
-      for (const mark of node.marks) {
-        switch (mark.type) {
-          case "bold":
-            text = `**${text}**`;
-            break;
-          case "italic":
-            text = `*${text}*`;
-            break;
-          case "underline":
-            text = `<u>${text}</u>`;
-            break;
-          case "strike":
-            text = `~~${text}~~`;
-            break;
-          case "code":
-            text = `\`${text}\``;
-            break;
-          case "highlight":
-            text = `==${text}==`;
-            break;
-          case "link":
-            text = `[${text}](${mark.attrs?.href || ""})`;
-            break;
-        }
-      }
-      return text;
+    const first = doc.content[0];
+    const firstText = (first?.content || []).map((n: any) => n.text || "").join("").trim();
+    if (fallbackTitle.trim() && !(first?.type === "heading" && firstText === fallbackTitle.trim())) {
+      lines.push(`# ${escapeMarkdownText(fallbackTitle.trim())}\n\n`);
     }
 
     for (const child of doc.content) {
@@ -386,6 +401,8 @@ export function noteContentToPlainText(content: string, fallbackTitle = "Untitle
     function extract(node: any) {
       if (node.isText || node.type === "text") {
         texts.push(node.text || "");
+      } else if (node.type === "hardBreak") {
+        texts.push("\n");
       } else if (node.type === "horizontalRule") {
         texts.push("\n---\n");
       } else if (node.type === "taskItem") {

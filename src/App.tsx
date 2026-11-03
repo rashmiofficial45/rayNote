@@ -1,3 +1,6 @@
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { safeLocalStorageGetItem } from "./lib/storage";
 /**
  * NoteFast Main Application Controller (App.tsx)
  *
@@ -67,7 +70,7 @@ import { initTheme } from "./lib/theme";
 import { registerClearAllNotesHandler } from "./lib/noteDeletion";
 import { noteCache } from "./lib/noteCache";
 import { titleStore } from "./lib/titleStore";
-import { broadcastSync, listenToSettingsSync, matchesEvent } from "./lib/settingsSync";
+import { broadcastSync, listenToSettingsSync, matchesEvent, nativeShortcut } from "./lib/settingsSync";
 import { getStoredCommandsConfig, CommandRow } from "./lib/commandsConfig";
 import {
   Check,
@@ -94,7 +97,7 @@ function App() {
    */
   const [recentNotes, setRecentNotes] = useState<NoteSummary[]>(() => {
     try {
-      const cached = localStorage.getItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem("notefast_cached_notes");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -113,10 +116,10 @@ function App() {
    * Priority: 1. Previously active note from localStorage, 2. First note in cache, 3. null.
    */
   const [activeNoteId, setActiveNoteId] = useState<string | null>(() => {
-    const saved = readActiveNoteSnapshot()?.id || localStorage.getItem("notefast_active_note_id");
+    const saved = readActiveNoteSnapshot()?.id || safeLocalStorageGetItem("notefast_active_note_id");
     if (saved) return saved;
     try {
-      const cached = localStorage.getItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem("notefast_cached_notes");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
@@ -131,6 +134,7 @@ function App() {
   const clearingNotesRef = useRef<Promise<void> | null>(null);
   const deletingNoteRef = useRef<string | null>(null);
 
+  const [isBootReady, setIsBootReady] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "settings">("actions");
@@ -138,7 +142,7 @@ function App() {
   const [isFindOpen, setIsFindOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(() => {
     try {
-      const cached = localStorage.getItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem("notefast_cached_notes");
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return false;
@@ -148,7 +152,7 @@ function App() {
   });
   const [deleteConfirm, setDeleteConfirm] = useState<{ noteId: string; agreed: boolean } | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(() => {
-    const saved = localStorage.getItem("notefast_zoom_level");
+    const saved = safeLocalStorageGetItem("notefast_zoom_level");
     if (saved) {
       const parsed = parseFloat(saved);
       if (!isNaN(parsed) && parsed >= 0.6 && parsed <= 2.0) {
@@ -162,7 +166,7 @@ function App() {
   const [discardedNoteId, setDiscardedNoteId] = useState<string | null>(null);
 
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_esc_loses_focus") === "true";
+    return safeLocalStorageGetItem("notefast_esc_loses_focus") === "true";
   });
 
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
@@ -174,6 +178,7 @@ function App() {
   const [isMouseOverApp, setIsMouseOverApp] = useState(false);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
 
     getCurrentWindow().isFocused().then((focused) => {
@@ -186,7 +191,7 @@ function App() {
         setIsMouseOverApp(false);
       }
     }).then((fn) => {
-      unlisten = fn;
+      if (disposed) fn(); else unlisten = fn;
     }).catch(() => { });
 
     const handleFocus = () => setIsWindowFocused(true);
@@ -221,6 +226,7 @@ function App() {
     document.addEventListener("mouseleave", handleMouseLeave);
 
     return () => {
+      disposed = true;
       if (unlisten) unlisten();
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
@@ -301,8 +307,12 @@ function App() {
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // History stack for navigating back/forward
-  const [history, setHistory] = useState<string[]>([]);
-  const [, setHistoryIndex] = useState(-1);
+  const navigationHistoryRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: -1 });
+  const pruneHistory = useCallback((deleted: Set<string>) => {
+    const history = navigationHistoryRef.current;
+    const index = history.ids.slice(0, history.index + 1).filter(id => !deleted.has(id)).length - 1;
+    navigationHistoryRef.current = { ids: history.ids.filter(id => !deleted.has(id)), index };
+  }, []);
 
   const activeNote =
     (activeNoteSummary && activeNoteSummary.id === activeNoteId ? activeNoteSummary : null) ||
@@ -369,15 +379,9 @@ function App() {
     }
 
     if (recordHistory) {
-      setHistoryIndex((prevIndex) => {
-        setHistory((prevHistory) => {
-          // Cap history buffer to 50 to prevent memory growth
-          const newHistory = prevHistory.slice(Math.max(0, prevIndex - 49), prevIndex + 1);
-          newHistory.push(id);
-          return newHistory;
-        });
-        return Math.min(prevIndex + 1, 50);
-      });
+      const history = navigationHistoryRef.current;
+      const ids = [...history.ids.slice(0, history.index + 1), id].slice(-50);
+      navigationHistoryRef.current = { ids, index: ids.length - 1 };
     }
 
     // Fast in-memory LRU cache check (0ms instantaneous switch)
@@ -580,13 +584,18 @@ function App() {
    * Recovers unsaved snapshot content whose note was removed from SQLite by creating
    * a fresh database row, switching to it, and evicting the orphan snapshot.
    */
+  const pendingRecoveriesRef = useRef(new Map<string, Promise<string>>());
   const handleRecoverOrphan = useCallback(
-    async (content: string, sourceId?: string) => {
+    (content: string, sourceId?: string): Promise<string> => {
+      const recoveryKey = `${sourceId || readActiveNoteSnapshot()?.id || "unknown"}:${content}`;
+      const pending = pendingRecoveriesRef.current.get(recoveryKey);
+      if (pending) return pending;
+      const operation = (async () => {
       try {
         // Idempotent recovery check: was a recovery already started for THIS snapshot before a crash?
-        const currentSourceId = sourceId || readActiveNoteSnapshot()?.id || localStorage.getItem("notefast_active_note_id") || "unknown";
+        const currentSourceId = sourceId || readActiveNoteSnapshot()?.id || safeLocalStorageGetItem("notefast_active_note_id") || "unknown";
         let existingRecoveredId: string | null = null;
-        const rawRecovered = localStorage.getItem("notefast_recovered_note_id");
+        const rawRecovered = safeLocalStorageGetItem("notefast_recovered_note_id");
         if (rawRecovered) {
           try {
             const parsed = JSON.parse(rawRecovered);
@@ -639,7 +648,10 @@ function App() {
         const recoveredUpdatedAt = await updateNote(note.id, title, content);
         noteCache.set(note.id, content, recoveredUpdatedAt, title, 0, false);
 
-        // The replacement row is durable; release the source recovery before publishing its replacement.
+        // The replacement is durable. Stop the old editor from saving/recovering its missing ID again.
+        discardEditorNote(currentSourceId);
+        setDiscardedNoteId(currentSourceId);
+        noteCache.delete(currentSourceId);
         clearActiveNoteSnapshot(currentSourceId);
 
         // 3. Update localStorage pointers to point to the newly recovered note
@@ -658,16 +670,21 @@ function App() {
         console.error("Failed to recover orphan note:", err);
         throw err;
       }
+      })();
+      pendingRecoveriesRef.current.set(recoveryKey, operation);
+      operation.finally(() => pendingRecoveriesRef.current.delete(recoveryKey)).catch(() => {});
+      return operation;
     },
     [handleSelectNote, showToast]
   );
 
   // Load notes, initialize theme & apply always on top on mount
   useEffect(() => {
-    initTheme();
+    const stopTheme = initTheme();
     loadNotes();
-    const savedAlwaysOnTop = localStorage.getItem("notefast_always_on_top") !== "false";
+    const savedAlwaysOnTop = safeLocalStorageGetItem("notefast_always_on_top") !== "false";
     setAlwaysOnTop(savedAlwaysOnTop).catch(console.error);
+    return stopTheme;
   }, []);
 
   /**
@@ -684,7 +701,7 @@ function App() {
       safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(recents.slice(0, 30)));
 
       const snapshot = readActiveNoteSnapshot();
-      const savedId = snapshot?.id || localStorage.getItem("notefast_active_note_id");
+      const savedId = snapshot?.id || safeLocalStorageGetItem("notefast_active_note_id");
       const savedContent = snapshot?.content;
       const isUnsaved = snapshot?.unsaved === true;
 
@@ -711,7 +728,7 @@ function App() {
           } else {
             // Note row is MISSING from DB!
             let recoveredId: string | null = null;
-            const rawRecovered = localStorage.getItem("notefast_recovered_note_id");
+            const rawRecovered = safeLocalStorageGetItem("notefast_recovered_note_id");
             if (rawRecovered) {
               try {
                 const parsed = JSON.parse(rawRecovered);
@@ -724,6 +741,10 @@ function App() {
             }
             if (recoveredId) {
               const recoveredNote = await getNote(recoveredId).catch(() => null);
+              if (recoveredNote && isUnsaved && savedContent) {
+                await handleRecoverOrphan(savedContent, savedId);
+                return;
+              }
               if (recoveredNote) {
                 // The recovered note was already created and persisted in SQLite before previous crash
                 clearActiveNoteSnapshot(savedId);
@@ -761,6 +782,7 @@ function App() {
       console.error("Failed to load notes:", err);
     } finally {
       setIsLoading(false);
+      setIsBootReady(true);
     }
   };
 
@@ -768,32 +790,22 @@ function App() {
    * Navigates backward in the note navigation history stack.
    */
   const handleGoBack = useCallback(() => {
-    setHistoryIndex((prevIndex) => {
-      if (prevIndex > 0) {
-        const newIndex = prevIndex - 1;
-        handleSelectNote(history[newIndex], undefined, false);
-        showToast("Navigated Back");
-        return newIndex;
-      }
-      return prevIndex;
-    });
-  }, [history, handleSelectNote, showToast]);
+    const history = navigationHistoryRef.current;
+    if (history.index > 0) {
+      history.index--;
+      handleSelectNote(history.ids[history.index], undefined, false);
+      showToast("Navigated Back");
+    }
+  }, [handleSelectNote, showToast]);
 
-  /**
-   * Navigates forward in the note navigation history stack.
-   */
   const handleGoForward = useCallback(() => {
-    setHistoryIndex((prevIndex) => {
-      if (prevIndex < history.length - 1) {
-        const newIndex = prevIndex + 1;
-        handleSelectNote(history[newIndex], undefined, false);
-        showToast("Navigated Forward");
-        return newIndex;
-      }
-      return prevIndex;
-    });
-  }, [history, handleSelectNote, showToast]);
-
+    const history = navigationHistoryRef.current;
+    if (history.index < history.ids.length - 1) {
+      history.index++;
+      handleSelectNote(history.ids[history.index], undefined, false);
+      showToast("Navigated Forward");
+    }
+  }, [handleSelectNote, showToast]);
 
   /**
    * Sets note title explicitly, keeping React titleStore and in-memory cache in sync.
@@ -842,7 +854,7 @@ function App() {
     if (!activeNoteId || isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     try {
-      flushEditorNow();
+      await flushEditorNow();
       flushPendingTitle();
       await flushSaveQueue();
       const nextId = await getAdjacentNote(activeNoteId, "next");
@@ -864,7 +876,7 @@ function App() {
     if (!activeNoteId || isNavigatingRef.current) return;
     isNavigatingRef.current = true;
     try {
-      flushEditorNow();
+      await flushEditorNow();
       flushPendingTitle();
       await flushSaveQueue();
       const prevId = await getAdjacentNote(activeNoteId, "prev");
@@ -913,6 +925,8 @@ function App() {
   const handleDuplicateNote = useCallback(async () => {
     if (!activeNoteId) return;
     try {
+      await flushEditorNow();
+      await flushSaveQueue();
       let content = noteCache.get(activeNoteId)?.content;
       if (!content) {
         const full = await getNote(activeNoteId);
@@ -920,7 +934,17 @@ function App() {
       }
       const currentSummary = notes.find((n) => n.id === activeNoteId);
       const note = await createNote();
-      const title = currentSummary?.title ? `${currentSummary.title} (Copy)` : "Untitled (Copy)";
+      const sourceTitle = noteCache.peek(activeNoteId)?.title || currentSummary?.title || activeNoteSummary?.title;
+      const title = sourceTitle ? `${sourceTitle} (Copy)` : "Untitled (Copy)";
+      try {
+        const doc = JSON.parse(content);
+        if (doc.content?.[0]?.type === "heading" && doc.content[0].attrs?.level === 1) {
+          doc.content[0].content = [{ type: "text", text: title }];
+          content = JSON.stringify(doc);
+        }
+      } catch {
+        content = content.replace(/^#\s+[^\r\n]+/, `# ${title}`);
+      }
       await updateNote(note.id, title, content);
 
       noteCache.set(note.id, content, new Date().toISOString(), title, 0);
@@ -945,6 +969,38 @@ function App() {
     }
   }, [activeNoteId, notes, handleSelectNote, showToast]);
 
+  const nativeActionsRef = useRef({ handleNewNote, handleSelectNote, showToast, isBootReady });
+  nativeActionsRef.current = { handleNewNote, handleSelectNote, showToast, isBootReady };
+  useEffect(() => {
+    let disposed = false;
+    const stops: (() => void)[] = [];
+    const subscribe = (event: string, action: () => void | Promise<unknown>) => {
+      listen(event, action).then(stop => { if (disposed) stop(); else stops.push(stop); }).catch(console.error);
+    };
+    subscribe("new-note", () => nativeActionsRef.current.handleNewNote());
+    const openPending = async () => {
+      if (disposed || !nativeActionsRef.current.isBootReady) return;
+      const id = await invoke<string | null>("take_pending_note_link");
+      if (!disposed && id) nativeActionsRef.current.handleSelectNote(id);
+    };
+    subscribe("open-note", openPending);
+    subscribe("app-exit-canceled", () => nativeActionsRef.current.showToast("Unable to quit: changes could not be saved. Please retry or copy your text.", <AlertTriangle size={14} />));
+    return () => { disposed = true; stops.forEach(stop => stop()); };
+  }, []);
+  useEffect(() => {
+    if (!isBootReady) return;
+    invoke<string | null>("take_pending_note_link").then(id => {
+      if (id) nativeActionsRef.current.handleSelectNote(id);
+    }).catch(console.error);
+  }, [isBootReady]);
+
+  useEffect(() => {
+    const command = commandsConfig.find(c => c.id === "toggle");
+    try {
+      invoke("set_toggle_shortcut", { shortcut: command?.enabled === false ? null : nativeShortcut(command?.hotkey || "⌘⇧Space") }).catch(console.error);
+    } catch (error) { console.error("Invalid global shortcut", error); }
+  }, [commandsConfig]);
+
   const handleOpenCommandPalette = useCallback(
     (view: "actions" | "settings" = "actions") => {
       // 1. Open palette immediately (0ms) with existing cached recents
@@ -952,16 +1008,16 @@ function App() {
       setIsCommandPaletteOpen(true);
 
       // 2. Concurrently flush in-flight editor/title saves and replace with fresh recents once drained
-      flushEditorNow();
+      const pendingFlush = flushEditorNow();
       flushPendingTitle();
-      flushSaveQueue().then(async () => {
+      pendingFlush.then(() => flushSaveQueue()).then(async () => {
         try {
           const freshRecents = await getRecentNotes(30);
           setRecentNotes(freshRecents);
         } catch (e) {
           console.error("Failed to refresh recents on command palette open:", e);
         }
-      });
+      }).catch(console.error);
     },
     [flushPendingTitle]
   );
@@ -971,16 +1027,16 @@ function App() {
     setIsSmartSearchOpen(true);
 
     // 2. Concurrently flush in-flight editor/title saves and replace with fresh recents once drained
-    flushEditorNow();
+    const pendingFlush = flushEditorNow();
     flushPendingTitle();
-    flushSaveQueue().then(async () => {
+    pendingFlush.then(() => flushSaveQueue()).then(async () => {
       try {
         const freshRecents = await getRecentNotes(30);
         setRecentNotes(freshRecents);
       } catch (e) {
         console.error("Failed to refresh recents on smart search open:", e);
       }
-    });
+    }).catch(console.error);
   }, [flushPendingTitle]);
 
   const pendingCachedNotesJsonRef = useRef<string | null>(null);
@@ -1008,7 +1064,7 @@ function App() {
     // Immediate lifecycle flush: blur, visibility hidden, or panel-will-hide commits
     // editor debounce and title timer immediately without any 16ms delay.
     const handleImmediateFlush = () => {
-      flushEditorNow();
+      flushEditorNow().catch(console.error);
       flushPendingTitle();
       cachedNotesWriterRef.current.flush();
     };
@@ -1140,6 +1196,7 @@ function App() {
         flushPendingTitle();
         await flushSaveQueue();
         await deleteNote(id);
+        pruneHistory(new Set([id]));
         discardEditorNote(id);
         if (activeNoteId === id) {
           activeFetchIdRef.current++;
@@ -1149,7 +1206,10 @@ function App() {
         clearCachedRecentSearchResults();
         clearActiveNoteSnapshot(id);
         // Refetch recents after every delete
-        const freshRecents = await getRecentNotes(30);
+        const freshRecents = await getRecentNotes(30).catch(error => {
+          console.error("Failed to refresh after deletion", error);
+          return recentNotes.filter(note => note.id !== id);
+        });
         setRecentNotes(freshRecents);
         safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
 
@@ -1182,20 +1242,39 @@ function App() {
       flushPendingTitle();
       await flushSaveQueue();
       const allNotes = await getAllNotes();
-      await Promise.all(allNotes.map((n) => deleteNote(n.id)));
-      if (activeNoteId) discardEditorNote(activeNoteId);
+      const results = await Promise.allSettled(allNotes.map((n) => deleteNote(n.id)));
+      const deleted = new Set(allNotes.filter((_, i) => results[i].status === "fulfilled").map(n => n.id));
+      for (const id of deleted) {
+        discardEditorNote(id);
+        noteCache.delete(id);
+      }
+      pruneHistory(deleted);
       activeFetchIdRef.current++;
-      setDiscardedNoteId(activeNoteId);
-      setNotes([]);
-      setActiveNoteId(null);
-      setActiveNoteSummary(null);
-      titleStore.reset();
-      noteCache.clear();
+      const failures = results.filter(r => r.status === "rejected");
+      const remaining = failures.length ? (await getRecentNotes(30).catch(error => {
+        console.error("Failed to refresh after partial deletion", error);
+        return allNotes;
+      })).filter(n => !deleted.has(n.id)) : [];
+      setNotes(remaining);
       clearCachedRecentSearchResults();
       cachedNotesWriterRef.current.cancel();
       pendingCachedNotesJsonRef.current = null;
-      safeLocalStorageSetItem("notefast_cached_notes", "[]");
-      clearActiveNoteSnapshot();
+      safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(remaining));
+      if (!activeNoteId || deleted.has(activeNoteId)) {
+        setDiscardedNoteId(activeNoteId);
+        if (remaining.length) handleSelectNote(remaining[0].id, remaining[0]);
+        else {
+          setActiveNoteId(null);
+          setActiveNoteSummary(null);
+          titleStore.reset();
+        }
+      }
+      if (!failures.length) {
+        noteCache.clear();
+        clearActiveNoteSnapshot();
+        navigationHistoryRef.current = { ids: [], index: -1 };
+      }
+      if (failures.length) throw new Error(`Could not delete ${failures.length} note(s). Remaining notes were kept.`);
     })();
     clearingNotesRef.current = operation.finally(() => {
       clearingNotesRef.current = null;
@@ -1225,7 +1304,7 @@ function App() {
   }, [switchConflict, handleRecoverOrphan, handleSelectNote]);
 
   const handleConflictCopy = useCallback(async () => {
-    if (!switchConflict) return;
+    if (!switchConflict) return false;
     const textToCopy = switchConflict.text || switchConflict.content;
     const ok = await copyToClipboard(textToCopy);
     if (ok) {
@@ -1233,6 +1312,7 @@ function App() {
     } else {
       showToast("Failed to copy to clipboard", <AlertTriangle size={14} className="text-amber-400" />);
     }
+    return ok;
   }, [switchConflict, showToast]);
 
   const handleConflictDiscard = useCallback(() => {
@@ -1301,17 +1381,24 @@ function App() {
    */
   const handleCopyNoteAsMarkdown = useCallback(async () => {
     if (!activeNoteId) return;
+    try {
+    await flushEditorNow();
+    await flushSaveQueue();
     let content = noteCache.get(activeNoteId)?.content;
     if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
-    const md = noteContentToMarkdown(content, activeNote?.title);
+    const md = noteContentToMarkdown(content, noteCache.peek(activeNoteId)?.title || activeNote?.title);
     const ok = await copyToClipboard(md);
     if (ok) {
       showToast("Copied note as Markdown", <Check size={14} />);
     } else {
       showToast("Failed to copy to clipboard", <AlertTriangle size={14} className="text-amber-400" />);
+    }
+    } catch (error) {
+      console.error("Unable to read the latest note content", error);
+      showToast("Changes could not be saved. Please retry before copying or exporting.", <AlertTriangle size={14} />);
     }
   }, [activeNoteId, activeNote, showToast]);
 
@@ -1320,17 +1407,24 @@ function App() {
    */
   const handleCopyNoteAsText = useCallback(async () => {
     if (!activeNoteId) return;
+    try {
+    await flushEditorNow();
+    await flushSaveQueue();
     let content = noteCache.get(activeNoteId)?.content;
     if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
-    const text = noteContentToPlainText(content, activeNote?.title);
+    const text = noteContentToPlainText(content, noteCache.peek(activeNoteId)?.title || activeNote?.title);
     const ok = await copyToClipboard(text);
     if (ok) {
       showToast("Copied note as Plain Text", <Check size={14} />);
     } else {
       showToast("Failed to copy to clipboard", <AlertTriangle size={14} className="text-amber-400" />);
+    }
+    } catch (error) {
+      console.error("Unable to read the latest note content", error);
+      showToast("Changes could not be saved. Please retry before copying or exporting.", <AlertTriangle size={14} />);
     }
   }, [activeNoteId, activeNote, showToast]);
 
@@ -1353,16 +1447,23 @@ function App() {
    */
   const handleExportNote = useCallback(async () => {
     if (!activeNoteId) return;
+    try {
+    await flushEditorNow();
+    await flushSaveQueue();
     let content = noteCache.get(activeNoteId)?.content;
     if (!content) {
       const full = await getNote(activeNoteId);
       content = full?.content || "";
     }
-    const title = getNoteTitle(activeNote?.title || "", activeNote?.preview || content);
+    const title = getNoteTitle(noteCache.peek(activeNoteId)?.title || activeNote?.title || "", activeNote?.preview || content);
     const filename = `${title.replace(/[/\\?%*:|"<>]/g, "-") || "Note"}.md`;
-    const md = noteContentToMarkdown(content, activeNote?.title);
+    const md = noteContentToMarkdown(content, noteCache.peek(activeNoteId)?.title || activeNote?.title);
     downloadFile(filename, md, "text/markdown");
     showToast(`Exported "${filename}"`, <FileDown size={14} />);
+    } catch (error) {
+      console.error("Unable to read the latest note content", error);
+      showToast("Changes could not be saved. Please retry before copying or exporting.", <AlertTriangle size={14} />);
+    }
   }, [activeNoteId, activeNote, showToast]);
 
   /**
@@ -1473,7 +1574,7 @@ function App() {
       }
 
       // Dedicated Smart Document Search & Quick Switcher (Cmd+P)
-      if (isTriggered("browse", "⌘P") || isTriggered("smart_search", "⌘P")) {
+      if (isTriggered("browse", "⌘P")) {
         e.preventDefault();
         e.stopPropagation();
         if (isSmartSearchOpen) {
@@ -1492,7 +1593,7 @@ function App() {
       }
 
       // Duplicate Note
-      if (isTriggered("duplicate", "⌘D")) {
+      if (isTriggered("duplicate", "⌘D") && !(window as any).__RAYNOTE_EDITOR__?.storage?.blockSelection?.selectedPositions?.length) {
         e.preventDefault();
         handleDuplicateNote();
         return;
@@ -1647,12 +1748,15 @@ function App() {
           setIsSmartSearchOpen(false);
           return;
         }
-        if (isCommandPaletteOpen) {
-          setIsCommandPaletteOpen(false);
-          return;
-        }
+        if (isCommandPaletteOpen) return; // Palette handles its own subview Escape hierarchy.
         if (isFindOpen) {
           setIsFindOpen(false);
+          return;
+        }
+        if (!escLosesFocus) {
+          e.preventDefault();
+          e.stopPropagation();
+          hideWindow().catch(console.error);
           return;
         }
         // Defocus and unselect: collapse window selection & blur active element
@@ -1958,11 +2062,11 @@ function App() {
                 };
                 setNotes((prev) => [summary, ...prev.filter((n) => n.id !== summary.id)].slice(0, 30));
                 handleSelectNote(newNote.id);
-                setPreviewFile(null);
                 showToast(`Imported "${title}" to notes`, <Check size={14} />);
               } catch (err) {
                 console.error(err);
                 showToast("Failed to import note", <Trash2 size={14} />);
+                throw err;
               }
             }}
           />

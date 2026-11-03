@@ -1,5 +1,6 @@
+import { getStoredCommandsConfig } from "../lib/commandsConfig";
 import { Extension } from "@tiptap/react";
-import Suggestion, { SuggestionProps, SuggestionKeyDownProps, SuggestionOptions } from "@tiptap/suggestion";
+import Suggestion, { SuggestionProps, SuggestionKeyDownProps, SuggestionOptions, findSuggestionMatch } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import { Editor, Range } from "@tiptap/core";
 import "@tiptap/extension-underline";
@@ -437,6 +438,10 @@ export const SlashCommand = Extension.create({
     return {
       suggestion: {
         char: "/",
+        findSuggestionMatch: (config: Parameters<typeof findSuggestionMatch>[0]) => {
+          const trigger = getStoredCommandsConfig().find(c => c.id === "slash")?.hotkey;
+          return findSuggestionMatch({ ...config, char: trigger?.length === 1 ? trigger : "/" });
+        },
         command: ({
           editor,
           range,
@@ -448,14 +453,17 @@ export const SlashCommand = Extension.create({
         }) => {
           props.command({ editor, range });
         },
+        allow: () => getStoredCommandsConfig().find(c => c.id === "slash")?.enabled !== false,
         items: ({ query }: { query: string }) => {
+          const enabled = getStoredCommandsConfig().find(c => c.id === "tables")?.enabled !== false;
+          const commands = ALL_COMMAND_ITEMS.filter(item => enabled || !["Table", "Video"].includes(item.title));
           const q = query.toLowerCase().trim();
           if (!q) {
             // Natural initial order: Heading 1 is first
-            return ALL_COMMAND_ITEMS;
+            return commands;
           }
 
-          return ALL_COMMAND_ITEMS
+          return commands
             .map((item) => ({ item, score: scoreItem(item, q) }))
             .filter((res) => res.score > 0)
             .sort((a, b) => b.score - a.score)

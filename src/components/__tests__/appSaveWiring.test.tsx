@@ -128,9 +128,9 @@ describe("App onUpdate Save Wiring & IPC Invariants", () => {
     expect(invokeAttempts).toBe(1);
 
     // 3. Trigger flushEditorNow while invoke is still failing:
-    // It should retry because isDirty remained true!
+    // It retries because isDirty remained true, and explicitly reports persistence failure.
     await act(async () => {
-      await flushEditorNow();
+      await expect(flushEditorNow()).rejects.toThrow("IPC update_note rejected");
       await vi.advanceTimersByTimeAsync(50);
     });
 

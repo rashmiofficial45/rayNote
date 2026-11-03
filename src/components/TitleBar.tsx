@@ -126,6 +126,7 @@ export function TitleBar({
   const isHoveredRef = useRef(false);
 
   useEffect(() => {
+    let disposed = false;
     let unlistenFocus: (() => void) | undefined;
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
@@ -136,7 +137,7 @@ export function TitleBar({
         }
       })
       .then((fn) => {
-        unlistenFocus = fn;
+        if (disposed) fn(); else unlistenFocus = fn;
       })
       .catch(() => { });
 
@@ -177,6 +178,7 @@ export function TitleBar({
     document.addEventListener("mouseleave", handleReset);
 
     return () => {
+      disposed = true;
       if (unlistenFocus) unlistenFocus();
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("mouseout", handleMouseOut);

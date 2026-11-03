@@ -37,17 +37,20 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
   useEffect(() => {
     if (isOpen && editor) {
       const { from, to } = editor.state.selection;
+      let effectiveQuery = query;
       if (from !== to) {
         const text = editor.state.doc.textBetween(from, to).trim();
         if (text && text.length < 60 && !text.includes("\n")) {
           setQuery(text);
-          editor.commands.setSearchTerm(text);
+          effectiveQuery = text;
         }
       }
-      setTimeout(() => {
+      editor.commands.setSearchTerm(effectiveQuery);
+      const focusTimer = setTimeout(() => {
         searchInputRef.current?.focus();
         searchInputRef.current?.select();
       }, 50);
+      return () => clearTimeout(focusTimer);
     } else if (!isOpen && editor) {
       editor.commands.clearSearch();
     }

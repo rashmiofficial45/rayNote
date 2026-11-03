@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "../lib/storage";
 import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { NoteSummary, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 
@@ -149,10 +150,10 @@ export function CommandPalette({
   const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_esc_loses_focus") === "true";
+    return safeLocalStorageGetItem("notefast_esc_loses_focus") === "true";
   });
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_show_menubar") !== "false";
+    return safeLocalStorageGetItem("notefast_show_menubar") !== "false";
   });
   const [aliases, setAliases] = useState<Record<string, string>>(getStoredAliases);
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
@@ -168,6 +169,7 @@ export function CommandPalette({
       onThemeModeChange: (mode) => setCurrentTheme(mode),
       onAccentChange: (acc) => setCurrentAccent(acc),
       onFontChange: (f) => setCurrentFont(f),
+      onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: (v) => setEscLosesFocus(v),
     });
   }, []);
@@ -212,7 +214,7 @@ export function CommandPalette({
   const handleApplyZoom = (zoom: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(zoom * 10) / 10));
     onSetZoom?.(clamped);
-    localStorage.setItem("notefast_zoom_level", clamped.toString());
+    safeLocalStorageSetItem("notefast_zoom_level", clamped.toString());
     broadcastSync({ type: "zoom", value: clamped });
     onShowToast?.(`Zoom set to ${Math.round(clamped * 100)}%`, <ZoomIn size={14} />);
     onClose();
@@ -221,7 +223,7 @@ export function CommandPalette({
   const handleToggleEscLosesFocus = () => {
     const val = !escLosesFocus;
     setEscLosesFocus(val);
-    localStorage.setItem("notefast_esc_loses_focus", val ? "true" : "false");
+    safeLocalStorageSetItem("notefast_esc_loses_focus", val ? "true" : "false");
     broadcastSync({ type: "esc_loses_focus", value: val });
     onShowToast?.(
       val
@@ -234,7 +236,8 @@ export function CommandPalette({
   const handleToggleMenuBar = () => {
     const val = !showMenuBar;
     setShowMenuBar(val);
-    localStorage.setItem("notefast_show_menubar", val ? "true" : "false");
+    safeLocalStorageSetItem("notefast_show_menubar", val ? "true" : "false");
+    broadcastSync({ type: "menu_bar", value: val });
     invoke("set_menu_bar_visible", { visible: val }).catch(console.error);
     onShowToast?.(
       val ? "Menu bar toggle button enabled" : "Menu bar toggle button disabled"
@@ -449,13 +452,13 @@ export function CommandPalette({
       id: "toggle-smooth-caret",
       category: "Preferences",
       label: "Smooth Cursor Caret",
-      badge: (typeof window !== "undefined" && localStorage.getItem("notefast_smooth_caret") === "false") ? "OFF" : "ON",
+      badge: (typeof window !== "undefined" && safeLocalStorageGetItem("notefast_smooth_caret") === "false") ? "OFF" : "ON",
       icon: <Sparkles size={14} />,
       keywords: ["cursor", "caret", "smooth", "animation", "vscode", "typing"],
       action: () => {
-        const current = localStorage.getItem("notefast_smooth_caret") !== "false";
+        const current = safeLocalStorageGetItem("notefast_smooth_caret") !== "false";
         const next = !current;
-        localStorage.setItem("notefast_smooth_caret", String(next));
+        safeLocalStorageSetItem("notefast_smooth_caret", String(next));
         document.documentElement.dataset.smoothCaret = String(next);
         window.dispatchEvent(
           new CustomEvent("notefast_toggle_smooth_caret", { detail: { enabled: next } })

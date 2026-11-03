@@ -52,17 +52,15 @@ const wantsDmg = !bundlesValue || bundlesValue.includes('dmg');
 // Force Tauri to ONLY build 'app' bundle so it never runs its legacy create-dmg script
 const tauriArgs = [...args];
 if (bundlesArgIndex !== -1) {
-  if (bundlesValue === 'dmg') {
-    tauriArgs[bundlesArgIndex + 1] = 'app';
-  } else if (bundlesValue.startsWith('--bundles=dmg')) {
-    tauriArgs[bundlesArgIndex] = '--bundles=app';
-  } else if (bundlesValue.includes('dmg')) {
-    const list = bundlesValue.split(',').filter(b => b !== 'dmg');
-    if (!list.includes('app')) list.push('app');
+  const list = bundlesValue.split(',').filter(b => b !== 'dmg');
+  if (wantsDmg && !list.includes('app')) list.push('app');
+  if (args[bundlesArgIndex].startsWith('--bundles=')) {
+    tauriArgs[bundlesArgIndex] = `--bundles=${list.join(',')}`;
+  } else {
     tauriArgs[bundlesArgIndex + 1] = list.join(',');
   }
 } else {
-  // If no --bundles flag was specified, explicitly restrict Tauri to 'app'
+  // Keep the existing default: native app first, custom DMG afterwards.
   tauriArgs.push('--bundles', 'app');
 }
 

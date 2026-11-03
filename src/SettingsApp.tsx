@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestClearAllNotes } from "./lib/noteDeletion";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -64,7 +65,7 @@ type SettingsPane = "general" | "commands" | "aliases" | "storage" | "about";
 export default function SettingsApp() {
   // Restore most recently viewed pane (Apple standard)
   const [activePane, setActivePane] = useState<SettingsPane>(() => {
-    const saved = localStorage.getItem("notefast_settings_active_pane") as SettingsPane | null;
+    const saved = safeLocalStorageGetItem("notefast_settings_active_pane") as SettingsPane | null;
     if (saved && ["general", "commands", "aliases", "storage", "about"].includes(saved)) {
       return saved;
     }
@@ -78,7 +79,7 @@ export default function SettingsApp() {
 
   // Zoom State
   const [zoomLevel, setZoomLevel] = useState<number>(() => {
-    const saved = localStorage.getItem("notefast_zoom_level");
+    const saved = safeLocalStorageGetItem("notefast_zoom_level");
     if (saved) {
       const parsed = parseFloat(saved);
       if (!isNaN(parsed) && parsed >= 0.6 && parsed <= 2.0) return parsed;
@@ -88,10 +89,10 @@ export default function SettingsApp() {
 
   // Toggles State
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_show_menubar") !== "false";
+    return safeLocalStorageGetItem("notefast_show_menubar") !== "false";
   });
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
-    return localStorage.getItem("notefast_esc_loses_focus") === "true";
+    return safeLocalStorageGetItem("notefast_esc_loses_focus") === "true";
   });
 
   // Commands state
@@ -122,20 +123,22 @@ export default function SettingsApp() {
 
   // Initialize theme, storage stats, and real-time sync listeners on mount
   useEffect(() => {
-    initTheme();
+    const stopTheme = initTheme();
     loadStorageStats();
 
-    return listenToSettingsSync({
+    const stopSync = listenToSettingsSync({
       onThemeModeChange: setThemeMode,
       onAccentChange: setAccent,
       onFontChange: setFontFamily,
       onZoomChange: setZoomLevel,
+      onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: setEscLosesFocus,
       onCommandsConfigChange: setCommands,
       onAliasesConfigChange: (newAliases) => {
         setAliases(newAliases || {});
       },
     });
+    return () => { stopTheme?.(); stopSync(); };
   }, []);
 
   // Native window drag on mousedown for top header bar (identical to Note window)
@@ -198,7 +201,7 @@ export default function SettingsApp() {
   const handlePaneChange = (pane: SettingsPane) => {
     if (pane === activePane) return;
     setActivePane(pane);
-    localStorage.setItem("notefast_settings_active_pane", pane);
+    safeLocalStorageSetItem("notefast_settings_active_pane", pane);
   };
 
   const startRecording = (id: string) => {
@@ -209,7 +212,7 @@ export default function SettingsApp() {
   const handleUpdateHotkey = useCallback((id: string, newHotkey: string) => {
     setCommands((prev) => {
       const updated = prev.map((c) => (c.id === id ? { ...c, hotkey: newHotkey } : c));
-      localStorage.setItem("notefast_commands_config", JSON.stringify(updated));
+      safeLocalStorageSetItem("notefast_commands_config", JSON.stringify(updated));
       broadcastSync({ type: "commands_config", value: updated });
       return updated;
     });
@@ -398,7 +401,7 @@ export default function SettingsApp() {
   const handleZoom = (level: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(level * 10) / 10));
     setZoomLevel(clamped);
-    localStorage.setItem("notefast_zoom_level", clamped.toString());
+    safeLocalStorageSetItem("notefast_zoom_level", clamped.toString());
     broadcastSync({ type: "zoom", value: clamped });
     window.dispatchEvent(new CustomEvent("notefast_zoom_changed", { detail: { zoom: clamped } }));
   };
@@ -407,7 +410,8 @@ export default function SettingsApp() {
   const handleToggleMenuBar = async () => {
     const val = !showMenuBar;
     setShowMenuBar(val);
-    localStorage.setItem("notefast_show_menubar", val ? "true" : "false");
+    safeLocalStorageSetItem("notefast_show_menubar", val ? "true" : "false");
+    broadcastSync({ type: "menu_bar", value: val });
     try {
       await invoke("set_menu_bar_visible", { visible: val });
     } catch (err) {
@@ -418,7 +422,7 @@ export default function SettingsApp() {
   const handleToggleEscLosesFocus = () => {
     const val = !escLosesFocus;
     setEscLosesFocus(val);
-    localStorage.setItem("notefast_esc_loses_focus", val ? "true" : "false");
+    safeLocalStorageSetItem("notefast_esc_loses_focus", val ? "true" : "false");
     broadcastSync({ type: "esc_loses_focus", value: val });
   };
 
@@ -427,7 +431,7 @@ export default function SettingsApp() {
   const handleToggleCommand = (id: string) => {
     setCommands((prev) => {
       const next = prev.map((c) => (c.id === id ? { ...c, enabled: !c.enabled } : c));
-      localStorage.setItem("notefast_commands_config", JSON.stringify(next));
+      safeLocalStorageSetItem("notefast_commands_config", JSON.stringify(next));
       broadcastSync({ type: "commands_config", value: next });
       return next;
     });

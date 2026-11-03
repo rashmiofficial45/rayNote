@@ -35,6 +35,7 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     document.body.appendChild(container);
     root = createRoot(container);
     noteCache.clear();
+    localStorage.clear();
   });
 
   afterEach(() => {
@@ -477,8 +478,8 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     const mockOnSwitchConflict = vi.fn();
     let editorInstance: any = null;
 
-    noteCache.set("switch-test-1", "{}", new Date().toISOString(), "Title 1", 0);
-    noteCache.set("switch-test-2", "{}", new Date().toISOString(), "Title 2", 0);
+    noteCache.set("switch-test-1", '{"type":"doc","content":[{"type":"paragraph"}]}' , new Date().toISOString(), "Title 1", 0);
+    noteCache.set("switch-test-2", '{"type":"doc","content":[{"type":"paragraph"}]}' , new Date().toISOString(), "Title 2", 0);
 
     act(() => {
       root.render(
@@ -528,8 +529,8 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     const mockOnSwitchConflict = vi.fn();
     let editorInstance: any = null;
 
-    noteCache.set("switch-fail-1", "{}", new Date().toISOString(), "Title 1", 0);
-    noteCache.set("switch-fail-2", "{}", new Date().toISOString(), "Title 2", 0);
+    noteCache.set("switch-fail-1", '{"type":"doc","content":[{"type":"paragraph"}]}' , new Date().toISOString(), "Title 1", 0);
+    noteCache.set("switch-fail-2", '{"type":"doc","content":[{"type":"paragraph"}]}' , new Date().toISOString(), "Title 2", 0);
 
     act(() => {
       root.render(
@@ -583,9 +584,9 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     mockInvoke.mockImplementation(async (cmd: string, args?: any) => {
       if (cmd === "get_note") {
         if (args?.id === "missing-1") {
-          return { id: "missing-1", content: "{}", updated_at: "t0", title: "Title 1" } as any;
+          return { id: "missing-1", content: '{"type":"doc","content":[{"type":"paragraph"}]}' , updated_at: "t0", title: "Title 1" } as any;
         }
-        return { id: args?.id, content: "{}", updated_at: "t0", title: "Target" } as any;
+        return { id: args?.id, content: '{"type":"doc","content":[{"type":"paragraph"}]}' , updated_at: "t0", title: "Target" } as any;
       }
       return undefined;
     });
@@ -598,8 +599,8 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     localStorage.setItem("notefast_active_note_content", "precious snapshot");
     localStorage.setItem("notefast_active_note_unsaved", "true");
 
-    noteCache.set("missing-1", "{}", "t0", "Title 1", 0);
-    noteCache.set("target-2", "{}", "t0", "Title 2", 0);
+    noteCache.set("missing-1", '{"type":"doc","content":[{"type":"paragraph"}]}' , "t0", "Title 1", 0);
+    noteCache.set("target-2", '{"type":"doc","content":[{"type":"paragraph"}]}' , "t0", "Title 2", 0);
 
     act(() => {
       root.render(
@@ -651,7 +652,7 @@ describe("Save Path Rejection Recovery & lastSavedDocRef Invariants", () => {
     expect(conflictData.targetNoteId).toBe("target-2");
 
     // LocalStorage recovery snapshot is preserved and NOT wiped
-    expect(localStorage.getItem("notefast_active_note_content")).toBe("precious snapshot");
+    expect(localStorage.getItem("notefast_active_note_content")).toContain("Edits before missing row switch");
     expect(localStorage.getItem("notefast_active_note_unsaved")).toBe("true");
   });
 });

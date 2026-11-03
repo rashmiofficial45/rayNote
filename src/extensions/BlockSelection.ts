@@ -1,3 +1,4 @@
+import { copyToClipboard } from "../lib/clipboard";
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey, TextSelection, Selection, EditorState } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
@@ -450,10 +451,19 @@ export function serializeSelectedBlocks(state: EditorState): { markdownText: str
   if (nodes.length === 0) return null;
 
   const fragment = Fragment.fromArray(nodes);
-  const slice = new Slice(fragment, 0, 0);
 
   // Serialize to Markdown
-  const markdownText = sliceToMarkdown(slice);
+  // A block selection can contain list items without their parent list node.
+  // Carry the source parent/start so ordered items retain their actual numbering.
+  const markdownText = nodes.map((node, i) => {
+    if (node.type.name !== "listItem") return sliceToMarkdown(new Slice(Fragment.from(node), 0, 0));
+    const resolved = state.doc.resolve(sortedPositions[i]);
+    const parent = resolved.parent;
+    const kind = parent.type.name === "orderedList" ? "orderedList" : "bulletList";
+    const attrs = kind === "orderedList" ? { ...parent.attrs, start: (parent.attrs.start || 1) + resolved.index() } : parent.attrs;
+    const wrapper = state.schema.nodes[kind].create(attrs, node);
+    return sliceToMarkdown(new Slice(Fragment.from(wrapper), 0, 0));
+  }).join("\n\n");
 
   // Serialize to HTML
   let htmlText = "";
@@ -469,49 +479,27 @@ export function serializeSelectedBlocks(state: EditorState): { markdownText: str
   return { markdownText, htmlText };
 }
 
-export function copySelectedBlocks(view: EditorView, isCut = false): boolean {
+export async function copySelectedBlocks(view: EditorView, isCut = false): Promise<boolean> {
   const serialized = serializeSelectedBlocks(view.state);
   if (!serialized) return false;
-
-  // 1. Synchronously copy via focused hidden textarea (100% reliable in all WebKit / Safari contexts)
-  try {
-    const el = document.createElement("textarea");
-    el.value = serialized.markdownText;
-    el.style.position = "fixed";
-    el.style.left = "-9999px";
-    el.style.top = "-9999px";
-    el.style.opacity = "0";
-    document.body.appendChild(el);
-    el.focus();
-    el.select();
-    document.execCommand("copy");
-    document.body.removeChild(el);
-  } catch (err) {
-    console.warn("execCommand copy fallback failed:", err);
+  const sourceDoc = view.state.doc;
+  const sourcePositions = [...(blockSelectionPluginKey.getState(view.state)?.selectedPositions || [])];
+  let copied = false;
+  if (navigator.clipboard?.write && window.ClipboardItem && serialized.htmlText) {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        "text/plain": new Blob([serialized.markdownText], { type: "text/plain" }),
+        "text/html": new Blob([serialized.htmlText], { type: "text/html" }),
+      })]);
+      copied = true;
+    } catch { /* Fall back to plain text through native/legacy paths. */ }
   }
-
-  // 2. Also write via navigator.clipboard asynchronously for rich HTML if supported
-  if (navigator.clipboard) {
-    if (window.ClipboardItem && serialized.htmlText) {
-      try {
-        const items: Record<string, Blob> = {
-          "text/plain": new Blob([serialized.markdownText], { type: "text/plain" }),
-          "text/html": new Blob([serialized.htmlText], { type: "text/html" }),
-        };
-        navigator.clipboard.write([new ClipboardItem(items)]).catch(() => {});
-      } catch {
-        navigator.clipboard.writeText(serialized.markdownText).catch(() => {});
-      }
-    } else {
-      navigator.clipboard.writeText(serialized.markdownText).catch(() => {});
-    }
+  if (!copied) copied = await copyToClipboard(serialized.markdownText);
+  if (isCut && copied && !view.isDestroyed && view.state.doc === sourceDoc) {
+    const positions = blockSelectionPluginKey.getState(view.state)?.selectedPositions || [];
+    if (positions.length === sourcePositions.length && positions.every((p, i) => p === sourcePositions[i])) deleteSelectedBlocks(view);
   }
-
-  if (isCut) {
-    deleteSelectedBlocks(view);
-  }
-
-  return true;
+  return copied;
 }
 
 declare module "@tiptap/core" {

@@ -412,7 +412,8 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
 pub fn run() {
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            for arg in args { commands::route_note_link(app, &arg); }
             show_and_focus_main_panel(app);
         }));
 
@@ -521,8 +522,10 @@ pub fn run() {
             }
 
             // Register global shortcuts to toggle NoteFast window (both Phase 4 ⌘⇧Space and ⌘⇧N)
-            let _ = app.global_shortcut().register("CommandOrControl+Shift+Space");
-            let _ = app.global_shortcut().register("CommandOrControl+Shift+N");
+            let defaults = vec!["Shift+CommandOrControl+Space".to_string(), "CommandOrControl+Shift+N".to_string()];
+            for shortcut in &defaults { let _ = app.global_shortcut().register(shortcut.as_str()); }
+            app.manage(commands::ToggleShortcuts(std::sync::Mutex::new(defaults)));
+            for arg in std::env::args() { commands::route_note_link(app.handle(), &arg); }
 
             // Set macOS-specific window behavior and subclass to NSPanel
             #[cfg(target_os = "macos")]
@@ -556,6 +559,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_all_notes,
+            set_toggle_shortcut,
+            take_pending_note_link,
             get_recent_notes,
             search_documents,
             get_note,
@@ -588,28 +593,41 @@ pub fn run() {
 
     app.run(|app_handle, event| {
         match event {
+            #[cfg(any(target_os = "macos", target_os = "ios"))]
+            tauri::RunEvent::Opened { urls } => {
+                for url in urls { commands::route_note_link(app_handle, url.as_str()); }
+                show_and_focus_main_panel(app_handle);
+            }
             tauri::RunEvent::Reopen { .. } => {
                 show_and_focus_main_panel(app_handle);
             }
             tauri::RunEvent::ExitRequested { api, .. } => {
                 static EXITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-                if EXITING.swap(true, std::sync::atomic::Ordering::SeqCst) {
-                    return;
-                }
+                static EXIT_APPROVED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+                if EXIT_APPROVED.load(std::sync::atomic::Ordering::SeqCst) { return; }
                 api.prevent_exit();
+                if EXITING.swap(true, std::sync::atomic::Ordering::SeqCst) { return; }
+                commands::begin_exit_flush();
 
                 use tauri::Emitter;
                 let _ = app_handle.emit("app-will-exit", ());
 
                 let handle_clone = app_handle.clone();
                 tauri::async_runtime::spawn(async move {
-                    commands::wait_for_flush_done(std::time::Duration::from_millis(1500));
+                    let flushed = tauri::async_runtime::spawn_blocking(|| commands::wait_for_flush_done(std::time::Duration::from_secs(15))).await.unwrap_or(false);
+                    if !flushed {
+                        EXITING.store(false, std::sync::atomic::Ordering::SeqCst);
+                        let _ = handle_clone.emit("app-exit-canceled", ());
+                        show_and_focus_main_panel(&handle_clone);
+                        return;
+                    }
 
                     if let Some(db) = handle_clone.try_state::<std::sync::Arc<Database>>() {
                         let conn = db.writer.lock().unwrap_or_else(|e| e.into_inner());
                         let _ = conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()));
                     }
 
+                    EXIT_APPROVED.store(true, std::sync::atomic::Ordering::SeqCst);
                     handle_clone.exit(0);
                 });
             }

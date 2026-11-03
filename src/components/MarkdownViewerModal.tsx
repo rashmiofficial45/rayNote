@@ -27,7 +27,7 @@ export interface PreviewFileData {
 interface MarkdownViewerModalProps {
   fileData: PreviewFileData | null;
   onClose: () => void;
-  onImportToNotes: (title: string, markdown: string) => void;
+  onImportToNotes: (title: string, markdown: string) => void | Promise<unknown>;
   onShowToast?: (message: string, icon?: React.ReactNode) => void;
 }
 
@@ -39,6 +39,7 @@ export function MarkdownViewerModal({
 }: MarkdownViewerModalProps) {
   const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
   const [copied, setCopied] = useState(false);
+  const importingRef = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,9 +91,15 @@ export function MarkdownViewerModal({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleImport = () => {
-    onImportToNotes(docTitle, fileData.content);
-    onClose();
+  const handleImport = async () => {
+    if (importingRef.current) return;
+    importingRef.current = true;
+    try {
+      await onImportToNotes(docTitle, fileData.content);
+      onClose();
+    } catch (error) {
+      console.error("Import failed; keeping the preview available", error);
+    } finally { importingRef.current = false; }
   };
 
   return (

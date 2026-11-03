@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "../lib/storage";
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Editor } from "@tiptap/react";
 import { blockSelectionPluginKey } from "../extensions/BlockSelection";
@@ -91,7 +92,7 @@ export function SmoothCaret({
   const pendingImmediateRef = useRef(false);
 
   const [isEnabled, setIsEnabled] = useState(() => {
-    const saved = localStorage.getItem("notefast_smooth_caret");
+    const saved = safeLocalStorageGetItem("notefast_smooth_caret");
     return saved === null ? true : saved === "true";
   });
 
@@ -99,7 +100,7 @@ export function SmoothCaret({
   useEffect(() => {
     document.documentElement.dataset.smoothCaret = isEnabled ? "true" : "false";
     try {
-      localStorage.setItem("notefast_smooth_caret", String(isEnabled));
+      safeLocalStorageSetItem("notefast_smooth_caret", String(isEnabled));
     } catch {}
   }, [isEnabled]);
 

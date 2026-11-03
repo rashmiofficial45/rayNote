@@ -6,20 +6,73 @@ use uuid::Uuid;
 use chrono::Utc;
 
 static FLUSH_CONDVAR: std::sync::Condvar = std::sync::Condvar::new();
-static FLUSH_DONE: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
+static FLUSH_DONE: std::sync::Mutex<Option<bool>> = std::sync::Mutex::new(None);
 
 #[tauri::command]
-pub fn flush_done() {
+pub fn flush_done(ok: Option<bool>) {
     let mut done = FLUSH_DONE.lock().unwrap_or_else(|e| e.into_inner());
-    *done = true;
+    *done = Some(ok.unwrap_or(true));
     FLUSH_CONDVAR.notify_all();
 }
 
-pub fn wait_for_flush_done(timeout: std::time::Duration) {
+pub fn begin_exit_flush() {
+    *FLUSH_DONE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
+
+pub fn wait_for_flush_done(timeout: std::time::Duration) -> bool {
     let done = FLUSH_DONE.lock().unwrap_or_else(|e| e.into_inner());
-    if !*done {
-        let _ = FLUSH_CONDVAR.wait_timeout(done, timeout);
+    let (done, _) = FLUSH_CONDVAR.wait_timeout_while(done, timeout, |done| done.is_none()).unwrap_or_else(|e| e.into_inner());
+    *done == Some(true)
+}
+
+pub struct ToggleShortcuts(pub std::sync::Mutex<Vec<String>>);
+
+#[tauri::command]
+pub fn set_toggle_shortcut(app: tauri::AppHandle, shortcut: Option<String>) -> Result<(), String> {
+    use tauri::Manager;
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+    let mut desired = shortcut.into_iter().collect::<Vec<_>>();
+    // Keep the legacy alternate only with the unchanged default shortcut.
+    if desired.first().is_some_and(|s| s == "Shift+CommandOrControl+Space") {
+        desired.push("CommandOrControl+Shift+N".into());
     }
+    for value in &desired { value.parse::<Shortcut>().map_err(|e| e.to_string())?; }
+    let state = app.state::<ToggleShortcuts>();
+    let mut current = state.0.lock().unwrap_or_else(|e| e.into_inner());
+    if *current == desired { return Ok(()); }
+    app.global_shortcut().unregister_all().map_err(|e| e.to_string())?;
+    for value in &desired {
+        if let Err(error) = app.global_shortcut().register(value.as_str()) {
+            let _ = app.global_shortcut().unregister_all();
+            for old in current.iter() { let _ = app.global_shortcut().register(old.as_str()); }
+            return Err(error.to_string());
+        }
+    }
+    *current = desired;
+    Ok(())
+}
+
+static PENDING_NOTE_LINK: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+pub fn note_id_from_url(value: &str) -> Option<String> {
+    let url = tauri::Url::parse(value).ok()?;
+    if !matches!(url.scheme(), "notefast" | "raynote") || url.host_str() != Some("note") { return None; }
+    let id = url.path().strip_prefix('/')?;
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') { return None; }
+    Some(id.to_string())
+}
+
+pub fn route_note_link(app: &tauri::AppHandle, value: &str) {
+    use tauri::Emitter;
+    if let Some(id) = note_id_from_url(value) {
+        *PENDING_NOTE_LINK.lock().unwrap_or_else(|e| e.into_inner()) = Some(id);
+        let _ = app.emit("open-note", ());
+    }
+}
+
+#[tauri::command]
+pub fn take_pending_note_link() -> Option<String> {
+    PENDING_NOTE_LINK.lock().unwrap_or_else(|e| e.into_inner()).take()
 }
 
 #[tauri::command]
@@ -763,22 +816,51 @@ fn note_content_to_markdown_clean(content: &str, title: &str) -> String {
     }
 }
 
+fn escape_markdown_text(value: &str) -> String {
+    let mut out = String::new();
+    for c in value.chars() {
+        match c {
+            '&' => out.push_str("&amp;"), '<' => out.push_str("&lt;"), '>' => out.push_str("&gt;"),
+            '\\' | '`' | '*' | '_' | '~' | ':' | '#' | '[' | ']' => { out.push('\\'); out.push(c); },
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
+fn wrap_markdown_mark(text: &str, delimiter: &str) -> String {
+    let core = text.trim();
+    if core.is_empty() { return text.to_string(); }
+    let leading = text.len() - text.trim_start().len();
+    let trailing = text.trim_end().len();
+    format!("{}{}{}{}{}", &text[..leading], delimiter, core, delimiter, &text[trailing..])
+}
+
 fn serialize_inline_json(node: &serde_json::Value) -> String {
-    let mut text = node.get("text").and_then(|t| t.as_str()).unwrap_or("").to_string();
-    if let Some(marks) = node.get("marks").and_then(|m| m.as_array()) {
+    if node.get("type").and_then(|t| t.as_str()) == Some("hardBreak") { return "  \n".into(); }
+    let raw = node.get("text").and_then(|t| t.as_str()).unwrap_or("");
+    let marks = node.get("marks").and_then(|m| m.as_array());
+    let code = marks.is_some_and(|m| m.iter().any(|mark| mark["type"] == "code"));
+    let mut text = if code {
+        let length = raw.split(|c| c != '`').map(str::len).max().unwrap_or(0) + 1;
+        let fence = "`".repeat(length);
+        let pad = if raw.starts_with('`') || raw.ends_with('`') || (raw.starts_with(' ') && raw.ends_with(' ') && !raw.trim().is_empty()) { " " } else { "" };
+        format!("{fence}{pad}{raw}{pad}{fence}")
+    } else { escape_markdown_text(raw) };
+    if let Some(marks) = marks {
         for mark in marks {
-            if let Some(mark_type) = mark.get("type").and_then(|t| t.as_str()) {
-                match mark_type {
-                    "bold" => text = format!("**{}**", text),
-                    "italic" => text = format!("*{}*", text),
-                    "strike" => text = format!("~~{}~~", text),
-                    "code" => text = format!("`{}`", text),
-                    "link" => {
-                        let href = mark.get("attrs").and_then(|a| a.get("href")).and_then(|h| h.as_str()).unwrap_or("");
-                        text = format!("[{}]({})", text, href);
-                    }
-                    _ => {}
-                }
+            match mark.get("type").and_then(|t| t.as_str()).unwrap_or("") {
+                "bold" => text = wrap_markdown_mark(&text, "**"),
+                "italic" => text = wrap_markdown_mark(&text, "*"),
+                "strike" => text = wrap_markdown_mark(&text, "~~"),
+                "underline" => text = format!("<u>{text}</u>"),
+                "highlight" => text = format!("<mark>{text}</mark>"),
+                "link" => {
+                    let href = mark["attrs"]["href"].as_str().unwrap_or("");
+                    let href = href.replace(' ', "%20").replace('(', "%28").replace(')', "%29").replace('<', "%3C").replace('>', "%3E").replace('\\', "%5C");
+                    text = format!("[{text}]({href})");
+                },
+                _ => {},
             }
         }
     }
@@ -1135,11 +1217,8 @@ pub async fn get_storage_stats(
         } else {
             app_dir.join("notefast.db")
         };
-        let size_bytes = if let Ok(meta) = std::fs::metadata(&db_path) {
-            meta.len()
-        } else {
-            0
-        };
+        let size_bytes: u64 = [db_path.clone(), std::path::PathBuf::from(format!("{}-wal", db_path.display())), std::path::PathBuf::from(format!("{}-shm", db_path.display()))]
+            .iter().filter_map(|path| std::fs::metadata(path).ok()).map(|meta| meta.len()).sum();
         Ok(serde_json::json!({
             "notes_count": count,
             "db_path": db_path.to_string_lossy(),
@@ -1330,4 +1409,39 @@ mod tests {
         let result = String::from_utf8(output.stdout).expect("pbpaste output was not valid UTF-8");
         assert_eq!(result, sample);
     }
+    #[test]
+    fn audit_native_markdown_keeps_literal_text_and_marks() {
+        let doc = serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[
+            {"type":"text","text":"**literal** "},
+            {"type":"text","text":"under","marks":[{"type":"underline"}]},
+            {"type":"text","text":"lit","marks":[{"type":"highlight"}]},
+            {"type":"text","text":"a`b","marks":[{"type":"code"}]}
+        ]}]}).to_string();
+        let md = note_content_to_markdown_clean(&doc, "");
+        assert!(md.contains(r"\*\*literal\*\*"), "{md}");
+        assert!(md.contains("<u>under</u>"), "{md}");
+        assert!(md.contains("<mark>lit</mark>"), "{md}");
+        assert!(md.contains("``a`b``"), "{md}");
+    }
+
+    #[test]
+    fn audit_deeplink_identity_validation() {
+        assert_eq!(note_id_from_url("notefast://note/abc-123"), Some("abc-123".into()));
+        assert_eq!(note_id_from_url("raynote://note/abc-123"), Some("abc-123".into()));
+        for value in ["https://note/abc", "notefast://other/abc", "notefast://note/", "notefast://note/a/b", "javascript:alert(1)"] {
+            assert_eq!(note_id_from_url(value), None);
+        }
+    }
+    #[test]
+    fn audit_exit_requires_positive_flush_confirmation() {
+        begin_exit_flush();
+        assert!(!wait_for_flush_done(std::time::Duration::from_millis(1)));
+        flush_done(Some(false));
+        assert!(!wait_for_flush_done(std::time::Duration::ZERO));
+        begin_exit_flush();
+        flush_done(Some(true));
+        assert!(wait_for_flush_done(std::time::Duration::ZERO));
+        begin_exit_flush();
+    }
+
 }

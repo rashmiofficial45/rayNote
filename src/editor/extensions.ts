@@ -1,3 +1,5 @@
+import Youtube from "@tiptap/extension-youtube";
+import { IframeExtension } from "./iframeExtension";
 import StarterKit from "@tiptap/starter-kit";
 import Document from "@tiptap/extension-document";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -119,6 +121,10 @@ export const LOWLIGHT_LANGUAGE_LOADERS: Record<string, () => Promise<any>> = {
   go: () => import("highlight.js/lib/languages/go"),
   java: () => import("highlight.js/lib/languages/java"),
   diff: () => import("highlight.js/lib/languages/diff"),
+  swift: () => import("highlight.js/lib/languages/swift"),
+  kotlin: () => import("highlight.js/lib/languages/kotlin"),
+  php: () => import("highlight.js/lib/languages/php"),
+  ruby: () => import("highlight.js/lib/languages/ruby"),
 };
 
 export async function ensureLanguageLoaded(lang: string): Promise<boolean> {
@@ -156,8 +162,23 @@ export async function ensureLanguageLoaded(lang: string): Promise<boolean> {
 /**
  * Scans a note payload (TipTap JSON string, JSON object, or Markdown) for all declared code block languages.
  */
+const codeLanguagesByNode = new WeakMap<object, string[]>();
+const noCodeLanguages: string[] = [];
+function scanProseMirrorLanguages(node: any): string[] {
+  if (node.isText || (node.isTextblock && node.type?.name !== "codeBlock")) return noCodeLanguages;
+  const cached = codeLanguagesByNode.get(node);
+  if (cached) return cached;
+  const found = new Set<string>();
+  if (node.type?.name === "codeBlock" && node.attrs?.language) found.add(String(node.attrs.language).toLowerCase().trim());
+  if (!node.isTextblock && typeof node.forEach === "function") node.forEach((child: any) => scanProseMirrorLanguages(child).forEach(language => found.add(language)));
+  const result = [...found];
+  codeLanguagesByNode.set(node, result);
+  return result;
+}
+
 export function scanCodeBlockLanguages(content: unknown): string[] {
   if (!content) return [];
+  if (typeof content === "object" && typeof (content as any).type?.name === "string" && typeof (content as any).forEach === "function") return scanProseMirrorLanguages(content);
   const languages = new Set<string>();
 
   if (typeof content === "string") {
@@ -177,14 +198,11 @@ export function scanCodeBlockLanguages(content: unknown): string[] {
     // JSON AST object traversal
     const traverse = (node: any) => {
       if (!node) return;
-      if (node.type === "codeBlock" && node.attrs?.language) {
+      if ((node.type === "codeBlock" || node.type?.name === "codeBlock") && node.attrs?.language) {
         languages.add(String(node.attrs.language).toLowerCase().trim());
       }
-      if (Array.isArray(node.content)) {
-        for (const child of node.content) {
-          traverse(child);
-        }
-      }
+      if (Array.isArray(node.content)) node.content.forEach(traverse);
+      else if (typeof node.forEach === "function") node.forEach(traverse);
     };
     traverse(content);
   }
@@ -298,6 +316,8 @@ export function getExtensions(
       includeChildren: false,
       emptyEditorClass: "is-editor-empty",
     }),
+    IframeExtension,
+    Youtube.configure({ nocookie: true }),
     TaskList,
     TaskItem.configure({
       nested: true,

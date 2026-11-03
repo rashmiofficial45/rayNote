@@ -11,7 +11,7 @@ export interface SwitchConflictInfo {
 interface SwitchConflictModalProps {
   conflict: SwitchConflictInfo | null;
   onSaveAsNewNote: () => Promise<void> | void;
-  onCopyText: () => void;
+  onCopyText: () => boolean | void | Promise<boolean | void>;
   onDiscardAndSwitch: () => void;
   onClose: () => void;
 }
@@ -28,10 +28,12 @@ export function SwitchConflictModal({
 
   if (!conflict) return null;
 
-  const handleCopy = () => {
-    onCopyText();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      const success = await onCopyText();
+      setCopied(success === true);
+      if (success === true) setTimeout(() => setCopied(false), 2000);
+    } catch { setCopied(false); }
   };
 
   const handleSaveAsNew = async () => {

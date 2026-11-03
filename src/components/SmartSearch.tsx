@@ -108,8 +108,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
         setResults(cachedRecentNotes);
         setSelectedIndex(0);
       }
-      flushEditorNow();
-      flushSaveQueue().then(() => {
+      flushEditorNow().then(() => flushSaveQueue()).then(() => {
         getRecentSearchResults(30)
           .then((recentNotes) => {
             if (requestIdRef.current === reqId) {
@@ -119,7 +118,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             }
           })
           .catch(console.error);
-      });
+      }).catch(console.error);
       return;
     }
 

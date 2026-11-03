@@ -102,7 +102,7 @@ pub fn extract_searchable_text(content: &str) -> String {
             let mut extracted = String::new();
             extract_text_recursive(&value, &mut extracted);
             let cleaned = extracted.split_whitespace().collect::<Vec<_>>().join(" ");
-            if !cleaned.is_empty() {
+            if value.get("type").and_then(|v| v.as_str()) == Some("doc") || !cleaned.is_empty() {
                 return cleaned;
             }
         }
@@ -113,18 +113,15 @@ pub fn extract_searchable_text(content: &str) -> String {
 
 fn extract_text_recursive(node: &serde_json::Value, out: &mut String) {
     if let Some(text) = node.get("text").and_then(|t| t.as_str()) {
-        if !out.is_empty() && !out.ends_with(' ') {
-            out.push(' ');
-        }
         out.push_str(text);
     }
     if let Some(children) = node.get("content").and_then(|c| c.as_array()) {
-        for child in children {
-            extract_text_recursive(child, out);
-        }
-        if !out.is_empty() && !out.ends_with(' ') {
-            out.push(' ');
-        }
+        for child in children { extract_text_recursive(child, out); }
+    }
+    // Inline marks split text nodes, not words. Only structural boundaries separate text.
+    let kind = node.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    if matches!(kind, "paragraph" | "heading" | "codeBlock" | "hardBreak" | "tableCell" | "tableHeader") && !out.ends_with(' ') {
+        out.push(' ');
     }
 }
 
@@ -362,6 +359,22 @@ impl Database {
             }
 
             tx.execute("PRAGMA user_version = 3", [])?;
+            tx.commit()?;
+        }
+
+        if user_version < 4 {
+            let tx = writer.transaction()?;
+            {
+                let mut stmt = tx.prepare("SELECT id, content FROM notes")?;
+                let mut rows = stmt.query([])?;
+                while let Some(row) = rows.next()? {
+                    let id: String = row.get(0)?;
+                    let content: String = row.get(1)?;
+                    let text = extract_searchable_text(&content);
+                    tx.execute("UPDATE notes SET search_text = ?1, preview = ?2 WHERE id = ?3", params![text, truncate_preview(&text, 120), id])?;
+                }
+            }
+            tx.pragma_update(None, "user_version", 4)?;
             tx.commit()?;
         }
 
@@ -708,6 +721,7 @@ impl Database {
                     "SELECT f.id, snippet(notes_fts, 2, '', '', '…', 15), rank
                      FROM notes_fts f
                      WHERE notes_fts MATCH ?1
+                     ORDER BY rank
                      LIMIT ?2",
                 );
                 if let Ok(mut prepared) = stmt {
@@ -3154,4 +3168,24 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }
+    #[test]
+    fn audit_search_text_preserves_inline_words_and_ignores_empty_json() {
+        let split = r#"{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"hel"},{"type":"text","text":"lo","marks":[{"type":"bold"}]}]},{"type":"paragraph","content":[{"type":"text","text":"world"}]}]}"#;
+        assert_eq!(extract_searchable_text(split), "hello world");
+        assert_eq!(extract_searchable_text(r#"{"type":"doc","content":[{"type":"heading","attrs":{"level":1}}]}"#), "");
+    }
+
+    #[test]
+    fn audit_body_search_ranks_before_limiting_candidates() {
+        let dir = std::env::temp_dir().join(format!("raynote_rank_{}", uuid::Uuid::new_v4()));
+        let db = Database::new(dir.clone()).unwrap();
+        for i in 0..12 {
+            let text = if i == 11 { "quasar ".repeat(200) } else { format!("quasar {}", "unrelated ".repeat(200)) };
+            db.create_note(&Note { id: format!("n{i:02}"), title: format!("Journal {i}"), content: serde_json::json!({"type":"doc", "content":[{"type":"paragraph", "content":[{"type":"text","text":text}]}]}).to_string(), preview: String::new(), created_at: "2026-01-01".into(), updated_at: "2026-01-01".into(), is_pinned: false }).unwrap();
+        }
+        assert_eq!(db.search_documents("quasar", 3).unwrap()[0].id, "n11");
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
 }

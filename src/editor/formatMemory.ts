@@ -53,7 +53,8 @@ export const FormatMemoryExtension = Extension.create({
 });
 
 // In-memory fallback map tracking previous format per block position / key
-const fallbackFormatMemory = new Map<string, FormatKind>();
+const formatMemoryByEditor = new WeakMap<Editor, Map<string, FormatKind>>();
+export function clearFormatMemory(editor: Editor): void { formatMemoryByEditor.delete(editor); }
 
 export function getBlockMemoryKey(editor: Editor): string {
   const { state } = editor;
@@ -146,6 +147,11 @@ export function smartToggleBlockFormat(editor: Editor, target: FormatKind): bool
 
   const currentlyActive = isFormatActive(editor, target);
   const memKey = getBlockMemoryKey(editor);
+  let fallbackFormatMemory = formatMemoryByEditor.get(editor);
+  if (!fallbackFormatMemory) {
+    fallbackFormatMemory = new Map();
+    formatMemoryByEditor.set(editor, fallbackFormatMemory);
+  }
 
   if (currentlyActive) {
     // Toggling OFF: Check if we have previous format memory

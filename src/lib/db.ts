@@ -1,3 +1,4 @@
+import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
 /**
  * NoteFast Tauri IPC Database Client (db.ts)
  *
@@ -128,13 +129,7 @@ export function registerEditorFlush(flushFn: (() => Promise<void> | void) | null
  * Awaits commit of active editor uncommitted changes and any in-flight follow-up saves into saveQueue.
  */
 export async function flushEditorNow(): Promise<void> {
-  if (activeEditorFlush) {
-    try {
-      await activeEditorFlush();
-    } catch (e) {
-      console.error("Error flushing editor debounce:", e);
-    }
-  }
+  if (activeEditorFlush) await activeEditorFlush();
 }
 
 /**
@@ -164,8 +159,8 @@ export async function flushSaveQueue(): Promise<void> {
 /**
  * Notifies the native backend that pending frontend saves have flushed completely before app exit.
  */
-export async function flushDone(): Promise<void> {
-  return invoke("flush_done");
+export async function flushDone(ok = true): Promise<void> {
+  return ok ? invoke("flush_done") : invoke("flush_done", { ok: false });
 }
 
 /**
@@ -217,41 +212,18 @@ export function registerPanelHideHandler(onHideCallback?: () => void): Promise<U
 export function registerExitFlushHandler(flushPendingCallback?: () => void): Promise<UnlistenFn> | undefined {
   try {
     return listen("app-will-exit", async () => {
-      // 1. Kick off editor flush callback synchronously
-      let flushPromise: Promise<void> | void = undefined;
-      if (activeEditorFlush) {
-        try {
-          flushPromise = activeEditorFlush();
-        } catch (e) {
-          console.error("Error calling activeEditorFlush on app-will-exit:", e);
-        }
-      }
-      // 2. Synchronously commit pending title timer into saveQueue
-      if (flushPendingCallback) {
-        try {
-          flushPendingCallback();
-        } catch (e) {
-          console.error("Error in flushPendingCallback on app-will-exit:", e);
-        }
-      }
-      // 3. Await active editor flush promise chain
-      if (flushPromise && typeof (flushPromise as any).then === "function") {
-        try {
-          await flushPromise;
-        } catch {}
-      }
-      // 4. Await complete drain of saveQueue
-      await flushSaveQueue();
-      // 5. Signal native backend
       try {
+        const editorFlush = activeEditorFlush?.();
+        flushPendingCallback?.();
+        await editorFlush;
+        await flushSaveQueue();
         await flushDone();
-      } catch (e) {
-        console.error("Error calling flush_done:", e);
+      } catch (error) {
+        console.error("Exit canceled: unsaved changes could not be persisted", error);
+        await flushDone(false);
       }
     });
-  } catch {
-    return undefined;
-  }
+  } catch { return undefined; }
 }
 
 /**
@@ -263,13 +235,13 @@ export async function deleteNote(id: string): Promise<void> {
   clearActiveNoteSnapshot(id);
   try {
     if (typeof localStorage !== "undefined") {
-      const cached = localStorage.getItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem("notefast_cached_notes");
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
             const filtered = parsed.filter((n: any) => n.id !== id);
-            localStorage.setItem("notefast_cached_notes", JSON.stringify(filtered));
+            safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(filtered));
           }
         } catch {}
       }
