@@ -1125,8 +1125,9 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .tiptap ul[data-type="taskList"] li[data-checked="true"] > div > p {
-  text-decoration: line-through;
+  text-decoration: none;
   color: var(--text-muted);
+  opacity: 0.65;
 }
 
 /* Blockquote */
