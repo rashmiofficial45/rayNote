@@ -47,10 +47,6 @@ export function insertHorizontalRuleSmart(
     // Delete the '---' text in the current text block
     if (matchedRange) {
       tr.delete(matchedRange.from, matchedRange.to);
-    } else {
-      const blockStart = $from.start($from.depth);
-      const blockEnd = $from.end($from.depth);
-      tr.delete(blockStart, blockEnd);
     }
 
     // Case A: First item in the checklist or list
@@ -102,8 +98,6 @@ export function insertHorizontalRuleSmart(
     if (blockNode.attrs.level === 1 && blockBefore === 0) {
       if (matchedRange) {
         tr.delete(matchedRange.from, matchedRange.to);
-      } else {
-        tr.delete($from.start(blockDepth), $from.end(blockDepth));
       }
       const mappedAfter = tr.mapping.map(blockAfter);
       tr.insert(mappedAfter, hrNode);
@@ -122,8 +116,6 @@ export function insertHorizontalRuleSmart(
     // Other headings (H2, H3): insert HR directly ABOVE heading
     if (matchedRange) {
       tr.delete(matchedRange.from, matchedRange.to);
-    } else {
-      tr.delete($from.start(blockDepth), $from.end(blockDepth));
     }
     const mappedBefore = tr.mapping.map(blockBefore);
     tr.insert(mappedBefore, hrNode);

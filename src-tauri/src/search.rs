@@ -35,7 +35,7 @@ pub fn normalize_query(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut last_was_space = false;
 
-    for c in s.chars() {
+    for c in s.chars().flat_map(char::to_lowercase) {
         match c {
             'ß' => {
                 out.push_str("ss");
@@ -777,4 +777,15 @@ mod tests {
         let snippet_empty = generate_contextual_snippet("", "query", None, "", 100);
         assert_eq!(snippet_empty, "");
     }
+    #[test]
+    fn audit_fix_non_latin_titles_are_case_insensitive() {
+        for (title, query) in [("МОСКВА", "москва"), ("ΑΘΗΝΑ", "αθηνα")] {
+            let doc = DocumentCandidate {
+                id: "exact", title, search_text: "body", preview: "body",
+                updated_at: "2026-11-03T00:00:00Z", is_pinned: false, fts_snippet: None,
+            };
+            assert_eq!(score_document(query, &doc).1, "exact_title");
+        }
+    }
+
 }

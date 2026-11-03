@@ -123,7 +123,8 @@ export function extractAutoTitleAndBody(rawText: string): {
   cleanTitle = cleanTitle.trim();
 
   // 4. Cap at about 120 characters
-  if (cleanTitle.length > 120) {
+  const titleWasTruncated = cleanTitle.length > 120;
+  if (titleWasTruncated) {
     cleanTitle = cleanTitle.slice(0, 120).trim();
   }
 
@@ -131,7 +132,7 @@ export function extractAutoTitleAndBody(rawText: string): {
   if (!cleanTitle) return null;
 
   // 6. Remove first line and blank lines immediately following it
-  const remainingLines = lines.slice(firstLineIdx + 1);
+  const remainingLines = lines.slice(firstLineIdx + (titleWasTruncated ? 0 : 1));
   while (remainingLines.length > 0 && remainingLines[0].trim().length === 0) {
     remainingLines.shift();
   }
@@ -167,7 +168,14 @@ export const PasteTitleExtension = Extension.create<PasteTitleOptions>({
             if (!clipboardData) return false;
 
             // Trigger condition 1: note is empty before paste, or all content is selected
-            const isDocEmpty = view.state.doc.textContent.trim().length === 0;
+            let isDocEmpty = true;
+            view.state.doc.forEach(node => {
+              // Only blank text placeholders count as empty; embeds, tables,
+              // rules and lists are content even when they contain no text.
+              if (!['paragraph', 'heading'].includes(node.type.name) || node.content.size > 0) {
+                isDocEmpty = false;
+              }
+            });
             const isSelectingAll =
               view.state.selection.from <= 1 &&
               view.state.selection.to >= view.state.doc.content.size - 1 &&

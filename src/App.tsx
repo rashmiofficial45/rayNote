@@ -169,6 +169,7 @@ function App() {
   });
 
   const [switchConflict, setSwitchConflict] = useState<SwitchConflictInfo | null>(null);
+  const [editorReloadKey, setEditorReloadKey] = useState(0);
   const [discardedNoteId, setDiscardedNoteId] = useState<string | null>(null);
 
   const [escLosesFocus, setEscLosesFocus] = useState<boolean>(() => {
@@ -1450,25 +1451,55 @@ function App() {
     return ok;
   }, [switchConflict, showToast]);
 
-  const handleConflictDiscard = useCallback(() => {
-    if (!switchConflict) return;
-    setDiscardedNoteId(switchConflict.failedNoteId);
+  const conflictDiscardInFlightRef = useRef(false);
+  const handleConflictDiscard = useCallback(async () => {
+    if (!switchConflict || conflictDiscardInFlightRef.current) return;
+    conflictDiscardInFlightRef.current = true;
+    try {
     const targetId = switchConflict.targetNoteId;
+    if (!targetId || targetId === switchConflict.failedNoteId) {
+      try {
+        await flushSaveQueue();
+        const saved = await getNote(switchConflict.failedNoteId);
+        if (!saved) throw new Error("The saved note is no longer available");
+        if (getEditorNoteId() !== saved.id) return;
+        // Invalidate the old editor before unmount so it cannot flush discarded
+        // changes back over the saved version. Mount a clean editing session.
+        discardEditorNote(saved.id);
+        noteCache.set(saved.id, saved.content, saved.updated_at, saved.title, 0, false);
+        noteCache.persistActiveToLocalStorage(saved.id, saved.content, saved.updated_at, false);
+        setActiveNoteSummary(saved);
+        titleStore.setTitle(saved.title);
+        setDiscardedNoteId(null);
+        setEditorReloadKey(key => key + 1);
+        setSwitchConflict(null);
+        saveStatusStore.reset();
+      } catch (error) {
+        console.error("Could not restore saved note", error);
+        showToast("Could not restore saved note. Your edits are still available.");
+      }
+      return;
+    }
+    setDiscardedNoteId(switchConflict.failedNoteId);
     setSwitchConflict(null);
     saveStatusStore.reset();
     if (targetId && targetId !== switchConflict.failedNoteId) {
       handleSelectNote(targetId);
     }
-  }, [switchConflict, handleSelectNote]);
+    } finally {
+      conflictDiscardInFlightRef.current = false;
+    }
+  }, [switchConflict, handleSelectNote, showToast]);
 
   const handleOpenSaveConflict = useCallback(() => {
     if (activeNoteId) {
       const cached = noteCache.get(activeNoteId);
+      const content = readEditorRecoverySnapshot(activeNoteId)?.content || cached?.content || "";
       setSwitchConflict({
         failedNoteId: activeNoteId,
         targetNoteId: null,
-        content: cached?.content || "",
-        text: getPreviewText(cached?.content || ""),
+        content,
+        text: noteContentToPlainText(content),
       });
     }
   }, [activeNoteId]);
@@ -2104,6 +2135,7 @@ function App() {
 
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
         <NoteEditor
+          key={editorReloadKey}
           noteId={activeNoteId}
           noteTitle={activeNote?.title || ""}
           onSetTitle={handleSetTitle}

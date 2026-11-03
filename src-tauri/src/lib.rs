@@ -1,6 +1,7 @@
 pub mod database;
 pub mod search;
 pub mod commands;
+mod window_geometry;
 
 use database::Database;
 use commands::*;
@@ -23,6 +24,7 @@ tauri_panel! {
 
 #[cfg(target_os = "macos")]
 thread_local! {
+    static POINTER_INSIDE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static LAST_GRAB: std::cell::Cell<Option<std::time::Instant>> = const { std::cell::Cell::new(None) };
 }
 
@@ -49,21 +51,11 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
         // NOTE: set_always_on_top ends with setFloatingPanel:, which resets the level to 3
         // (NSFloatingWindowLevel), so checking for 1000 here would never pass. Off = level 0.
         if !visible || level < 3 {
+            POINTER_INSIDE.with(|inside| inside.set(false));
             return;
         }
 
         let is_key: bool = msg_send![ns_win, isKeyWindow];
-
-        // Already has focus — nothing to do
-        if is_key {
-            return;
-        }
-
-        // Don't steal mid-click or mid-drag
-        let buttons: usize = msg_send![objc2::class!(NSEvent), pressedMouseButtons];
-        if buttons != 0 {
-            return;
-        }
 
         // --- Core fix: only grab focus if the mouse cursor is inside the panel's frame ---
         // This means clicking on another app's input field won't be interrupted.
@@ -75,8 +67,15 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
             && mouse_loc.y >= frame.origin.y
             && mouse_loc.y <= frame.origin.y + frame.size.height;
 
-        if !mouse_inside {
-            return;
+        let entered = POINTER_INSIDE.with(|inside| !inside.replace(mouse_inside) && mouse_inside);
+        if !entered || is_key { return; }
+        let buttons: usize = msg_send![objc2::class!(NSEvent), pressedMouseButtons];
+        if buttons != 0 { return; }
+        let window_number: isize = msg_send![ns_win, windowNumber];
+        let top_window: isize = msg_send![objc2::class!(NSWindow), windowNumberAtPoint: mouse_loc belowWindowWithWindowNumber: 0isize];
+        if top_window != window_number { return; }
+        if let Some(settings) = app.get_webview_window("settings") {
+            if settings.is_focused().unwrap_or(false) { return; }
         }
 
         // Cooldown to avoid spamming focus grabs
@@ -185,6 +184,22 @@ fn setup_macos_panel(app: &tauri::App) {
                     }
                 }
             }
+
+            // Cocoa screen coordinates and saved frames share a bottom-left origin.
+            // Keep valid placements, including displays left of the primary screen.
+            let screens: *mut AnyObject = msg_send![objc2::class!(NSScreen), screens];
+            let count: usize = msg_send![screens, count];
+            let mut visible_frames = Vec::with_capacity(count);
+            for index in 0..count {
+                let screen: *mut AnyObject = msg_send![screens, objectAtIndex: index];
+                let rect: tauri_nspanel::objc2_foundation::NSRect = msg_send![screen, visibleFrame];
+                visible_frames.push((rect.origin.x, rect.origin.y, rect.size.width, rect.size.height));
+            }
+            let mut frame: tauri_nspanel::objc2_foundation::NSRect = msg_send![ns_panel, frame];
+            let (x, y, w, h) = window_geometry::reachable_frame(
+                (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height), &visible_frames);
+            frame.origin.x = x; frame.origin.y = y; frame.size.width = w; frame.size.height = h;
+            let _: () = msg_send![ns_panel, setFrame: frame, display: true];
 
             // Level 1000 = kCGScreenSaverWindowLevel / NSScreenSaverWindowLevel
             // Guarantees NoteFast stays strictly ABOVE native fullscreen apps, auxiliary overlays, and spaces

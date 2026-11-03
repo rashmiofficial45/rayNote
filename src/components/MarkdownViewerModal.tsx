@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import DOMPurify from "dompurify";
 import {
   FileText,
@@ -217,7 +218,16 @@ export function MarkdownViewerModal({
         </div>
 
         {/* Content Body */}
-        <div ref={bodyRef} className="md-viewer-body relative">
+        <div ref={bodyRef} className="md-viewer-body relative" onClickCapture={event => {
+          const link = (event.target as HTMLElement).closest('a');
+          if (!link) return;
+          const href = link.getAttribute('href');
+          if (!href || href.startsWith('#')) return;
+          event.preventDefault();
+          if (/^(https?:|mailto:)/i.test(href)) {
+            openUrl(href).catch(() => onShowToast?.("Could not open link"));
+          }
+        }}>
           {viewMode === "rendered" ? (
             <div
               className="tiptap md-viewer-rendered"

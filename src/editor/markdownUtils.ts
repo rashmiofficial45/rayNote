@@ -205,12 +205,26 @@ export function markdownToTipTapHtml(
       li.appendChild(div);
     }
 
-    const taskLis = container.querySelectorAll('li[data-type="taskItem"]');
-    for (const tli of Array.from(taskLis)) {
-      const parent = tli.parentElement;
-      if (parent && (parent.tagName === "UL" || parent.tagName === "OL")) {
-        parent.setAttribute("data-type", "taskList");
-      }
+    // A TipTap list cannot mix listItem and taskItem children. Split into
+    // consecutive runs rather than relabeling ordinary items as tasks.
+    for (const list of Array.from(container.querySelectorAll('ul, ol')).reverse()) {
+      const items = Array.from(list.children).filter(child => child.tagName === 'LI');
+      if (!items.some(item => item.getAttribute('data-type') === 'taskItem')) continue;
+      const fragment = doc.createDocumentFragment();
+      let run: HTMLElement | null = null;
+      let previousTask: boolean | undefined;
+      items.forEach((item, index) => {
+        const task = item.getAttribute('data-type') === 'taskItem';
+        if (!run || task !== previousTask) {
+          run = doc.createElement(task ? 'ul' : list.tagName.toLowerCase());
+          if (task) run.setAttribute('data-type', 'taskList');
+          else if (list.tagName === 'OL') run.setAttribute('start', String(Number(list.getAttribute('start') || 1) + index));
+          fragment.appendChild(run);
+          previousTask = task;
+        }
+        run.appendChild(item);
+      });
+      list.replaceWith(fragment);
     }
 
     return container.innerHTML;

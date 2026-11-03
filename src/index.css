@@ -1823,7 +1823,7 @@ body:has(.command-overlay) .editor-char-count {
 
 .command-palette {
   width: min(92vw, 475px);
-  max-height: 500px;
+  max-height: min(500px, calc(100dvh - 64px));
   background: var(--modal-bg);
   backdrop-filter: blur(36px) saturate(210%);
   -webkit-backdrop-filter: blur(36px) saturate(210%);

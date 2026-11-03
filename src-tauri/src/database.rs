@@ -3188,4 +3188,24 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
+    #[test]
+    fn audit_fix_cyrillic_exact_title_ranks_before_prefix_at_limit_one() {
+        let dir = std::env::temp_dir().join(format!("raynote_unicode_rank_{}", uuid::Uuid::new_v4()));
+        let db = Database::new(dir.clone()).unwrap();
+        for (id, title) in [("exact", "МОСКВА"), ("prefix", "москва trip")] {
+            db.create_note(&Note {
+                id: id.into(), title: title.into(),
+                content: serde_json::json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"body"}]}]}).to_string(),
+                preview: String::new(), created_at: "2026-11-03T00:00:00Z".into(),
+                updated_at: "2026-11-03T00:00:00Z".into(), is_pinned: false,
+            }).unwrap();
+        }
+        let results = db.search_documents("москва", 1).unwrap();
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "exact");
+        assert_eq!(results[0].match_type, "exact_title");
+    }
+
 }

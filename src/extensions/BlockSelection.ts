@@ -579,6 +579,7 @@ declare module "@tiptap/core" {
 
 export const BlockSelection = Extension.create({
   name: "blockSelection",
+  priority: 1100,
 
   addCommands() {
     return {
@@ -1040,13 +1041,23 @@ export const BlockSelection = Extension.create({
             if (event.key === "Tab") {
               event.preventDefault();
               event.stopPropagation();
-              if (event.shiftKey) {
-                editor.commands.liftListItem("listItem") ||
-                  editor.commands.liftListItem("taskItem");
-              } else {
-                editor.commands.sinkListItem("listItem") ||
-                  editor.commands.sinkListItem("taskItem");
+              const selected = getCachedAllBlocks(state.doc).filter(block => pluginState.selectedPositions.includes(block.pos));
+              const groups: BlockInfo[][] = [];
+              for (const block of selected) {
+                const last = groups[groups.length - 1];
+                const previous = last?.[last.length - 1];
+                if (previous && previous.pos + previous.nodeSize === block.pos) last.push(block);
+                else groups.push([block]);
               }
+              // Work backwards so changes cannot invalidate earlier positions.
+              for (const group of groups.reverse()) {
+                const first = group[0];
+                const last = group[group.length - 1];
+                const chain = editor.chain().setTextSelection({ from: first.pos + 2, to: last.pos + last.nodeSize - 2 });
+                if (event.shiftKey) chain.liftListItem(first.node.type.name === 'taskItem' ? 'taskItem' : 'listItem').run();
+                else chain.sinkListItem(first.node.type.name === 'taskItem' ? 'taskItem' : 'listItem').run();
+              }
+              editor.commands.clearBlockSelection();
               return true;
             }
 

@@ -825,7 +825,7 @@ fn escape_markdown_text(value: &str) -> String {
     for c in value.chars() {
         match c {
             '&' => out.push_str("&amp;"), '<' => out.push_str("&lt;"), '>' => out.push_str("&gt;"),
-            '\\' | '`' | '*' | '_' | '~' | ':' | '#' | '[' | ']' => { out.push('\\'); out.push(c); },
+            '\\' | '`' | '*' | '_' | '~' | ':' | '#' | '[' | ']' | '-' | '+' | '.' | ')'  => { out.push('\\'); out.push(c); },
             _ => out.push(c),
         }
     }
@@ -931,6 +931,7 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                                     if idx == 0 {
                                         item_lines.push(format!("{}- {}", indent, line_text));
                                     } else {
+                                        item_lines.push(String::new());
                                         item_lines.push(format!("{}  {}", indent, line_text));
                                     }
                                 } else {
@@ -967,6 +968,7 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                                     if idx == 0 {
                                         item_lines.push(format!("{}{}{}", indent, prefix, line_text));
                                     } else {
+                                        item_lines.push(String::new());
                                         item_lines.push(format!("{}{}{}", indent, indent_prefix, line_text));
                                     }
                                 } else {
@@ -1001,6 +1003,7 @@ fn json_doc_to_markdown_recursive(node: &serde_json::Value, out: &mut String, in
                                     if idx == 0 {
                                         item_lines.push(format!("{}- {} {}", indent, box_str, line_text));
                                     } else {
+                                        item_lines.push(String::new());
                                         item_lines.push(format!("{}  {}", indent, line_text));
                                     }
                                 } else {
@@ -1446,6 +1449,41 @@ mod tests {
         flush_done(Some(true));
         assert!(wait_for_flush_done(std::time::Duration::ZERO));
         begin_exit_flush();
+    }
+
+    #[test]
+    fn audit_fix_native_list_paragraphs_remain_separate() {
+        for (list_type, item_type, prefix, indent) in [
+            ("bulletList", "listItem", "- ", "  "),
+            ("orderedList", "listItem", "1. ", "   "),
+            ("taskList", "taskItem", "- [ ] ", "  "),
+        ] {
+            let doc = serde_json::json!({"type":"doc","content":[{
+                "type":list_type,"content":[{"type":item_type,"attrs":{"checked":false},"content":[
+                    {"type":"paragraph","content":[{"type":"text","text":"First paragraph"}]},
+                    {"type":"paragraph","content":[{"type":"text","text":"Second paragraph"}]}
+                ]}]
+            }]}).to_string();
+            let md = note_content_to_markdown_clean(&doc, "");
+            assert_eq!(md, format!("{prefix}First paragraph\n\n{indent}Second paragraph"),
+                "{list_type} must retain both paragraphs in the same list item");
+        }
+    }
+
+    #[test]
+    fn audit_fix_native_literal_list_prefixes_are_escaped() {
+        for (literal, escaped) in [
+            ("- not a list", r"\- not a list"),
+            ("+ not a list", r"\+ not a list"),
+            ("1. not a list", r"1\. not a list"),
+            ("1) not a list", r"1\) not a list"),
+        ] {
+            let doc = serde_json::json!({"type":"doc","content":[{
+                "type":"paragraph","content":[{"type":"text","text":literal}]
+            }]}).to_string();
+            assert_eq!(note_content_to_markdown_clean(&doc, ""), escaped,
+                "literal paragraph must not become a Markdown list");
+        }
     }
 
 }

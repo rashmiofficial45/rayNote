@@ -49,6 +49,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
 }) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>(cachedRecentNotes);
+  const [searchError, setSearchError] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
 
@@ -94,6 +95,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
       return;
     }
 
+    setSearchError(false);
     const trimmed = query.trim();
     const reqId = ++requestIdRef.current;
 
@@ -142,9 +144,11 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
           is_pinned: n.is_pinned,
         }));
 
-      if (instantMatches.length > 0) {
-        setResults(instantMatches);
-      }
+      setResults(instantMatches);
+      setSelectedIndex(0);
+    } else {
+      setResults([]);
+      setSelectedIndex(0);
     }
 
     // 20ms debounce: fast backend query across deep SQLite full-text content
@@ -159,6 +163,8 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
         .catch((err) => {
           console.error("Search error:", err);
           if (requestIdRef.current === reqId) {
+            setResults([]);
+            setSearchError(true);
             setSelectedIndex(0);
           }
         });
@@ -199,6 +205,15 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Tab") {
+      const modal = inputRef.current?.closest('.smart-search-modal');
+      const controls = Array.from(modal?.querySelectorAll<HTMLElement>('input, button:not([disabled])') || []);
+      const index = controls.indexOf(document.activeElement as HTMLElement);
+      e.preventDefault();
+      e.stopPropagation();
+      controls[(index + (e.shiftKey ? -1 : 1) + controls.length) % controls.length]?.focus();
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       e.stopPropagation();
@@ -270,7 +285,6 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             className="smart-search-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder="Search notes…"
             autoFocus
             spellCheck={false}
@@ -337,9 +351,9 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             })
           ) : query.trim() !== "" ? (
             <div className="smart-search-empty">
-              <div className="smart-search-empty-title">No notes found</div>
+              <div className="smart-search-empty-title">{searchError ? "Search unavailable" : "No notes found"}</div>
               <div className="smart-search-empty-desc">
-                No matching documents for &ldquo;{query}&rdquo;
+                {searchError ? "Please try your search again." : <>No matching documents for &ldquo;{query}&rdquo;</>}
               </div>
             </div>
           ) : null}

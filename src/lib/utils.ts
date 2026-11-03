@@ -241,7 +241,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
                 lines.push(serializeNode(child, indent + "  ").trimEnd());
               } else {
-                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+                lines.push(serializeNode(child).trimEnd().split("\n").map(line => `${indent}  ${line}`).join("\n"));
               }
             });
             return lines.join("\n");
@@ -266,7 +266,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
                 lines.push(serializeNode(child, indent + indentPrefix).trimEnd());
               } else {
-                lines.push(`${indent}${indentPrefix}${serializeNode(child, indent + indentPrefix).trim()}`);
+                lines.push(serializeNode(child).trimEnd().split("\n").map(line => `${indent}${indentPrefix}${line}`).join("\n"));
               }
             });
             return lines.join("\n");
@@ -290,7 +290,7 @@ export function noteContentToMarkdown(content: string, fallbackTitle = ""): stri
               } else if (child.type === "bulletList" || child.type === "orderedList" || child.type === "taskList") {
                 lines.push(serializeNode(child, indent + "  ").trimEnd());
               } else {
-                lines.push(`${indent}  ${serializeNode(child, indent + "  ").trim()}`);
+                lines.push(serializeNode(child).trimEnd().split("\n").map(line => `${indent}  ${line}`).join("\n"));
               }
             });
             return lines.join("\n");
