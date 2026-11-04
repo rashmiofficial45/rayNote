@@ -44,4 +44,19 @@ describe('Audit search failure and keyboard regressions', () => {
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(input);
   });
+  it('does not open a result when Enter is pressed on the clear button', async () => {
+    const select = vi.fn();
+    await act(async () => root.render(<SmartSearch isOpen onClose={() => {}} onSelectNote={select} notes={[note]} />));
+    const input = host.querySelector('input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, 'Unrelated');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const clear = host.querySelector<HTMLButtonElement>('[aria-label="Clear search"]')!;
+    clear.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    await act(async () => clear.dispatchEvent(event));
+    expect(event.defaultPrevented).toBe(false);
+    expect(select).not.toHaveBeenCalled();
+  });
 });

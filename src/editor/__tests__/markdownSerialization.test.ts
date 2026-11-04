@@ -30,6 +30,17 @@ describe('Markdown Serialization & Clipboard Utilities (Test C)', () => {
   });
 
   describe('markdownToTipTapHtml parser', () => {
+    it.each([
+      ['- [x] Buy milk\n- [ ] Bread', 'ul[data-type="taskList"] li[data-checked="true"]', 'Buy milk'],
+      ['- First bullet\n- Second bullet', 'ul:not([data-type="taskList"]) li', 'First bullet'],
+      ['1. First item\n2. Second item', 'ol li', 'First item'],
+      ['> Quoted opening\n\nBody', 'blockquote', 'Quoted opening'],
+    ])('keeps a leading Markdown block when adding a filename title', (md, selector, content) => {
+      const container = document.createElement('div');
+      container.innerHTML = markdownToTipTapHtml(md, { ensureFirstLineH1: true, fallbackTitle: 'Imported note' });
+      expect(container.querySelector('h1')?.textContent).toBe('Imported note');
+      expect(container.querySelector(selector)?.textContent).toContain(content);
+    });
     it('converts markdown tasks into TipTap task items with checked state', () => {
       const md = '- [x] Ship v1.0\n- [ ] Write docs';
       const html = markdownToTipTapHtml(md);

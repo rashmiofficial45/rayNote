@@ -103,16 +103,16 @@ export function ensureFirstLineHeading(md: string, fallbackTitle?: string): stri
 
   if (firstLineIdx !== -1) {
     const firstLine = lines[firstLineIdx].trim();
-    // Do not promote if it's a code block fence (```), horizontal rule (---), or table (|)
+    // Preserve structured blocks; use the filename as a separate title when available.
     const isSpecialBlock =
       firstLine.startsWith("```") ||
       firstLine.startsWith("~~~") ||
       /^(?:---|___|\*\*\*)$/.test(firstLine) ||
-      firstLine.startsWith("|");
+      firstLine.startsWith("|") ||
+      /^(?:[-*+]\s+|\d+[.)]\s+|>\s?)/.test(firstLine);
 
     if (!isSpecialBlock) {
-      const cleanTitle = firstLine.replace(/^[-*+]\s+/, "").replace(/^\d+\.\s+/, "");
-      lines[firstLineIdx] = `# ${cleanTitle}`;
+      lines[firstLineIdx] = `# ${firstLine}`;
       return lines.join("\n");
     }
   }

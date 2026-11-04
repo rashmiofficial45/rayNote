@@ -19,6 +19,38 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
     });
   }
 
+  it.each(['bulletList', 'orderedList', 'taskList'])('preserves other content in a single %s item when Enter is pressed in an empty paragraph', type => {
+    const itemType = type === 'taskList' ? 'taskItem' : 'listItem';
+    const editor = createTestEditor();
+    editor.commands.setContent({ type: 'doc', content: [{ type, content: [{ type: itemType,
+      ...(type === 'taskList' ? { attrs: { checked: false } } : {}),
+      content: [{ type: 'paragraph' }, { type: 'paragraph', content: [{ type: 'text', text: 'Keep this content' }] }],
+    }] }] });
+    editor.commands.setTextSelection(3);
+    const shortcuts = editor.extensionManager.extensions.find(ext => ext.name === 'shortcutsExtension');
+    (shortcuts as any).config.addKeyboardShortcuts.call({ editor }).Enter();
+    expect(editor.getText()).toContain('Keep this content');
+    editor.destroy();
+  });
+
+  it.each(['bulletList', 'orderedList', 'taskList'])('preserves nested %s content on Enter and Backspace in its empty parent', type => {
+    const itemType = type === 'taskList' ? 'taskItem' : 'listItem';
+    for (const key of ['Enter', 'Backspace']) {
+      const editor = createTestEditor();
+      const attrs = type === 'taskList' ? { attrs: { checked: false } } : {};
+      editor.commands.setContent({ type: 'doc', content: [{ type, content: [{ type: itemType, ...attrs, content: [
+        { type: 'paragraph' }, { type, content: [{ type: itemType, ...attrs, content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'Nested content' }] },
+        ] }] },
+      ] }] }] });
+      editor.commands.setTextSelection(3);
+      const shortcuts = editor.extensionManager.extensions.find(ext => ext.name === 'shortcutsExtension');
+      (shortcuts as any).config.addKeyboardShortcuts.call({ editor })[key]();
+      expect(editor.getText()).toContain('Nested content');
+      editor.destroy();
+    }
+  });
+
   describe("1. Code Block Formatting & Shortcuts", () => {
     it("creates code block with default language", () => {
       const editor = createTestEditor("<p>const a = 1;</p>");

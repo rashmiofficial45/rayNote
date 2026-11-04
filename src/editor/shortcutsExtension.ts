@@ -225,6 +225,15 @@ export const ShortcutsExtension = Extension.create({
         // Only handle when cursor is at the very beginning of the block content
         if ($from.parentOffset !== 0) return false;
 
+        if ($from.parent.textContent.length === 0) {
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d);
+            if ((node.type.name === "taskItem" || node.type.name === "listItem") && node.childCount > 1) {
+              return true;
+            }
+          }
+        }
+
         // 1. TaskItem: lift out or convert single item to paragraph
         if (this.editor.isActive("taskItem")) {
           if ($from.parent.textContent.length === 0) {
@@ -356,6 +365,16 @@ export const ShortcutsExtension = Extension.create({
         const parent = $from.parent;
 
         if (parent.textContent.length === 0) {
+          // A list item can contain additional paragraphs or nested lists.
+          // Never convert the whole list when the current empty paragraph is
+          // only one part of that item.
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d);
+            if ((node.type.name === "taskItem" || node.type.name === "listItem") && node.childCount > 1) {
+              this.editor.commands.splitListItem(node.type.name);
+              return true;
+            }
+          }
           if (this.editor.isActive("taskItem")) {
             for (let d = $from.depth; d > 0; d--) {
               const node = $from.node(d);

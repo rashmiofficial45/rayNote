@@ -233,6 +233,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     }
 
     if (e.key === "Enter") {
+      if (e.target instanceof HTMLButtonElement) return;
       e.preventDefault();
       e.stopPropagation();
       handleSelectCurrent(selectedIndex);
