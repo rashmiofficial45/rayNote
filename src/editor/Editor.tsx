@@ -1249,8 +1249,8 @@ export function Editor({
           style={{
             position: "absolute",
             display: "none",
-            backgroundColor: "rgba(14, 165, 233, 0.08)",
-            border: "1px solid rgba(14, 165, 233, 0.35)",
+            backgroundColor: "var(--color-accent-subtle)",
+            border: "1px solid var(--color-accent-border)",
             borderRadius: "8px",
             pointerEvents: "none",
             zIndex: 50,

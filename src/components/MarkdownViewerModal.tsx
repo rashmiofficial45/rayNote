@@ -116,7 +116,7 @@ export function MarkdownViewerModal({
         <div className="md-viewer-topbar">
           <div className="md-viewer-header-left">
             <div className="md-viewer-icon-wrapper">
-              <FileText size={18} className="text-[#6C5CE7]" />
+              <FileText size={18} className="text-[var(--color-accent)]" />
             </div>
 
             <div className="md-viewer-title-box">

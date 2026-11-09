@@ -1381,6 +1381,12 @@ html[data-smooth-caret="false"] .tiptap {
   opacity: 1;
 }
 
+.light .code-lang-item.is-selected .code-lang-dot,
+[data-resolved-theme="light"] .code-lang-item.is-selected .code-lang-dot,
+[data-theme="light"] .code-lang-item.is-selected .code-lang-dot {
+  background: var(--color-accent);
+}
+
 .code-lang-item.is-current-active {
   font-weight: 600;
 }
@@ -2185,8 +2191,8 @@ body:has(.command-overlay) .editor-char-count {
 /* ── Notion-style Block Selection ──────────────────────── */
 .raynote-block-selected,
 .notefast-block-selected {
-  background-color: rgba(14, 165, 233, 0.08) !important;
-  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.20) !important;
+  background-color: var(--color-accent-subtle, rgba(14, 165, 233, 0.08)) !important;
+  box-shadow: 0 0 0 1px var(--color-accent-border, rgba(14, 165, 233, 0.20)) !important;
   border-radius: 6px !important;
   transition: background-color 80ms ease, box-shadow 80ms ease, border-radius 80ms ease;
   position: relative;
@@ -2264,8 +2270,8 @@ body:has(.command-overlay) .editor-char-count {
 .dark .notefast-block-selected,
 [data-theme="dark"] .raynote-block-selected,
 [data-theme="dark"] .notefast-block-selected {
-  background-color: rgba(56, 189, 248, 0.10) !important;
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.22) !important;
+  background-color: var(--color-accent-subtle, rgba(56, 189, 248, 0.10)) !important;
+  box-shadow: 0 0 0 1px var(--color-accent-border, rgba(56, 189, 248, 0.22)) !important;
 }
 
 /* Ensure ALL selected blocks are rounded consistently on all corners */
@@ -2327,16 +2333,16 @@ body:has(.command-overlay) .editor-char-count {
 [data-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"],
 .light .tiptap pre.notefast-code-block[data-block-selected="true"],
 [data-resolved-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"] {
-  background: #e0f2fe !important;
-  border: 1px solid rgba(14, 165, 233, 0.50) !important;
-  box-shadow: 0 0 0 1.5px rgba(14, 165, 233, 0.40), 0 4px 14px rgba(14, 165, 233, 0.12) !important;
+  background: var(--color-accent-subtle, #e0f2fe) !important;
+  border: 1px solid var(--color-accent-border, rgba(14, 165, 233, 0.50)) !important;
+  box-shadow: 0 0 0 1.5px var(--color-accent-border, rgba(14, 165, 233, 0.40)), 0 4px 14px var(--color-accent-glow, rgba(14, 165, 233, 0.12)) !important;
   border-radius: 12px !important;
 }
 
 [data-theme="light"] .tiptap pre.notefast-code-block.raynote-block-selected:hover,
 .light .tiptap pre.notefast-code-block.raynote-block-selected:hover,
 [data-theme="light"] .tiptap pre.notefast-code-block[data-block-selected="true"]:hover {
-  border-color: rgba(14, 165, 233, 0.65) !important;
+  border-color: var(--color-accent, rgba(14, 165, 233, 0.65)) !important;
 }
 
 /* Dark Mode */
@@ -2347,16 +2353,16 @@ body:has(.command-overlay) .editor-char-count {
 .dark .tiptap pre.notefast-code-block.raynote-block-selected,
 [data-theme="dark"] .tiptap pre.notefast-code-block.raynote-block-selected,
 [data-theme="dark"] .tiptap pre.notefast-code-block[data-block-selected="true"] {
-  background: rgba(14, 165, 233, 0.16) !important;
-  border: 1px solid rgba(56, 189, 248, 0.45) !important;
-  box-shadow: 0 0 0 1.5px rgba(56, 189, 248, 0.35), 0 4px 20px rgba(0, 0, 0, 0.35) !important;
+  background: var(--color-accent-subtle, rgba(14, 165, 233, 0.16)) !important;
+  border: 1px solid var(--color-accent-border, rgba(56, 189, 248, 0.45)) !important;
+  box-shadow: 0 0 0 1.5px var(--color-accent-border, rgba(56, 189, 248, 0.35)), 0 4px 20px rgba(0, 0, 0, 0.35) !important;
   border-radius: 12px !important;
 }
 
 .tiptap pre.notefast-code-block.raynote-block-selected:hover,
 .tiptap pre.notefast-code-block[data-block-selected="true"]:hover,
 [data-theme="dark"] .tiptap pre.notefast-code-block.raynote-block-selected:hover {
-  border-color: rgba(56, 189, 248, 0.60) !important;
+  border-color: var(--color-accent, rgba(56, 189, 248, 0.60)) !important;
 }
 
 /* Ensure code inside selected code block is clearly legible */
@@ -3377,7 +3383,7 @@ body:has(.command-overlay) .editor-char-count {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Segoe UI", "Apple Color Emoji", sans-serif;
   border-radius: 12px;
-  box-shadow: inset 0 1px 1px 0 var(--app-inner-highlight);
+  box-shadow: var(--app-inner-highlight);
 }
 
 /* Header bar with custom red close button and draggable top bar */
@@ -3406,6 +3412,15 @@ body:has(.command-overlay) .editor-char-count {
   position: static;
   display: flex;
   align-items: center;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+.settings-header-left .close-btn-x {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  -webkit-app-region: no-drag !important;
 }
 
 .settings-tab-pills {
@@ -3443,7 +3458,7 @@ body:has(.command-overlay) .editor-char-count {
 .settings-tab-pill.is-active {
   background: var(--surface-glass-elevated);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), inset 0 1px 0.5px 0 var(--app-inner-highlight);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), var(--app-inner-highlight);
 }
 
 .settings-header-right-spacer {

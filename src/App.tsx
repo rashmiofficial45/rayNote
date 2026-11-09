@@ -1975,7 +1975,7 @@ function App() {
     return (
       <div className="app-shell flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-6 h-6 border-2 border-[#6C5CE7]/30 border-t-[#6C5CE7] rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-[var(--color-accent-border)] border-t-[var(--color-accent)] rounded-full animate-spin" />
         </div>
       </div>
     );
@@ -2001,7 +2001,7 @@ function App() {
       {isDragOver && (
         <div className="drag-drop-overlay">
           <div className="drag-drop-modal">
-            <Upload size={38} className="text-[#6C5CE7] animate-bounce" />
+            <Upload size={38} className="text-[var(--color-accent)] animate-bounce" />
             <h3 className="drag-drop-title">Drop Markdown File</h3>
             <p className="drag-drop-subtitle">
               Drop here to choose between Upload to notes or Quick View
@@ -2077,7 +2077,7 @@ function App() {
           <div className="drop-prompt-modal" onClick={(e) => e.stopPropagation()}>
             <div className="drop-prompt-header">
               <div className="drop-prompt-icon">
-                <FileText size={22} className="text-[#6C5CE7]" />
+                <FileText size={22} className="text-[var(--color-accent)]" />
               </div>
               <div>
                 <h3 className="drop-prompt-title">Open Markdown Document</h3>
