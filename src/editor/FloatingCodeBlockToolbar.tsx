@@ -460,6 +460,7 @@ export function FloatingCodeBlockToolbar({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
+        lastMousePosRef.current = null;
         setSelectedIndex((prev) => Math.min(filteredLanguages.length - 1, prev + 1));
         return;
       }
@@ -467,6 +468,7 @@ export function FloatingCodeBlockToolbar({
       if (e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
+        lastMousePosRef.current = null;
         setSelectedIndex((prev) => Math.max(0, prev - 1));
         return;
       }
@@ -576,9 +578,18 @@ export function FloatingCodeBlockToolbar({
                           e.stopPropagation();
                         }}
                         onClick={(e) => handleSelectLanguage(lang.value, e)}
-                        onMouseMove={() => {
-                          if (selectedIndex !== idx) {
-                            setSelectedIndex(idx);
+                        onMouseMove={(e) => {
+                          if (!lastMousePosRef.current) {
+                            lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                            return;
+                          }
+                          const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+                          const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+                          if (dx > 2 || dy > 2) {
+                            lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                            if (selectedIndex !== idx) {
+                              setSelectedIndex(idx);
+                            }
                           }
                         }}
                       >

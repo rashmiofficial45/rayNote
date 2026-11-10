@@ -39,6 +39,8 @@ import { saveStatusStore } from "../lib/saveStatusStore";
 import { SwitchConflictInfo } from "../components/SwitchConflictModal";
 import { clearActiveNoteSnapshot } from "../lib/storage";
 import { preloadLanguagesForContent, scanCodeBlockLanguages, ensureLanguageLoaded } from "./extensions";
+import { EditorContextMenu } from "./EditorContextMenu";
+import { resolveContextMenuState, ContextMenuState } from "./contextMenuUtils";
 
 export interface EditorCharCountProps {
   editor: any;
@@ -247,6 +249,12 @@ export function Editor({
   onSwitchConflictRef.current = onSwitchConflict;
   const discardedNoteIdRef = useRef(discardedNoteId);
   discardedNoteIdRef.current = discardedNoteId;
+
+  const [contextMenuState, setContextMenuState] = useState<ContextMenuState | null>(null);
+
+  useEffect(() => {
+    setContextMenuState(null);
+  }, [noteId]);
 
   const currentTitleRef = useRef<string>(noteTitle || "");
   useEffect(() => {
@@ -542,6 +550,19 @@ export function Editor({
           blur: () => {
             saveNow();
             return false;
+          },
+          contextmenu: (_view, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (!editorRef.current || editorRef.current.isDestroyed) return true;
+            const resolved = resolveContextMenuState(editorRef.current, {
+              x: event.clientX,
+              y: event.clientY,
+            });
+            if (resolved) {
+              setContextMenuState(resolved);
+            }
+            return true;
           },
         },
         clipboardTextSerializer: (slice) => {
@@ -1211,6 +1232,26 @@ export function Editor({
     [editor]
   );
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (!editor || editor.isDestroyed) return;
+
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".find-bar") || target?.closest(".document-tick-slider")) {
+        return;
+      }
+
+      const resolved = resolveContextMenuState(editor, { x: e.clientX, y: e.clientY });
+      if (resolved) {
+        setContextMenuState(resolved);
+      }
+    },
+    [editor]
+  );
+
   if (!editor) return null;
 
   return (
@@ -1224,6 +1265,7 @@ export function Editor({
         ref={scrollContainerRef}
         data-scroll-container
         onClick={handleWrapperClick}
+        onContextMenu={handleContextMenu}
         className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative"
       >
         <div
@@ -1262,6 +1304,11 @@ export function Editor({
       {/* Bottom frosted glass blend scrim for scrolling text */}
       <div className="app-bottom-blend" aria-hidden="true" />
       <BottomToolbar editor={editor} />
+      <EditorContextMenu
+        editor={editor}
+        menuState={contextMenuState}
+        onClose={() => setContextMenuState(null)}
+      />
     </div>
   );
 }

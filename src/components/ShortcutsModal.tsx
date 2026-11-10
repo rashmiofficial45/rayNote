@@ -19,34 +19,6 @@ interface ShortcutItem {
   category: "Navigation & App" | "Formatting" | "Blocks & Lists" | "Sharing & View";
 }
 
-const STATIC_FORMATTING_SHORTCUTS: ShortcutItem[] = [
-  // Formatting
-  { keys: ["⌘", "B"], description: "Toggle Bold", category: "Formatting" },
-  { keys: ["⌘", "I"], description: "Toggle Italic", category: "Formatting" },
-  { keys: ["⌘", "U"], description: "Toggle Underline", category: "Formatting" },
-  { keys: ["⇧", "⌘", "X"], description: "Toggle Strikethrough", category: "Formatting" },
-  { keys: ["⌘", "E"], description: "Toggle Inline Code", category: "Formatting" },
-  { keys: ["⇧", "⌘", "H"], description: "Toggle Highlight", category: "Formatting" },
-  { keys: ["⌘", "L"], description: "Insert or Edit Link", category: "Formatting" },
-
-  // Blocks & Lists
-  { keys: ["⌘", "⌥", "1"], description: "Heading 1", category: "Blocks & Lists" },
-  { keys: ["⌘", "⌥", "2"], description: "Heading 2", category: "Blocks & Lists" },
-  { keys: ["⌘", "⌥", "3"], description: "Heading 3", category: "Blocks & Lists" },
-  { keys: ["⌘", "⌥", "0"], description: "Paragraph / Normal Text", category: "Blocks & Lists" },
-  { keys: ["⇧", "⌘", "8"], description: "Bullet List", category: "Blocks & Lists" },
-  { keys: ["⇧", "⌘", "7"], description: "Numbered List", category: "Blocks & Lists" },
-  { keys: ["⇧", "⌘", "9"], description: "Task List (Checklist)", category: "Blocks & Lists" },
-  { keys: ["⌘", "↵"], description: "Toggle Task Checkbox", category: "Blocks & Lists" },
-  { keys: ["⇧", "⌘", "B"], description: "Blockquote", category: "Blocks & Lists" },
-  { keys: ["⌘", "⌥", "C"], description: "Code Block", category: "Blocks & Lists" },
-  { keys: ["Tab"], description: "Indent List / 2 Spaces in Code", category: "Blocks & Lists" },
-  { keys: ["⇧", "Tab"], description: "Outdent List", category: "Blocks & Lists" },
-  { keys: ["⌘", "⌥", "-"], description: "Horizontal Ruler / Separation Line", category: "Blocks & Lists" },
-  { keys: ["-", "-", "-"], description: "Horizontal Line (Type --- on new line)", category: "Blocks & Lists" },
-  { keys: ["/"], description: "Slash Command Menu", category: "Blocks & Lists" },
-];
-
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
   const [filter, setFilter] = useState("");
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
@@ -95,6 +67,34 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
       { keys: getKeys("delete", "⇧⌘⌫"), description: "Delete Current Note", category: "Navigation & App" },
     ];
 
+    const formattingShortcuts: ShortcutItem[] = [
+      { keys: getKeys("bold", "⌘B"), description: "Toggle Bold", category: "Formatting" },
+      { keys: getKeys("italic", "⌘I"), description: "Toggle Italic", category: "Formatting" },
+      { keys: getKeys("underline", "⌘U"), description: "Toggle Underline", category: "Formatting" },
+      { keys: getKeys("strike", "⇧⌘X"), description: "Toggle Strikethrough", category: "Formatting" },
+      { keys: getKeys("code", "⌘E"), description: "Toggle Inline Code", category: "Formatting" },
+      { keys: getKeys("highlight", "⇧⌘H"), description: "Toggle Highlight", category: "Formatting" },
+      { keys: getKeys("link", "⌘L"), description: "Insert or Edit Link", category: "Formatting" },
+    ];
+
+    const blockShortcuts: ShortcutItem[] = [
+      { keys: getKeys("heading1", "⌘⌥1"), description: "Heading 1", category: "Blocks & Lists" },
+      { keys: getKeys("heading2", "⌘⌥2"), description: "Heading 2", category: "Blocks & Lists" },
+      { keys: getKeys("heading3", "⌘⌥3"), description: "Heading 3", category: "Blocks & Lists" },
+      { keys: ["⌘", "⌥", "0"], description: "Paragraph / Normal Text", category: "Blocks & Lists" },
+      { keys: getKeys("bullet_list", "⇧⌘8"), description: "Bullet List", category: "Blocks & Lists" },
+      { keys: getKeys("ordered_list", "⇧⌘7"), description: "Numbered List", category: "Blocks & Lists" },
+      { keys: getKeys("checklist", "⇧⌘9"), description: "Task List (Checklist)", category: "Blocks & Lists" },
+      { keys: ["⌘", "↵"], description: "Toggle Task Checkbox", category: "Blocks & Lists" },
+      { keys: getKeys("blockquote", "⇧⌘B"), description: "Blockquote", category: "Blocks & Lists" },
+      { keys: getKeys("code_block", "⌘⌥C"), description: "Code Block", category: "Blocks & Lists" },
+      { keys: ["Tab"], description: "Indent List / 2 Spaces in Code", category: "Blocks & Lists" },
+      { keys: ["⇧", "Tab"], description: "Outdent List", category: "Blocks & Lists" },
+      { keys: getKeys("divider", "⌘⌥-"), description: "Horizontal Ruler / Separation Line", category: "Blocks & Lists" },
+      { keys: ["-", "-", "-"], description: "Horizontal Line (Type --- on new line)", category: "Blocks & Lists" },
+      { keys: ["/"], description: "Slash Command Menu", category: "Blocks & Lists" },
+    ];
+
     const shareShortcuts: ShortcutItem[] = [
       { keys: getKeys("copy_markdown", "⇧⌘C"), description: "Copy Note as Markdown", category: "Sharing & View" },
       { keys: getKeys("copy_deeplink", "⇧⌘D"), description: "Copy Deeplink", category: "Sharing & View" },
@@ -106,7 +106,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
       { keys: ["Esc"], description: "Close Active Modal / Overlay", category: "Sharing & View" },
     ];
 
-    return [...navShortcuts, ...STATIC_FORMATTING_SHORTCUTS, ...shareShortcuts];
+    return [...navShortcuts, ...formattingShortcuts, ...blockShortcuts, ...shareShortcuts];
   }, [commandsConfig]);
 
   if (!isOpen) return null;
