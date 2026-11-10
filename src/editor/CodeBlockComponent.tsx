@@ -41,6 +41,7 @@ export function CodeBlockComponent({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   const currentLang = (node?.attrs?.language || "bash").toLowerCase();
 
@@ -158,6 +159,7 @@ export function CodeBlockComponent({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       e.stopPropagation();
+      lastMousePosRef.current = null;
       setSelectedIndex((prev) =>
         Math.min(filteredLanguages.length - 1, prev + 1)
       );
@@ -167,6 +169,7 @@ export function CodeBlockComponent({
     if (e.key === "ArrowUp") {
       e.preventDefault();
       e.stopPropagation();
+      lastMousePosRef.current = null;
       setSelectedIndex((prev) => Math.max(0, prev - 1));
       return;
     }
@@ -277,9 +280,18 @@ export function CodeBlockComponent({
                             e.stopPropagation();
                           }}
                           onClick={(e) => handleSelectLanguage(lang.value, e)}
-                          onMouseMove={() => {
-                            if (selectedIndex !== idx) {
-                              setSelectedIndex(idx);
+                          onMouseMove={(e) => {
+                            if (!lastMousePosRef.current) {
+                              lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                              return;
+                            }
+                            const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+                            const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+                            if (dx > 2 || dy > 2) {
+                              lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                              if (selectedIndex !== idx) {
+                                setSelectedIndex(idx);
+                              }
                             }
                           }}
                         >

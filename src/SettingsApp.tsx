@@ -60,6 +60,7 @@ import {
   DEFAULT_COMMANDS,
   CommandRow,
   getStoredCommandsConfig,
+  detectShortcutConflict,
 } from "./lib/commandsConfig";
 
 type SettingsPane = "general" | "commands" | "aliases" | "storage" | "about";
@@ -121,7 +122,17 @@ export default function SettingsApp() {
 
   // Header drag ref & single red close button hover state
   const headerRef = useRef<HTMLElement>(null);
+  const tabPillsRef = useRef<HTMLDivElement>(null);
   const [isCloseHovered, setIsCloseHovered] = useState(false);
+
+  // Keep active tab scrolled into view on narrow screens
+  useEffect(() => {
+    if (!tabPillsRef.current) return;
+    const activeEl = tabPillsRef.current.querySelector(".is-active") as HTMLElement | null;
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    }
+  }, [activePane]);
 
   // Initialize theme, storage stats, and real-time sync listeners on mount
   useEffect(() => {
@@ -214,6 +225,15 @@ export default function SettingsApp() {
   const shortcutChangePendingRef = useRef(false);
   const handleUpdateHotkey = useCallback(async (id: string, newHotkey: string) => {
     if (shortcutChangePendingRef.current) return;
+
+    // Detect conflict with another existing command
+    const conflict = detectShortcutConflict(newHotkey, id, commands);
+    if (conflict) {
+      setActionMessage(`"${newHotkey}" is already assigned to "${conflict.title}".`);
+      setTimeout(() => setActionMessage(null), 3500);
+      return;
+    }
+
     if (id === "toggle") {
       shortcutChangePendingRef.current = true;
       try {
@@ -551,47 +571,59 @@ export default function SettingsApp() {
         </div>
 
         {/* Tab Pills */}
-        <div className="settings-tab-pills" data-tauri-drag-region>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("general")}
-          >
-            <Sliders size={12} />
-            <span>General</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("commands")}
-          >
-            <Keyboard size={12} />
-            <span>Commands</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "aliases" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("aliases")}
-          >
-            <Tag size={12} />
-            <span>Aliases</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("storage")}
-          >
-            <Database size={12} />
-            <span>Storage</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("about")}
-          >
-            <Info size={12} />
-            <span>About</span>
-          </button>
+        <div className="settings-tab-pills-container" data-tauri-drag-region>
+          <div ref={tabPillsRef} className="settings-tab-pills" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "general"}
+              className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("general")}
+            >
+              <Sliders size={12} />
+              <span>General</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "commands"}
+              className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("commands")}
+            >
+              <Keyboard size={12} />
+              <span>Commands</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "aliases"}
+              className={`settings-tab-pill liquid-btn ${activePane === "aliases" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("aliases")}
+            >
+              <Tag size={12} />
+              <span>Aliases</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "storage"}
+              className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("storage")}
+            >
+              <Database size={12} />
+              <span>Storage</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "about"}
+              className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("about")}
+            >
+              <Info size={12} />
+              <span>About</span>
+            </button>
+          </div>
         </div>
 
         {/* Right spacer for symmetrical centering */}
@@ -819,147 +851,95 @@ export default function SettingsApp() {
               </span>
             </div>
 
-            <div className="settings-card commands-table-card">
-              {commands
-                .filter((c) => c.category === "commands")
-                .map((cmd, idx, arr) => {
-                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
-                  const isCustom = cmd.hotkey !== defaultHotkey;
-                  const isRecording = recordingCommandId === cmd.id;
+            {[
+              { title: "Application & Window Commands", category: "commands" as const, symbol: "⌘" },
+              { title: "Text Formatting", category: "formatting" as const, symbol: "B" },
+              { title: "Document Editing", category: "editing" as const, symbol: "E" },
+              { title: "Extensions", category: "extensions" as const, symbol: "✨" },
+            ].map(({ title, category, symbol }, secIdx) => {
+              const filtered = commands.filter((c) => c.category === category);
+              if (filtered.length === 0) return null;
 
-                  return (
-                    <React.Fragment key={cmd.id}>
-                      <div className="settings-command-row">
-                        <div className="settings-cmd-left">
-                          <div className="settings-cmd-icon">
-                            <span className="settings-cmd-icon-symbol">T</span>
-                          </div>
-                          <span className="settings-cmd-title">{cmd.title}</span>
-                        </div>
+              return (
+                <div key={category} className="settings-command-section" style={{ marginTop: secIdx === 0 ? 0 : 20 }}>
+                  <div className="settings-section-header" style={{ marginBottom: 8 }}>
+                    <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {title}
+                    </h3>
+                  </div>
+                  <div className="settings-card commands-table-card">
+                    {filtered.map((cmd, idx, arr) => {
+                      const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
+                      const isCustom = cmd.hotkey !== defaultHotkey;
+                      const isRecording = recordingCommandId === cmd.id;
 
-                        <div className="settings-cmd-right">
-                          <div className="settings-cmd-kbd-wrapper">
-                            <button
-                              type="button"
-                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                startRecording(cmd.id);
-                              }}
-                              title="Double-click to record shortcut"
-                            >
-                              {isRecording ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span className="recording-pulse-dot" />
-                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
-                                </span>
-                              ) : (
-                                cmd.hotkey || "None"
-                              )}
-                            </button>
-                            {isCustom && !isRecording && (
+                      return (
+                        <React.Fragment key={cmd.id}>
+                          <div className="settings-command-row">
+                            <div className="settings-cmd-left">
+                              <div className="settings-cmd-icon">
+                                {category === "extensions" ? (
+                                  <Sparkles size={12} />
+                                ) : (
+                                  <span className="settings-cmd-icon-symbol">{symbol}</span>
+                                )}
+                              </div>
+                              <span className="settings-cmd-title">{cmd.title}</span>
+                            </div>
+
+                            <div className="settings-cmd-right">
+                              <div className="settings-cmd-kbd-wrapper">
+                                <button
+                                  type="button"
+                                  className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    startRecording(cmd.id);
+                                  }}
+                                  title="Double-click to record shortcut"
+                                >
+                                  {isRecording ? (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="recording-pulse-dot" />
+                                      <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
+                                    </span>
+                                  ) : (
+                                    cmd.hotkey || "None"
+                                  )}
+                                </button>
+                                {isCustom && !isRecording && (
+                                  <button
+                                    type="button"
+                                    className="settings-cmd-reset-btn liquid-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResetHotkey(cmd.id);
+                                    }}
+                                    title="Reset to default shortcut"
+                                  >
+                                    <RotateCcw size={11} />
+                                  </button>
+                                )}
+                              </div>
+
                               <button
                                 type="button"
-                                className="settings-cmd-reset-btn liquid-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResetHotkey(cmd.id);
-                                }}
-                                title="Reset to default shortcut"
+                                className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
+                                onClick={() => handleToggleCommand(cmd.id)}
+                                aria-label={`Toggle ${cmd.title}`}
                               >
-                                <RotateCcw size={11} />
+                                {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
                               </button>
-                            )}
+                            </div>
                           </div>
-
-                          <button
-                            type="button"
-                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                            onClick={() => handleToggleCommand(cmd.id)}
-                            aria-label={`Toggle ${cmd.title}`}
-                          >
-                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </div>
-                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                    </React.Fragment>
-                  );
-                })}
-            </div>
-
-            <div className="settings-section-header" style={{ marginTop: 24 }}>
-              <h2>Extensions & Formatting</h2>
-            </div>
-
-            <div className="settings-card commands-table-card">
-              {commands
-                .filter((c) => c.category === "extensions")
-                .map((cmd, idx, arr) => {
-                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
-                  const isCustom = cmd.hotkey !== defaultHotkey;
-                  const isRecording = recordingCommandId === cmd.id;
-
-                  return (
-                    <React.Fragment key={cmd.id}>
-                      <div className="settings-command-row">
-                        <div className="settings-cmd-left">
-                          <div className="settings-cmd-icon">
-                            <Sparkles size={12} />
-                          </div>
-                          <span className="settings-cmd-title">{cmd.title}</span>
-                        </div>
-
-                        <div className="settings-cmd-right">
-                          <div className="settings-cmd-kbd-wrapper">
-                            <button
-                              type="button"
-                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                startRecording(cmd.id);
-                              }}
-                              title="Double-click to record shortcut"
-                            >
-                              {isRecording ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span className="recording-pulse-dot" />
-                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
-                                </span>
-                              ) : (
-                                cmd.hotkey || "None"
-                              )}
-                            </button>
-                            {isCustom && !isRecording && (
-                              <button
-                                type="button"
-                                className="settings-cmd-reset-btn liquid-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResetHotkey(cmd.id);
-                                }}
-                                title="Reset to default shortcut"
-                              >
-                                <RotateCcw size={11} />
-                              </button>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                            onClick={() => handleToggleCommand(cmd.id)}
-                            aria-label={`Toggle ${cmd.title}`}
-                          >
-                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </div>
-                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                    </React.Fragment>
-                  );
-                })}
-            </div>
+                          {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/react";
-import { Selection, TextSelection } from "@tiptap/pm/state";
+import { Selection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { joinBackward } from "@tiptap/pm/commands";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
@@ -11,10 +11,75 @@ import {
   findBlockAtPos,
 } from "../extensions/BlockSelection";
 import { smartToggleBlockFormat, smartToggleMark } from "./formatMemory";
+import { matchesEvent } from "../lib/settingsSync";
+import { getStoredCommandsConfig, DEFAULT_COMMANDS } from "../lib/commandsConfig";
+
+const DYNAMIC_EDITOR_ACTIONS: Record<string, (editor: any) => boolean | void> = {
+  bold: (editor) => smartToggleMark(editor, "bold"),
+  italic: (editor) => smartToggleMark(editor, "italic"),
+  underline: (editor) => smartToggleMark(editor, "underline"),
+  strike: (editor) => smartToggleMark(editor, "strike"),
+  code: (editor) => smartToggleMark(editor, "code"),
+  highlight: (editor) => smartToggleMark(editor, "highlight"),
+  blockquote: (editor) => smartToggleBlockFormat(editor, "blockquote"),
+  heading1: (editor) => smartToggleBlockFormat(editor, "heading1"),
+  heading2: (editor) => smartToggleBlockFormat(editor, "heading2"),
+  heading3: (editor) => smartToggleBlockFormat(editor, "heading3"),
+  bullet_list: (editor) => smartToggleBlockFormat(editor, "bulletList"),
+  ordered_list: (editor) => smartToggleBlockFormat(editor, "orderedList"),
+  checklist: (editor) => smartToggleBlockFormat(editor, "taskList"),
+  code_block: (editor) => smartToggleBlockFormat(editor, "codeBlock"),
+  divider: (editor) => editor.commands.setHorizontalRule(),
+  undo: (editor) => editor.commands.undo(),
+  redo: (editor) => editor.commands.redo(),
+  select_all: (editor) => editor.commands.selectAll(),
+};
 
 export const ShortcutsExtension = Extension.create({
   name: "shortcutsExtension",
   priority: 1000,
+
+  addProseMirrorPlugins() {
+    const editor = this.editor;
+    return [
+      new Plugin({
+        key: new PluginKey("dynamicShortcutsPlugin"),
+        props: {
+          handleKeyDown(_view, event) {
+            const config = getStoredCommandsConfig();
+
+            // 1. Check if event matches ANY active dynamic command
+            for (const [actionId, actionFn] of Object.entries(DYNAMIC_EDITOR_ACTIONS)) {
+              const cmd = config.find((c) => c.id === actionId);
+              if (cmd && cmd.enabled !== false && cmd.hotkey) {
+                if (matchesEvent(event, cmd.hotkey)) {
+                  actionFn(editor);
+                  return true;
+                }
+              }
+            }
+
+            // 2. Check if event matches a DEFAULT shortcut of an action that has been remapped or disabled
+            for (const [actionId] of Object.entries(DYNAMIC_EDITOR_ACTIONS)) {
+              const defaultCmd = DEFAULT_COMMANDS.find((c) => c.id === actionId);
+              if (!defaultCmd?.hotkey) continue;
+
+              const activeCmd = config.find((c) => c.id === actionId);
+              const isRemappedOrDisabled =
+                activeCmd && (activeCmd.enabled === false || activeCmd.hotkey !== defaultCmd.hotkey);
+
+              if (isRemappedOrDisabled && matchesEvent(event, defaultCmd.hotkey)) {
+                // Deactivate the old default binding
+                return true;
+              }
+            }
+
+            return false;
+          },
+        },
+      }),
+    ];
+  },
 
   addKeyboardShortcuts() {
     return {

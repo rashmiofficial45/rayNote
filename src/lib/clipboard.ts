@@ -52,3 +52,17 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 
   return false;
 }
+
+/**
+ * Reads text from the clipboard via the modern async clipboard API with graceful error recovery.
+ */
+export async function readFromClipboard(): Promise<string> {
+  if (typeof navigator !== "undefined" && navigator?.clipboard?.readText) {
+    try {
+      return await navigator.clipboard.readText();
+    } catch (err) {
+      console.warn("[clipboard] navigator.clipboard.readText failed:", err);
+    }
+  }
+  return "";
+}

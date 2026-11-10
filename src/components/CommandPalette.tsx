@@ -943,12 +943,14 @@ export function CommandPalette({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
+        lastMousePosRef.current = { x: 0, y: 0 };
         setSelectedIndex((i) => Math.min(currentItems.length - 1, i + 1));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
+        lastMousePosRef.current = { x: 0, y: 0 };
         setSelectedIndex((i) => Math.max(0, i - 1));
         return;
       }
