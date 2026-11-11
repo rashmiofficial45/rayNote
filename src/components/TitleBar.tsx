@@ -62,7 +62,7 @@ export function TitleBar({
     const handleMouseDown = async (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (
-        target.closest("button") ||
+        target.closest("button, .title-bar-right") ||
         target.closest(".command-popover")
       ) {
         return;
@@ -262,30 +262,30 @@ export function TitleBar({
       </div>
 
       {/* Right: Copy Markdown + Delete + Command Palette (Direct Action) */}
-      <div className="title-bar-right">
+      <div className="title-bar-right" role="group" aria-label="Note actions">
         <button
-          className="title-bar-btn liquid-btn copy-md-btn"
+          className="title-bar-btn copy-md-btn"
           onClick={onCopyMarkdown}
           title={`Copy Note as Markdown (${copyMarkdownHotkey})`}
           aria-label="Copy Note as Markdown"
         >
-          <FileText size={15} />
+          <FileText size={19} />
         </button>
         <button
-          className="title-bar-btn liquid-btn delete-btn"
+          className="title-bar-btn delete-btn"
           onClick={onDeleteNote}
           title={`Delete Note (${deleteHotkey})`}
           aria-label="Delete Note"
         >
-          <Trash2 size={15} />
+          <Trash2 size={19} />
         </button>
         <button
-          className="title-bar-btn liquid-btn command-palette-btn"
+          className="title-bar-btn command-palette-btn"
           onClick={onOpenCommandPalette}
           title={`Command Palette (${commandPaletteHotkey})`}
           aria-label="Command Palette"
         >
-          <Command size={16} />
+          <Command size={19} />
         </button>
       </div>
     </div>

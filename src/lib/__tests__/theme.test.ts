@@ -10,6 +10,12 @@ import {
   getStoredFont,
   setStoredFont,
   applyFont,
+  getStoredTextOpacity,
+  setStoredTextOpacity,
+  applyTextOpacity,
+  DEFAULT_TEXT_OPACITY,
+  MIN_TEXT_OPACITY,
+  MAX_TEXT_OPACITY,
   initTheme,
   FONT_OPTIONS,
   ACCENT_OPTIONS,
@@ -225,11 +231,73 @@ describe("Theme Engine (theme.ts)", () => {
     });
   });
 
+  describe("Text Opacity Management", () => {
+    it("getStoredTextOpacity defaults to DEFAULT_TEXT_OPACITY (100) when unset", () => {
+      expect(getStoredTextOpacity()).toBe(DEFAULT_TEXT_OPACITY);
+      expect(DEFAULT_TEXT_OPACITY).toBe(100);
+      expect(MIN_TEXT_OPACITY).toBe(50);
+      expect(MAX_TEXT_OPACITY).toBe(100);
+    });
+
+    it("getStoredTextOpacity reads valid stored opacity values", () => {
+      localStorage.setItem("notefast_text_opacity", "85");
+      expect(getStoredTextOpacity()).toBe(85);
+
+      localStorage.setItem("notefast_text_opacity", "50");
+      expect(getStoredTextOpacity()).toBe(50);
+
+      localStorage.setItem("notefast_text_opacity", "100");
+      expect(getStoredTextOpacity()).toBe(100);
+    });
+
+    it("getStoredTextOpacity falls back to default if stored value is invalid or out of bounds", () => {
+      localStorage.setItem("notefast_text_opacity", "invalid");
+      expect(getStoredTextOpacity()).toBe(100);
+
+      localStorage.setItem("notefast_text_opacity", "20"); // below min (50)
+      expect(getStoredTextOpacity()).toBe(100);
+
+      localStorage.setItem("notefast_text_opacity", "150"); // above max (100)
+      expect(getStoredTextOpacity()).toBe(100);
+    });
+
+    it("applyTextOpacity sets --app-text-opacity CSS variable and dataset attribute", () => {
+      applyTextOpacity(80);
+      expect(document.documentElement.style.getPropertyValue("--app-text-opacity")).toBe("80%");
+      expect(document.documentElement.dataset.textOpacity).toBe("80");
+    });
+
+    it("applyTextOpacity clamps values outside [50, 100]", () => {
+      applyTextOpacity(30);
+      expect(document.documentElement.style.getPropertyValue("--app-text-opacity")).toBe("50%");
+      expect(document.documentElement.dataset.textOpacity).toBe("50");
+
+      applyTextOpacity(120);
+      expect(document.documentElement.style.getPropertyValue("--app-text-opacity")).toBe("100%");
+      expect(document.documentElement.dataset.textOpacity).toBe("100");
+    });
+
+    it("setStoredTextOpacity persists, applies CSS, and dispatches notefast_text_opacity_changed", () => {
+      const listener = vi.fn();
+      window.addEventListener("notefast_text_opacity_changed", listener);
+
+      setStoredTextOpacity(75);
+      expect(localStorage.getItem("notefast_text_opacity")).toBe("75");
+      expect(document.documentElement.style.getPropertyValue("--app-text-opacity")).toBe("75%");
+      expect(document.documentElement.dataset.textOpacity).toBe("75");
+      expect(listener).toHaveBeenCalled();
+      expect(listener.mock.calls[0][0].detail).toEqual({ opacity: 75 });
+
+      window.removeEventListener("notefast_text_opacity_changed", listener);
+    });
+  });
+
   describe("Application Initialization (initTheme)", () => {
     it("hydrates all visual preferences and attaches system media query listener", () => {
       localStorage.setItem("notefast_theme_mode", "light");
       localStorage.setItem("notefast_accent_color", "rose");
       localStorage.setItem("notefast_font", "outfit");
+      localStorage.setItem("notefast_text_opacity", "85");
 
       initTheme();
 
@@ -237,6 +305,8 @@ describe("Theme Engine (theme.ts)", () => {
       expect(document.documentElement.dataset.accent).toBe("rose");
       expect(document.documentElement.dataset.font).toBe("outfit");
       expect(document.documentElement.style.getPropertyValue("--editor-font")).toContain("Outfit");
+      expect(document.documentElement.style.getPropertyValue("--app-text-opacity")).toBe("85%");
+      expect(document.documentElement.dataset.textOpacity).toBe("85");
     });
   });
 });

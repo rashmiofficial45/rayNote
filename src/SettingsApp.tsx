@@ -34,6 +34,8 @@ import {
   setStoredAccent,
   getStoredFont,
   setStoredFont,
+  getStoredTextOpacity,
+  setStoredTextOpacity,
   initTheme,
 } from "./lib/theme";
 import {
@@ -79,6 +81,7 @@ export default function SettingsApp() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accent, setAccent] = useState<AccentColor>(getStoredAccent);
   const [fontFamily, setFontFamily] = useState<string>(getStoredFont);
+  const [textOpacity, setTextOpacity] = useState<number>(getStoredTextOpacity);
 
   // Zoom State
   const [zoomLevel, setZoomLevel] = useState<number>(() => {
@@ -143,6 +146,7 @@ export default function SettingsApp() {
       onThemeModeChange: setThemeMode,
       onAccentChange: setAccent,
       onFontChange: setFontFamily,
+      onTextOpacityChange: setTextOpacity,
       onZoomChange: setZoomLevel,
       onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: setEscLosesFocus,
@@ -432,6 +436,12 @@ export default function SettingsApp() {
   const handleFontChange = (font: string) => {
     setFontFamily(font);
     setStoredFont(font);
+  };
+
+  const handleTextOpacityChange = (val: number) => {
+    const clamped = Math.min(100, Math.max(50, Math.round(val)));
+    setTextOpacity(clamped);
+    setStoredTextOpacity(clamped);
   };
 
   // Zoom handlers
@@ -743,6 +753,44 @@ export default function SettingsApp() {
                       </option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              <div className="settings-card-divider" />
+
+              {/* Text Opacity Slider */}
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Text Opacity</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                    Reduce eye strain by softening text contrast across the app.
+                  </div>
+                </div>
+                <div className="settings-row-action">
+                  <div className="settings-opacity-control">
+                    <button
+                      type="button"
+                      className="settings-stepper-btn liquid-btn"
+                      onClick={() => handleTextOpacityChange(100)}
+                      disabled={textOpacity === 100}
+                      title="Reset Opacity to 100%"
+                    >
+                      <RotateCcw size={13} />
+                    </button>
+                    <input
+                      type="range"
+                      min={50}
+                      max={100}
+                      step={1}
+                      value={textOpacity}
+                      onChange={(e) => handleTextOpacityChange(Number(e.target.value))}
+                      className="settings-range-slider"
+                      aria-label="Text Opacity"
+                    />
+                    <span className="settings-opacity-display">
+                      {textOpacity}%
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

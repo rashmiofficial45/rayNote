@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   THEME_MODE: "notefast_theme_mode",
   ACCENT_COLOR: "notefast_accent_color",
   FONT: "notefast_font",
+  TEXT_OPACITY: "notefast_text_opacity",
   SETTINGS_PANE: "notefast_settings_active_pane",
   COMMANDS_CONFIG: "notefast_commands_config",
   ALIASES: "raynote_custom_aliases",

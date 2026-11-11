@@ -179,9 +179,50 @@ export function setStoredFont(fontId: string): void {
   window.dispatchEvent(new CustomEvent("notefast_font_changed", { detail: { fontId: font.id } }));
 }
 
+export const DEFAULT_TEXT_OPACITY = 100;
+export const MIN_TEXT_OPACITY = 50;
+export const MAX_TEXT_OPACITY = 100;
+
+/**
+ * Retrieves stored text opacity percentage (50-100), defaulting to 100.
+ */
+export function getStoredTextOpacity(): number {
+  if (typeof window === "undefined") return DEFAULT_TEXT_OPACITY;
+  const stored = safeLocalStorageGetItem("notefast_text_opacity");
+  if (stored) {
+    const parsed = parseInt(stored, 10);
+    if (!isNaN(parsed) && parsed >= MIN_TEXT_OPACITY && parsed <= MAX_TEXT_OPACITY) {
+      return parsed;
+    }
+  }
+  return DEFAULT_TEXT_OPACITY;
+}
+
+/**
+ * Applies text opacity to document root via CSS variable `--app-text-opacity`.
+ */
+export function applyTextOpacity(opacity: number): void {
+  if (typeof window === "undefined") return;
+  const clamped = Math.min(MAX_TEXT_OPACITY, Math.max(MIN_TEXT_OPACITY, Math.round(opacity)));
+  document.documentElement.style.setProperty("--app-text-opacity", `${clamped}%`);
+  document.documentElement.dataset.textOpacity = String(clamped);
+}
+
+/**
+ * Stores text opacity preference, updates CSS variables, and broadcasts to other windows.
+ */
+export function setStoredTextOpacity(opacity: number): void {
+  if (typeof window === "undefined") return;
+  const clamped = Math.min(MAX_TEXT_OPACITY, Math.max(MIN_TEXT_OPACITY, Math.round(opacity)));
+  safeLocalStorageSetItem("notefast_text_opacity", String(clamped));
+  applyTextOpacity(clamped);
+  broadcastSync({ type: "text_opacity", value: clamped });
+  window.dispatchEvent(new CustomEvent("notefast_text_opacity_changed", { detail: { opacity: clamped } }));
+}
+
 /**
  * Initializes theme on application mount:
- * - Hydrates theme mode, accent color, and typography settings from localStorage.
+ * - Hydrates theme mode, accent color, typography, and text opacity settings from localStorage.
  * - Listens for macOS system dark mode preference changes (`prefers-color-scheme`)
  *   when in 'system' mode to dynamically switch themes without reload.
  */
@@ -190,6 +231,7 @@ export function initTheme(): () => void {
   applyThemeMode(getStoredThemeMode());
   applyAccent(getStoredAccent());
   applyFont(getStoredFont());
+  applyTextOpacity(getStoredTextOpacity());
   try {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => { if (getStoredThemeMode() === "system") applyThemeMode("system"); };
