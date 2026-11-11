@@ -2783,39 +2783,80 @@ body:has(.command-overlay) .editor-char-count {
 /* ── In-Note Search Highlighting ──────────────────────── */
 .search-match {
   background-color: rgba(234, 179, 8, 0.35);
-  border-radius: 2px;
+  border-radius: 4px;
+  /* Expand the painted highlight without shifting or wrapping editor text. */
+  box-shadow: 2px 0 rgba(234, 179, 8, 0.35), -2px 0 rgba(234, 179, 8, 0.35);
 }
 
 .search-match.search-match-active {
   background-color: #eab308 !important;
   color: #000000 !important;
   font-weight: 600;
-  border-radius: 2px;
+  box-shadow: 2px 0 #eab308, -2px 0 #eab308;
 }
 
-/* ── Find Bar Floating Pill (iOS 26 Liquid Glass) ──────── */
+.note-empty-state {
+  padding: 56px 16px;
+}
+
+.note-empty-content {
+  margin: auto;
+}
+
+.note-empty-create {
+  padding: 6px 14px;
+  min-height: 32px;
+  color: var(--text-primary);
+}
+
+.note-empty-shortcut {
+  padding: 1px 6px;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 9999px;
+}
+
+/* ── Find Bar (iOS 26 Liquid Glass) ────────────────────── */
 .find-bar-container {
+  /* Float over the full-height editor, clear of the document ruler. */
   position: absolute;
-  top: 56px;
-  right: 14px;
+  inset-block-start: 56px;
+  inset-inline-end: var(--slider-gutter-width);
   z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 5px;
   background: var(--surface-glass-elevated);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border: 1px solid var(--surface-glass-border);
+  border: 1px solid var(--glass-menu-border);
   border-radius: 18px;
   padding: 6px 12px;
-  box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
   animation: slideUp 0.12s ease-out;
-  min-width: 290px;
-  max-width: calc(100vw - 28px);
+  width: max-content;
+  min-width: min(290px, calc(100% - var(--slider-gutter-width) - 14px));
+  max-width: calc(100% - var(--slider-gutter-width) - 14px);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .find-bar-container {
+    background: var(--glass-menu-bg);
+    background: color-mix(in srgb, var(--glass-menu-bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(8px) saturate(165%);
+    backdrop-filter: blur(8px) saturate(165%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .find-bar-container {
+    background: var(--surface-glass-elevated);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 .find-bar-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
 }
@@ -2831,7 +2872,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .find-bar-input {
-  flex: 1;
+  flex: 1 1 6rem;
   min-width: 0;
   background: transparent;
   border: none;
@@ -2847,9 +2888,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .find-bar-counter {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  font-weight: 500;
+  flex-shrink: 0;
   padding: 1px 6px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
@@ -2862,11 +2901,13 @@ body:has(.command-overlay) .editor-char-count {
   align-items: center;
   gap: 3px;
   flex-shrink: 0;
+  margin-inline-start: auto;
 }
 
 .find-bar-btn {
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2928,9 +2969,6 @@ body:has(.command-overlay) .editor-char-count {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 7px 16px;
   background: var(--surface-glass-elevated);
   backdrop-filter: blur(28px) saturate(200%);
@@ -2938,23 +2976,8 @@ body:has(.command-overlay) .editor-char-count {
   border: 1px solid var(--surface-glass-border);
   border-radius: 9999px;
   box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 500;
   pointer-events: none;
   animation: slideUp 0.12s ease-out;
-  white-space: nowrap;
-}
-
-.notefast-toast-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-accent);
-}
-
-.notefast-toast-message {
-  line-height: 1;
 }
 
 /* ── Shortcuts Cheatsheet Modal (Liquid Glass) ─────────── */
@@ -3016,14 +3039,6 @@ body:has(.command-overlay) .editor-char-count {
   gap: 6px;
 }
 
-.shortcuts-category-title {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-accent);
-}
-
 .shortcuts-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -3044,11 +3059,6 @@ body:has(.command-overlay) .editor-char-count {
   border-radius: 9999px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
-}
-
-.shortcut-description {
-  font-size: 11.5px;
-  color: var(--text-secondary);
 }
 
 .shortcut-keys {
@@ -3689,9 +3699,6 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-hero-subtitle {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-muted);
   margin: 0;
 }
 
@@ -3751,15 +3758,10 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-row-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .settings-row-desc {
-  font-size: 12px;
-  color: var(--text-muted);
   line-height: 1.4;
   word-break: break-word;
 }
@@ -4457,10 +4459,6 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-stat-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent-text);
-  background: var(--color-accent-muted);
   padding: 4px 10px;
   border-radius: 9999px;
   border: 1px solid var(--btn-liquid-border);

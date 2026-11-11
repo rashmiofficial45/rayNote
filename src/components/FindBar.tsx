@@ -16,6 +16,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRef = useRef<HTMLInputElement>(null);
+  const findBarRef = useRef<HTMLDivElement>(null);
 
   // Subscribed via useEditorState so match count and current index update automatically on doc edits & rescans
   const searchState = useEditorState({
@@ -62,15 +63,33 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
     editor.commands.setSearchTerm(val);
   };
 
-  const handleNext = () => {
+  const navigateMatch = (direction: "next" | "previous") => {
     if (!editor || matchCount === 0) return;
-    editor.commands.nextSearchResult();
-  };
+    const moved = direction === "next"
+      ? editor.commands.nextSearchResult()
+      : editor.commands.previousSearchResult();
+    if (!moved) return;
 
-  const handlePrevious = () => {
-    if (!editor || matchCount === 0) return;
-    editor.commands.previousSearchResult();
+    // ProseMirror ignores scrollIntoView while the search input owns DOM focus.
+    const search = (editor.storage as { search?: SearchStorage }).search;
+    const match = search?.results[search.currentIndex];
+    const bar = findBarRef.current;
+    const viewport = editor.view.dom.closest<HTMLElement>("[data-scroll-container]");
+    if (!match || !bar || !viewport) return;
+
+    const bounds = viewport.getBoundingClientRect();
+    const top = Math.max(bounds.top, bar.getBoundingClientRect().bottom) + 8;
+    const scrim = viewport.parentElement?.querySelector(":scope > .app-bottom-blend");
+    const bottom = Math.min(bounds.bottom, scrim?.getBoundingClientRect().top ?? bounds.bottom) - 8;
+    if (bottom <= top) return;
+
+    const target = editor.view.coordsAtPos(match.from);
+    if (target.top < top || target.bottom > bottom) {
+      viewport.scrollTop += (target.top + target.bottom - top - bottom) / 2;
+    }
   };
+  const handleNext = () => navigateMatch("next");
+  const handlePrevious = () => navigateMatch("previous");
 
   const handleReplaceCurrent = () => {
     if (!editor || matchCount === 0) return;
@@ -108,7 +127,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="find-bar-container" onKeyDown={handleKeyDown}>
+    <div ref={findBarRef} className="find-bar-container" onKeyDown={handleKeyDown}>
       {/* Search row */}
       <div className="find-bar-row">
         <Search size={14} className="find-bar-icon" />
@@ -122,7 +141,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
         />
 
         {query.trim() && (
-          <span className="find-bar-counter">
+          <span className="find-bar-counter text-[10.5px] [font-weight:500] text-[color:var(--text-muted)]">
             {matchCount > 0 ? `${currentIndex + 1} of ${matchCount}` : "0 matches"}
           </span>
         )}

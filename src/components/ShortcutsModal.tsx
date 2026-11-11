@@ -163,11 +163,11 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
             if (items.length === 0) return null;
             return (
               <div key={cat} className="shortcuts-category-section">
-                <div className="shortcuts-category-title">{cat}</div>
+                <div className="shortcuts-category-title text-[10.5px] [font-weight:600] uppercase [letter-spacing:0.05em] text-[color:var(--color-accent)]">{cat}</div>
                 <div className="shortcuts-grid">
                   {items.map((item, idx) => (
                     <div key={idx} className="shortcut-row">
-                      <span className="shortcut-description">{item.description}</span>
+                      <span className="shortcut-description text-[11.5px] text-[color:var(--text-secondary)]">{item.description}</span>
                       <div className="shortcut-keys">
                         {item.keys.map((k, kIdx) => (
                           <kbd key={kIdx} className="shortcut-key">

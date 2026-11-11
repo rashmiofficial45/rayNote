@@ -2137,6 +2137,8 @@ function App() {
         <NoteEditor
           key={editorReloadKey}
           noteId={activeNoteId}
+          hasNotes={isBootReady ? notes.length > 0 : undefined}
+          onNewNote={handleNewNote}
           noteTitle={activeNote?.title || ""}
           onSetTitle={handleSetTitle}
           onUpdate={handleUpdateNote}

@@ -638,7 +638,7 @@ export default function SettingsApp() {
             <img src="/app-icon.png" alt="rayNote" className="settings-hero-icon-img" />
           </div>
           <h1 className="settings-hero-title">rayNote</h1>
-          <p className="settings-hero-subtitle">Raycast-inspired notes accessory for macOS.</p>
+          <p className="settings-hero-subtitle text-[13.5px] [font-weight:500] text-[color:var(--text-muted)]">Raycast-inspired notes accessory for macOS.</p>
         </div>
 
         {actionMessage && (
@@ -655,8 +655,8 @@ export default function SettingsApp() {
               {/* Appearance Mode */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Appearance</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Appearance</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Choose between Dark, Light, or automatic macOS system appearance.
                   </div>
                 </div>
@@ -695,8 +695,8 @@ export default function SettingsApp() {
               {/* Accent Palette (6 Liquid Glass Themes) */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Accent Theme</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Accent Theme</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     6 liquid glass curated palettes. Dynamically illuminates aura and controls.
                   </div>
                 </div>
@@ -726,8 +726,8 @@ export default function SettingsApp() {
               {/* Font Family Selection */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Editor Typography</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Editor Typography</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Select your preferred writing font with full Apple Color Emoji fallback.
                   </div>
                 </div>
@@ -752,8 +752,8 @@ export default function SettingsApp() {
               {/* Show Menu Bar Icon */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Show Menu Bar Icon</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Show Menu Bar Icon</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Display the rayNote icon in the macOS menu bar for quick notes, settings, and options.
                   </div>
                 </div>
@@ -774,8 +774,8 @@ export default function SettingsApp() {
               {/* Escape Key Loses Focus */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Escape Key Loses Focus</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Escape Key Loses Focus</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     When enabled, pressing Escape in Notes makes the window lose focus instead of hiding.
                   </div>
                 </div>
@@ -798,8 +798,8 @@ export default function SettingsApp() {
               {/* Zoom Level */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Zoom</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Zoom</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Adjust the zoom level in the Notes content.
                   </div>
                 </div>
@@ -1101,8 +1101,8 @@ export default function SettingsApp() {
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">SQLite Database Storage</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">SQLite Database Storage</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     All notes are stored strictly locally in high-performance SQLite WAL mode.
                   </div>
                 </div>
@@ -1122,11 +1122,11 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Total Notes</div>
-                  <div className="settings-row-desc">Active notes currently stored.</div>
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Total Notes</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">Active notes currently stored.</div>
                 </div>
                 <div className="settings-row-action">
-                  <span className="settings-stat-badge">
+                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">
                     {storageStats ? `${storageStats.notes_count} notes` : "Loading..."}
                   </span>
                 </div>
@@ -1136,8 +1136,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Export All Notes</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Export All Notes</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Download every note as a clean GitHub-Flavored Markdown (.md) file.
                   </div>
                 </div>
@@ -1158,8 +1158,8 @@ export default function SettingsApp() {
             <div className="settings-card danger-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title danger-title">Danger Zone</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title danger-title text-[13.5px] [font-weight:600]">Danger Zone</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Permanently delete all notes from your local SQLite database.
                   </div>
                 </div>
@@ -1215,13 +1215,13 @@ export default function SettingsApp() {
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">rayNote</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">rayNote</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Version 0.1.0 • macOS Apple Silicon (Universal)
                   </div>
                 </div>
                 <div className="settings-row-action">
-                  <span className="settings-stat-badge">v0.1.0</span>
+                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">v0.1.0</span>
                 </div>
               </div>
 
@@ -1229,8 +1229,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Architecture</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Architecture</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Ultra-lightweight: 1 primary NSPanel WebView during normal editing.
                     Settings runs on a standard macOS NSWindow on demand and destroys cleanly on close.
                   </div>
@@ -1241,8 +1241,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Tech Stack</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Tech Stack</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Tauri 2 • Rust • SQLite (WAL mode) • React 19 • TipTap Editor • Liquid Glass Design
                   </div>
                 </div>
