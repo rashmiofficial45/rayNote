@@ -5,12 +5,14 @@ import {
   applyThemeMode,
   applyAccent,
   applyFont,
+  applyTextOpacity,
 } from "./theme";
 
 export type SettingsSyncPayload =
   | { type: "theme_mode"; value: ThemeMode }
   | { type: "accent"; value: AccentColor }
   | { type: "font"; value: string }
+  | { type: "text_opacity"; value: number }
   | { type: "zoom"; value: number }
   | { type: "esc_loses_focus"; value: boolean }
   | { type: "always_on_top"; value: boolean }
@@ -67,6 +69,7 @@ export interface SettingsSyncCallbacks {
   onThemeModeChange?: (mode: ThemeMode) => void;
   onAccentChange?: (accent: AccentColor) => void;
   onFontChange?: (fontId: string) => void;
+  onTextOpacityChange?: (opacity: number) => void;
   onZoomChange?: (zoom: number) => void;
   onEscLosesFocusChange?: (val: boolean) => void;
   onMenuBarChange?: (value: boolean) => void;
@@ -104,6 +107,10 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
       case "font":
         applyFont(payload.value);
         callbacks?.onFontChange?.(payload.value);
+        break;
+      case "text_opacity":
+        applyTextOpacity(payload.value);
+        callbacks?.onTextOpacityChange?.(payload.value);
         break;
       case "zoom":
         callbacks?.onZoomChange?.(payload.value);
@@ -179,6 +186,9 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
       handlePayload({ type: "accent", value: e.newValue as AccentColor });
     } else if (e.key === "notefast_font" && e.newValue) {
       handlePayload({ type: "font", value: e.newValue });
+    } else if (e.key === "notefast_text_opacity" && e.newValue) {
+      const parsed = parseInt(e.newValue, 10);
+      if (!isNaN(parsed)) handlePayload({ type: "text_opacity", value: parsed });
     } else if (e.key === "notefast_zoom_level" && e.newValue) {
       const parsed = parseFloat(e.newValue);
       if (!isNaN(parsed)) handlePayload({ type: "zoom", value: parsed });

@@ -19,6 +19,10 @@
 
 
 /* ── Dynamic Accent Themes (6 Distinct Themes) ──────────── */
+:root {
+  --app-text-opacity: 100%;
+}
+
 :root, [data-accent="violet"] {
   --color-accent: #6C5CE7;
   --color-accent-hover: #7C6DF7;
@@ -164,11 +168,17 @@
   --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.10);
   --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #94a3b8;
-  --text-subtle: #64748b;
-  --placeholder: #8f9eb3;
+  --text-primary-base: #f8fafc;
+  --text-secondary-base: #cbd5e1;
+  --text-muted-base: #94a3b8;
+  --text-subtle-base: #64748b;
+  --placeholder-base: #8f9eb3;
+
+  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), transparent);
+  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), transparent);
+  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), transparent);
+  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), transparent);
+  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), transparent);
 
   --input-bg: #1d1d23;
   --border-primary: rgba(255, 255, 255, 0.10);
@@ -192,6 +202,25 @@
   --overlay-dim: rgba(14, 14, 18, 0.82);
   --scrollbar-thumb: rgba(255, 255, 255, 0.2);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
+
+  /* ── Liquid Glass Unified Design System Tokens (Dark) ── */
+  --glass-menu-bg: rgba(28, 28, 34, 0.78);
+  --glass-menu-blur: blur(36px) saturate(210%);
+  --glass-menu-border: rgba(255, 255, 255, 0.14);
+  --glass-menu-shadow: 0 16px 42px -4px rgba(0, 0, 0, 0.52), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
+  --glass-menu-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+  --glass-item-hover-bg: color-mix(in srgb, var(--color-accent) 22%, rgba(255, 255, 255, 0.08));
+  --glass-item-selected-bg: color-mix(in srgb, var(--color-accent) 26%, rgba(255, 255, 255, 0.12));
+  --glass-panel-bg: rgba(28, 28, 34, 0.82);
+  --glass-panel-border: rgba(255, 255, 255, 0.12);
+  --glass-panel-shadow: 0 20px 50px -6px rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.18);
+  --glass-control-bg: rgba(255, 255, 255, 0.07);
+  --glass-control-border: rgba(255, 255, 255, 0.10);
+  --glass-radius-menu: 16px;
+  --glass-radius-item: 10px;
+  --glass-radius-panel: 22px;
+  --glass-radius-control: 8px;
+  --glass-radius-pill: 9999px;
 }
 
 .light,
@@ -211,11 +240,17 @@
   --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
   --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 
-  --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #475569;
-  --text-subtle: #64748b;
-  --placeholder: #576579;
+  --text-primary-base: #0f172a;
+  --text-secondary-base: #334155;
+  --text-muted-base: #475569;
+  --text-subtle-base: #64748b;
+  --placeholder-base: #576579;
+
+  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), transparent);
+  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), transparent);
+  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), transparent);
+  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), transparent);
+  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), transparent);
 
   --input-bg: #f1f5f9;
   --border-primary: rgba(0, 0, 0, 0.10);
@@ -239,6 +274,25 @@
   --overlay-dim: rgba(248, 250, 252, 0.85);
   --scrollbar-thumb: rgba(0, 0, 0, 0.2);
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
+
+  /* ── Liquid Glass Unified Design System Tokens (Light) ── */
+  --glass-menu-bg: rgba(255, 255, 255, 0.80);
+  --glass-menu-blur: blur(36px) saturate(210%);
+  --glass-menu-border: rgba(255, 255, 255, 0.65);
+  --glass-menu-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.14), 0 4px 12px 0 rgba(0, 0, 0, 0.06);
+  --glass-menu-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  --glass-item-hover-bg: color-mix(in srgb, var(--color-accent) 18%, rgba(0, 0, 0, 0.04));
+  --glass-item-selected-bg: color-mix(in srgb, var(--color-accent) 22%, rgba(0, 0, 0, 0.06));
+  --glass-panel-bg: rgba(255, 255, 255, 0.85);
+  --glass-panel-border: rgba(0, 0, 0, 0.08);
+  --glass-panel-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
+  --glass-control-bg: rgba(0, 0, 0, 0.04);
+  --glass-control-border: rgba(0, 0, 0, 0.08);
+  --glass-radius-menu: 16px;
+  --glass-radius-item: 10px;
+  --glass-radius-panel: 22px;
+  --glass-radius-control: 8px;
+  --glass-radius-pill: 9999px;
 }
 
 /* ── Tailwind v4 Theme ────────────────────────────────── */
@@ -409,7 +463,7 @@ body,
   left: 0;
   right: 0;
   z-index: 30;
-  padding: 0 16px 0 18px;
+  padding: 0 clamp(12px, 2.5vw, 14px) 0 18px;
   gap: 10px;
   box-sizing: border-box;
   background: transparent;
@@ -550,12 +604,18 @@ body,
 }
 
 .title-bar-right {
+  --title-action-size: 34px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  flex-shrink: 0 !important;
-  min-width: 114px;
+  justify-content: center;
+  position: relative;
+  border: 1px solid var(--glass-panel-border);
+  border-radius: 9999px;
+  padding: 2px 0;
+  background: var(--glass-menu-bg);
+  -webkit-backdrop-filter: var(--glass-menu-blur);
+  backdrop-filter: var(--glass-menu-blur);
+  box-shadow: var(--glass-menu-highlight), 0 1px 4px rgba(0, 0, 0, 0.08);
   -webkit-app-region: no-drag;
   opacity: 0;
   pointer-events: none;
@@ -599,36 +659,63 @@ body,
 }
 
 .title-bar-btn {
-  width: 34px !important;
-  height: 34px !important;
-  min-width: 34px !important;
-  min-height: 34px !important;
-  max-width: 34px !important;
-  max-height: 34px !important;
-  aspect-ratio: 1 / 1 !important;
-  flex-shrink: 0 !important;
+  position: relative;
+  flex: 0 0 var(--title-action-size);
+  height: var(--title-action-size);
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 9999px;
-  border: 1px solid var(--surface-glass-border);
-  background: var(--surface-glass-elevated);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), var(--app-inner-highlight);
+  border: 0;
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
 }
 
-.title-bar-btn:hover {
+.title-bar-right::before {
+  content: "";
+  position: absolute;
+  left: calc((100% - 3 * var(--title-action-size)) / 2);
+  width: var(--title-action-size);
+  height: var(--title-action-size);
+  border-radius: 9999px;
+  pointer-events: none;
   background: var(--btn-liquid-bg-hover);
-  border-color: var(--btn-liquid-border);
-  color: var(--text-primary);
-  transform: translateY(-0.5px) scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
 }
 
-.title-bar-btn:active {
+.title-bar-right:has(> .title-bar-btn:hover)::before {
+  opacity: 1;
+}
+
+.title-bar-right:has(> .delete-btn:hover)::before {
+  transform: translateX(var(--title-action-size));
+}
+
+.title-bar-right:has(> .command-palette-btn:hover)::before {
+  transform: translateX(calc(2 * var(--title-action-size)));
+}
+
+body:not(:has(.command-overlay)) .title-bar-right:has(> .title-bar-btn:focus-visible) {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) !important;
+}
+
+.title-bar-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-bar-right::before {
+    transition: none;
+  }
+}
+
+.title-bar-btn:active svg {
   transform: scale(0.95);
 }
 
@@ -1263,12 +1350,17 @@ html[data-smooth-caret="false"] .tiptap {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  width: 144px;
-  max-width: 160px;
-  padding: 4px;
-  border-radius: 10px;
+  width: 154px;
+  max-width: 170px;
+  padding: 6px;
+  background: var(--glass-menu-bg);
+  backdrop-filter: var(--glass-menu-blur);
+  -webkit-backdrop-filter: var(--glass-menu-blur);
+  border: 1px solid var(--glass-menu-border);
+  border-radius: 16px;
   z-index: 9999;
-  box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow), 0 10px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
+  animation: editorContextMenuScaleIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .code-lang-liquid-menu.is-upward {
@@ -1279,26 +1371,26 @@ html[data-smooth-caret="false"] .tiptap {
 .code-lang-search-box {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2.5px 6px;
-  border-radius: 6px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  margin-bottom: 3px;
+  gap: 6px;
+  padding: 3.5px 7px;
+  border-radius: 8px;
+  background: var(--glass-control-bg);
+  border: 1px solid var(--glass-control-border);
+  margin-bottom: 5px;
 }
 
 .code-lang-search-icon {
   color: var(--text-muted);
   flex-shrink: 0;
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
 }
 
 .code-lang-search-input {
   background: transparent;
   border: none;
   outline: none;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 14px;
   color: var(--text-primary);
   width: 100%;
@@ -1310,12 +1402,12 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .code-lang-items-container {
-  max-height: 165px;
+  max-height: 175px;
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 1.5px;
+  gap: 2px;
 }
 
 .code-lang-items-container::-webkit-scrollbar {
@@ -1336,13 +1428,14 @@ html[data-smooth-caret="false"] .tiptap {
 .code-lang-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2.5px 6px !important;
-  min-height: 22px !important;
-  border-radius: 6px !important;
-  font-size: 11px !important;
+  gap: 6px;
+  padding: 3px 8px !important;
+  min-height: 24px !important;
+  border-radius: 8px !important;
+  font-size: 11.5px !important;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: background 0.08s ease, color 0.08s ease, border-color 0.08s ease;
+  transition: background 0.12s cubic-bezier(0.16, 1, 0.3, 1), color 0.12s ease;
 }
 
 /* Ensure only ONE item is highlighted at a time: the item with .is-selected */
@@ -1352,8 +1445,8 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .code-lang-item.is-selected {
-  background: var(--color-accent-muted) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--glass-item-selected-bg) !important;
+  border-color: transparent !important;
   color: var(--text-primary) !important;
 }
 
@@ -1688,7 +1781,7 @@ pre.notefast-code-block:hover {
   color: var(--text-primary);
   background: var(--surface-glass-elevated);
   border: 1px solid var(--surface-glass-border);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), var(--app-inner-highlight);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12), var(--app-inner-highlight);
   cursor: pointer;
   opacity: 0.95;
   pointer-events: auto;
@@ -1704,7 +1797,7 @@ pre.notefast-code-block:hover {
   background: var(--btn-liquid-bg-hover);
   color: var(--text-primary);
   transform: translateY(-1px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), var(--app-inner-highlight);
 }
 
 .format-corner-btn:active {
@@ -1715,7 +1808,7 @@ pre.notefast-code-block:hover {
   background: var(--color-accent) !important;
   border-color: var(--color-accent-hover) !important;
   color: #ffffff !important;
-  box-shadow: 0 0 14px var(--color-accent-glow), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 0 5px color-mix(in srgb, var(--color-accent-glow) 60%, transparent), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35) !important;
 }
 
 .format-corner-btn .format-indicator-dot {
@@ -1818,6 +1911,7 @@ pre.notefast-code-block:hover {
 }
 
 /* Eliminate background bleed-through blocks and smudges when any modal is open */
+body:has(.command-overlay) .title-bar-right,
 body:has(.command-overlay) .title-bar-btn,
 body:has(.command-overlay) .close-btn-x,
 body:has(.command-overlay) .format-corner-btn,
@@ -2039,107 +2133,176 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .slash-command-menu {
-  background: var(--surface-glass-elevated);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--surface-glass-border);
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  padding: 5px;
-  min-width: 190px;
-  max-width: 240px;
-  max-height: 280px;
+  background: var(--glass-menu-bg);
+  backdrop-filter: var(--glass-menu-blur);
+  -webkit-backdrop-filter: var(--glass-menu-blur);
+  border: 1px solid var(--glass-menu-border);
+  border-radius: var(--glass-radius-menu);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
+  padding: 6px 6px 0 6px;
+  min-width: 216px;
+  width: max-content;
+  max-width: 260px;
+  max-height: 348px;
+  height: auto;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scroll-padding: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
   z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  animation: none !important;
+  animation: editorContextMenuScaleIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
   contain: content;
+  outline: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Trailing spacer ensures WebKit flexbox scrollHeight always preserves bottom 6px breathing room */
+.slash-command-menu::after {
+  content: "";
+  display: block;
+  height: 6px;
+  min-height: 6px;
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* Liquid Glass subtle native scrollbar for slash menu */
+.slash-command-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.slash-command-menu::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.slash-command-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.slash-command-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.light .slash-command-menu,
+[data-theme="light"] .slash-command-menu {
+  scrollbar-color: rgba(0, 0, 0, 0.20) transparent;
+}
+
+.light .slash-command-menu::-webkit-scrollbar-thumb,
+[data-theme="light"] .slash-command-menu::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.20);
+}
+
+.light .slash-command-menu::-webkit-scrollbar-thumb:hover,
+[data-theme="light"] .slash-command-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
 }
 
 .slash-command-empty {
-  padding: 8px 12px;
+  padding: 8px 10px;
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12px;
   text-align: center;
 }
 
 .slash-command-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 9px;
-  border-radius: 9999px;
-  border: 1px solid transparent;
+  justify-content: space-between;
+  gap: 12px;
+  height: 28px;
+  min-height: 28px;
+  flex-shrink: 0;
+  scroll-margin: 6px;
+  padding: 0 10px;
+  border-radius: var(--glass-radius-item);
+  border: none;
   background: transparent;
-  cursor: pointer;
-  transition: all 0.1s ease;
-  color: var(--text-secondary);
-  font-size: 12px;
+  cursor: default;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 80ms ease,
+    color 120ms ease;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
   width: 100%;
   text-align: left;
   user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  white-space: nowrap;
+}
+
+/* Authoritative single active navigation highlight — no conflicting hover background */
+.slash-command-item.is-selected {
+  background: var(--glass-item-hover-bg);
+  color: var(--text-primary);
 }
 
 .slash-command-item:not(.is-selected):hover {
   background: transparent !important;
-  border-color: transparent !important;
 }
 
-.slash-command-item.is-selected {
-  background: var(--color-accent-muted);
-  border-color: var(--color-accent);
-  color: var(--text-primary);
+.slash-command-item:active {
+  transform: scale(0.98);
+}
+
+.slash-command-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .slash-command-item-icon {
-  width: 22px;
-  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
   flex-shrink: 0;
-  color: var(--color-accent);
-  transition: all 0.1s ease;
+  transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: transparent;
+  border: none;
 }
 
 .slash-command-item.is-selected .slash-command-item-icon {
-  background: var(--color-accent);
-  border-color: var(--color-accent-hover);
-  color: #ffffff;
+  color: var(--text-primary);
 }
 
 .slash-command-item-title {
-  font-weight: 500;
-  font-size: 12px;
+  font-weight: 450;
+  font-size: 13px;
   color: var(--text-primary);
-  flex: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
 }
 
 .slash-command-item-badge {
-  font-size: 10px;
-  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   color: var(--text-muted);
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  padding: 1px 5px;
-  border-radius: 9999px;
+  letter-spacing: 0.3px;
+  opacity: 0.75;
   flex-shrink: 0;
   margin-left: auto;
-  transition: all 0.1s ease;
+  transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .slash-command-item.is-selected .slash-command-item-badge {
   color: var(--text-primary);
-  background: var(--color-accent-muted);
+  opacity: 0.88;
 }
 
 /* ── Browse Notes ─────────────────────────────────────── */
@@ -2670,39 +2833,80 @@ body:has(.command-overlay) .editor-char-count {
 /* ── In-Note Search Highlighting ──────────────────────── */
 .search-match {
   background-color: rgba(234, 179, 8, 0.35);
-  border-radius: 2px;
+  border-radius: 4px;
+  /* Expand the painted highlight without shifting or wrapping editor text. */
+  box-shadow: 2px 0 rgba(234, 179, 8, 0.35), -2px 0 rgba(234, 179, 8, 0.35);
 }
 
 .search-match.search-match-active {
   background-color: #eab308 !important;
   color: #000000 !important;
   font-weight: 600;
-  border-radius: 2px;
+  box-shadow: 2px 0 #eab308, -2px 0 #eab308;
 }
 
-/* ── Find Bar Floating Pill (iOS 26 Liquid Glass) ──────── */
+.note-empty-state {
+  padding: 56px 16px;
+}
+
+.note-empty-content {
+  margin: auto;
+}
+
+.note-empty-create {
+  padding: 6px 14px;
+  min-height: 32px;
+  color: var(--text-primary);
+}
+
+.note-empty-shortcut {
+  padding: 1px 6px;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  border-radius: 9999px;
+}
+
+/* ── Find Bar (iOS 26 Liquid Glass) ────────────────────── */
 .find-bar-container {
+  /* Float over the full-height editor, clear of the document ruler. */
   position: absolute;
-  top: 56px;
-  right: 14px;
+  inset-block-start: 56px;
+  inset-inline-end: var(--slider-gutter-width);
   z-index: 60;
   display: flex;
   flex-direction: column;
   gap: 5px;
   background: var(--surface-glass-elevated);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border: 1px solid var(--surface-glass-border);
+  border: 1px solid var(--glass-menu-border);
   border-radius: 18px;
   padding: 6px 12px;
-  box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
   animation: slideUp 0.12s ease-out;
-  min-width: 290px;
-  max-width: calc(100vw - 28px);
+  width: max-content;
+  min-width: min(290px, calc(100% - var(--slider-gutter-width) - 14px));
+  max-width: calc(100% - var(--slider-gutter-width) - 14px);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .find-bar-container {
+    background: var(--glass-menu-bg);
+    background: color-mix(in srgb, var(--glass-menu-bg) 78%, transparent);
+    -webkit-backdrop-filter: blur(8px) saturate(165%);
+    backdrop-filter: blur(8px) saturate(165%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .find-bar-container {
+    background: var(--surface-glass-elevated);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 
 .find-bar-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
 }
@@ -2718,7 +2922,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .find-bar-input {
-  flex: 1;
+  flex: 1 1 6rem;
   min-width: 0;
   background: transparent;
   border: none;
@@ -2734,9 +2938,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .find-bar-counter {
-  font-size: 10.5px;
-  color: var(--text-muted);
-  font-weight: 500;
+  flex-shrink: 0;
   padding: 1px 6px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
@@ -2749,11 +2951,13 @@ body:has(.command-overlay) .editor-char-count {
   align-items: center;
   gap: 3px;
   flex-shrink: 0;
+  margin-inline-start: auto;
 }
 
 .find-bar-btn {
   width: 24px;
   height: 24px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2815,9 +3019,6 @@ body:has(.command-overlay) .editor-char-count {
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
-  display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 7px 16px;
   background: var(--surface-glass-elevated);
   backdrop-filter: blur(28px) saturate(200%);
@@ -2825,23 +3026,8 @@ body:has(.command-overlay) .editor-char-count {
   border: 1px solid var(--surface-glass-border);
   border-radius: 9999px;
   box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 500;
   pointer-events: none;
   animation: slideUp 0.12s ease-out;
-  white-space: nowrap;
-}
-
-.notefast-toast-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-accent);
-}
-
-.notefast-toast-message {
-  line-height: 1;
 }
 
 /* ── Shortcuts Cheatsheet Modal (Liquid Glass) ─────────── */
@@ -2903,14 +3089,6 @@ body:has(.command-overlay) .editor-char-count {
   gap: 6px;
 }
 
-.shortcuts-category-title {
-  font-size: 10.5px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-accent);
-}
-
 .shortcuts-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -2931,11 +3109,6 @@ body:has(.command-overlay) .editor-char-count {
   border-radius: 9999px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
-}
-
-.shortcut-description {
-  font-size: 11.5px;
-  color: var(--text-secondary);
 }
 
 .shortcut-keys {
@@ -3382,8 +3555,11 @@ body:has(.command-overlay) .editor-char-count {
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Segoe UI", "Apple Color Emoji", sans-serif;
-  border-radius: 12px;
-  box-shadow: var(--app-inner-highlight);
+  border-radius: 28px;
+  border: 1.5px solid var(--app-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  overscroll-behavior: none !important;
 }
 
 /* Header bar with custom red close button and draggable top bar */
@@ -3391,21 +3567,28 @@ body:has(.command-overlay) .editor-char-count {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  height: 48px;
+  padding: 0 16px;
+  height: 52px;
+  min-height: 52px;
   border-bottom: 1px solid var(--separator);
-  background: var(--surface-glass);
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
   flex-shrink: 0;
   -webkit-app-region: drag;
   user-select: none;
   position: relative;
+  gap: 10px;
 }
 
 .settings-header-left {
   display: flex;
   align-items: center;
   -webkit-app-region: drag;
-  min-width: 48px;
+  min-width: 32px;
+  flex-shrink: 0;
 }
 
 .settings-header-left .title-bar-left {
@@ -3423,36 +3606,55 @@ body:has(.command-overlay) .editor-char-count {
   -webkit-app-region: no-drag !important;
 }
 
+.settings-tab-pills-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
 .settings-tab-pills {
   display: flex;
   align-items: center;
-  gap: 4px;
-  background: var(--input-bg);
+  gap: 3px;
+  background: var(--glass-control-bg);
   padding: 3px;
-  border-radius: 10px;
-  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  border: 1px solid var(--glass-control-border);
   -webkit-app-region: no-drag;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-tab-pills::-webkit-scrollbar {
+  display: none;
 }
 
 .settings-tab-pill {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 11px;
-  border-radius: 7px;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 9px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
   background: transparent;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
 }
 
 .settings-tab-pill:hover:not(.is-active) {
   color: var(--text-primary);
-  background: var(--btn-liquid-bg);
+  background: var(--glass-item-hover-bg);
 }
 
 .settings-tab-pill.is-active {
@@ -3462,20 +3664,30 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-header-right-spacer {
-  min-width: 48px;
+  min-width: 32px;
+  width: 32px;
   height: 26px;
   pointer-events: none;
   -webkit-app-region: drag;
+  flex-shrink: 0;
 }
 
 /* Settings Body & Scrollable Content */
 .settings-body-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 32px 48px;
+  padding: 24px 28px 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 540px) {
+  .settings-body-content {
+    padding: 16px 14px 36px;
+  }
 }
 
 /* App Hero Section (matching Raycast screenshot) */
@@ -3537,9 +3749,6 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-hero-subtitle {
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-muted);
   margin: 0;
 }
 
@@ -3566,11 +3775,15 @@ body:has(.command-overlay) .editor-char-count {
 
 /* Grouped Cards (macOS Raycast standard) */
 .settings-card {
-  background: var(--surface-glass-elevated);
-  border: 1px solid var(--surface-glass-border);
-  border-radius: 16px;
+  background: var(--glass-panel-bg);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--glass-panel-border);
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: var(--surface-glass-inner), 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--glass-panel-shadow);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-card-divider {
@@ -3585,6 +3798,8 @@ body:has(.command-overlay) .editor-char-count {
   justify-content: space-between;
   padding: 13px 18px;
   gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .settings-row-text {
@@ -3593,22 +3808,43 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-row-title {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-primary);
   margin-bottom: 2px;
 }
 
 .settings-row-desc {
-  font-size: 12px;
-  color: var(--text-muted);
   line-height: 1.4;
+  word-break: break-word;
 }
 
 .settings-row-action {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 520px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .settings-row-action {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .settings-segmented-group {
+    width: 100%;
+  }
+
+  .settings-seg-btn {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 /* Segmented Theme Mode Control */
@@ -3825,6 +4061,81 @@ body:has(.command-overlay) .editor-char-count {
   text-align: center;
 }
 
+/* Text Opacity Range Slider (Liquid Glass Style) */
+.settings-opacity-control {
+  display: inline-flex;
+  align-items: center;
+  background: var(--btn-liquid-bg);
+  border: 1px solid var(--btn-liquid-border);
+  box-shadow: var(--btn-liquid-shadow);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border-radius: 9999px;
+  padding: 3px 6px 3px 4px;
+  gap: 8px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.settings-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.15);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.light .settings-range-slider,
+[data-theme="light"] .settings-range-slider,
+[data-resolved-theme="light"] .settings-range-slider {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.settings-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.settings-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 8px var(--color-accent-glow);
+}
+
+.settings-range-slider::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+}
+
+.settings-range-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.settings-opacity-display {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  min-width: 38px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 4px;
+}
+
 /* Section Header */
 .settings-section-header h2 {
   font-size: 13.5px;
@@ -3906,13 +4217,13 @@ body:has(.command-overlay) .editor-char-count {
 .settings-cmd-kbd {
   font-family: inherit;
   font-size: 11.5px;
-  padding: 3px 8px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
+  padding: 4px 9px;
+  background: var(--glass-control-bg);
+  border: 1px solid var(--glass-control-border);
   box-shadow: var(--btn-liquid-shadow);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-secondary);
   font-weight: 500;
   min-width: 36px;
@@ -3920,7 +4231,7 @@ body:has(.command-overlay) .editor-char-count {
   cursor: pointer;
   user-select: none;
   -webkit-user-select: none;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3929,9 +4240,9 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-cmd-kbd:hover {
-  background: var(--btn-liquid-bg-hover);
+  background: var(--glass-item-hover-bg);
   color: var(--text-primary);
-  border-color: var(--text-muted);
+  border-color: var(--color-accent);
 }
 
 .settings-cmd-kbd.is-recording {
@@ -4273,10 +4584,6 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .settings-stat-badge {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-accent-text);
-  background: var(--color-accent-muted);
   padding: 4px 10px;
   border-radius: 9999px;
   border: 1px solid var(--btn-liquid-border);
@@ -4340,6 +4647,7 @@ body:has(.command-overlay) .editor-char-count {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .settings-danger-checkbox {
@@ -5576,5 +5884,255 @@ body:has(.command-overlay) .editor-char-count {
   flex-shrink: 0;
   user-select: none;
 }
+
+/* ── Ultra-Minimal Liquid Glass macOS Context Menu ───────── */
+.editor-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 178px;
+  max-width: 228px;
+  background: var(--glass-menu-bg);
+  backdrop-filter: var(--glass-menu-blur);
+  -webkit-backdrop-filter: var(--glass-menu-blur);
+  border: 1px solid var(--glass-menu-border);
+  border-radius: var(--glass-radius-menu);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", sans-serif;
+  animation: editorContextMenuScaleIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  outline: none;
+  transform-origin: top left;
+}
+
+@keyframes editorContextMenuScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.editor-context-menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--glass-radius-item);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 450;
+  letter-spacing: -0.01em;
+  cursor: default;
+  text-align: left;
+  white-space: nowrap;
+  outline: none;
+  transition:
+    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 80ms ease,
+    color 120ms ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Authoritative single active navigation highlight — no conflicting hover background */
+.editor-context-menu-item.is-highlighted:not(:disabled) {
+  background: var(--glass-item-hover-bg);
+  color: var(--text-primary);
+}
+
+.editor-context-menu-item.is-submenu-open:not(.is-highlighted):not(:disabled) {
+  background: var(--glass-control-bg);
+  color: var(--text-primary);
+}
+
+.editor-context-menu-item:not(.is-highlighted):not(.is-submenu-open):hover {
+  background: transparent !important;
+}
+
+.editor-context-menu-item:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.editor-context-menu-item.is-highlighted:not(:disabled) .editor-context-menu-shortcut {
+  color: var(--text-primary);
+  opacity: 0.88;
+}
+
+.editor-context-menu-item.is-highlighted:not(:disabled) .editor-context-menu-icon,
+.editor-context-menu-item.is-highlighted:not(:disabled) .editor-context-menu-submenu-arrow,
+.editor-context-menu-item.is-submenu-open:not(:disabled) .editor-context-menu-submenu-arrow {
+  color: var(--text-primary);
+}
+
+.editor-context-menu-item.is-highlighted:not(:disabled) .editor-context-menu-check {
+  color: var(--color-accent);
+}
+
+.editor-context-menu-item:disabled {
+  opacity: 0.32;
+  cursor: default;
+  pointer-events: none;
+}
+
+.editor-context-menu-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.editor-context-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.editor-context-menu-label {
+  flex: 1;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-context-menu-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.editor-context-menu-check,
+.editor-context-menu-active-check {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.editor-context-menu-shortcut {
+  font-size: 11.5px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+  opacity: 0.75;
+  flex-shrink: 0;
+  transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.editor-context-menu-separator {
+  height: 1px;
+  background: var(--separator);
+  margin: 4px 6px;
+  opacity: 0.55;
+}
+
+.editor-context-menu-submenu-arrow {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.editor-context-submenu {
+  position: fixed;
+  z-index: 10002;
+  min-width: 176px;
+  max-width: 220px;
+  background: var(--glass-menu-bg);
+  backdrop-filter: var(--glass-menu-blur);
+  -webkit-backdrop-filter: var(--glass-menu-blur);
+  border: 1px solid var(--glass-menu-border);
+  border-radius: var(--glass-radius-menu);
+  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  animation: editorContextMenuScaleIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+/* Hover bridge corridor to prevent accidental closure */
+.editor-context-submenu::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  left: -12px;
+  width: 14px;
+  background: transparent;
+  pointer-events: auto;
+}
+
+.editor-context-submenu.align-left::before {
+  left: auto;
+  right: -12px;
+}
+
+/* ── Accessibility & Reduced Constraints ─────────────────── */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  .dark,
+  [data-theme="dark"],
+  [data-resolved-theme="dark"] {
+    --glass-menu-bg: #1c1c22;
+    --glass-menu-blur: none;
+    --glass-panel-bg: #1c1c22;
+  }
+  .light,
+  [data-theme="light"],
+  [data-resolved-theme="light"] {
+    --glass-menu-bg: #f9f9fb;
+    --glass-menu-blur: none;
+    --glass-panel-bg: #f9f9fb;
+  }
+  .editor-context-menu,
+  .editor-context-submenu,
+  .slash-command-menu,
+  .code-lang-liquid-menu,
+  .bottom-toolbar-expanded-menu,
+  .command-palette,
+  .shortcuts-modal-container,
+  .settings-card,
+  .settings-header-bar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-context-menu,
+  .editor-context-submenu,
+  .slash-command-menu,
+  .command-palette,
+  .shortcuts-modal-container,
+  .bottom-toolbar-expanded-menu {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 
 

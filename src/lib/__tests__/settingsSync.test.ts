@@ -107,10 +107,12 @@ describe("Settings Synchronization & Keystroke Utilities (settingsSync.ts)", () 
     it("listenToSettingsSync invokes callbacks on sync events and unlistens cleanly", () => {
       const onThemeModeChange = vi.fn();
       const onAccentChange = vi.fn();
+      const onTextOpacityChange = vi.fn();
 
       const unsubscribe = listenToSettingsSync({
         onThemeModeChange,
         onAccentChange,
+        onTextOpacityChange,
       });
 
       broadcastSync({ type: "theme_mode", value: "light" });
@@ -119,12 +121,18 @@ describe("Settings Synchronization & Keystroke Utilities (settingsSync.ts)", () 
       broadcastSync({ type: "accent", value: "emerald" });
       expect(onAccentChange).toHaveBeenCalledWith("emerald");
 
+      broadcastSync({ type: "text_opacity", value: 85 });
+      expect(onTextOpacityChange).toHaveBeenCalledWith(85);
+
       // Unlisten cleanly
       unsubscribe();
       onThemeModeChange.mockClear();
+      onTextOpacityChange.mockClear();
 
       broadcastSync({ type: "theme_mode", value: "dark" });
       expect(onThemeModeChange).not.toHaveBeenCalled();
+      broadcastSync({ type: "text_opacity", value: 90 });
+      expect(onTextOpacityChange).not.toHaveBeenCalled();
     });
   });
 });

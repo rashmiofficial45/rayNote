@@ -92,6 +92,45 @@ describe("FindBar In-Note Search & Replace UI Component", () => {
     expect((editor.storage as any).search.searchTerm).toBe("");
   });
 
+  it("reveals offscreen matches on Enter and Shift+Enter without blurring search", async () => {
+    const viewport = document.createElement("div");
+    viewport.dataset.scrollContainer = "";
+    viewport.appendChild(editor.view.dom);
+    vi.spyOn(viewport, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 500, 500));
+
+    act(() => {
+      root.render(<FindBar isOpen={true} onClose={vi.fn()} editor={editor} />);
+    });
+    // Put the actual editor viewport alongside FindBar, as in the app.
+    container.appendChild(viewport);
+    vi.spyOn(container.querySelector(".find-bar-container")!, "getBoundingClientRect")
+      .mockReturnValue(new DOMRect(200, 56, 300, 40));
+    const input = container.querySelector<HTMLInputElement>(".find-bar-input")!;
+    input.focus();
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set?.call(input, "fox");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const { results } = (editor.storage as any).search;
+    vi.spyOn(editor.view, "coordsAtPos").mockImplementation((pos) => {
+      const top = (pos === results[1].from ? 1300 : 150) - viewport.scrollTop;
+      return { top, bottom: top + 20, left: 20, right: 20 };
+    });
+    const enter = (shiftKey = false) => act(async () => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", shiftKey, bubbles: true }));
+    });
+
+    await enter();
+    expect(container.textContent).toContain("2 of 2");
+    expect(viewport.scrollTop).toBeGreaterThan(850);
+    expect(document.activeElement).toBe(input);
+
+    await enter(true);
+    expect(container.textContent).toContain("1 of 2");
+    expect(viewport.scrollTop).toBeLessThan(150);
+    expect(document.activeElement).toBe(input);
+  });
+
 
   it("clicking close button invokes onClose", () => {
     const onClose = vi.fn();

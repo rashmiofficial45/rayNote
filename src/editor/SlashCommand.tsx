@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 
 export interface CommandItem {
+  id?: string;
   title: string;
   badge?: string;
   aliases: string[];
@@ -41,8 +42,9 @@ export interface CommandItem {
   command: (props: { editor: Editor; range: Range }) => void;
 }
 
-const ALL_COMMAND_ITEMS: CommandItem[] = [
+export const ALL_COMMAND_ITEMS: CommandItem[] = [
   {
+    id: "heading1",
     title: "Heading 1",
     badge: "h1",
     aliases: ["h1", "heading1", "1"],
@@ -57,6 +59,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "heading2",
     title: "Heading 2",
     badge: "h2",
     aliases: ["h2", "heading2", "2"],
@@ -71,6 +74,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "heading3",
     title: "Heading 3",
     badge: "h3",
     aliases: ["h3", "heading3", "3"],
@@ -85,6 +89,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "checklist",
     title: "Task List",
     badge: "todo",
     aliases: ["todo", "task", "tasks", "checklist", "check"],
@@ -94,6 +99,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "bullet_list",
     title: "Bullet List",
     badge: "bullet",
     aliases: ["bullet", "bullets", "ul", "list"],
@@ -103,6 +109,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "ordered_list",
     title: "Numbered List",
     badge: "number",
     aliases: ["number", "numbered", "num", "ordered", "ol", "1."],
@@ -112,6 +119,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "divider",
     title: "Divider",
     badge: "divider",
     aliases: ["divider", "hr", "line", "rule", "separator"],
@@ -121,6 +129,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "code_block",
     title: "Code Block",
     badge: "code",
     aliases: ["code", "codeblock", "pre"],
@@ -130,6 +139,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "code",
     title: "Inline Code",
     badge: "inline",
     aliases: ["inline", "code", "inlinecode", "ic"],
@@ -139,6 +149,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "blockquote",
     title: "Quote",
     badge: "quote",
     aliases: ["quote", "blockquote", "bq"],
@@ -157,6 +168,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "bold",
     title: "Bold",
     badge: "bold",
     aliases: ["bold", "b"],
@@ -166,6 +178,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "italic",
     title: "Italic",
     badge: "italic",
     aliases: ["italic", "i", "em"],
@@ -175,6 +188,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "underline",
     title: "Underline",
     badge: "underline",
     aliases: ["underline", "u"],
@@ -184,6 +198,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "strike",
     title: "Strikethrough",
     badge: "strike",
     aliases: ["strike", "strikethrough", "del"],
@@ -193,6 +208,7 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
     },
   },
   {
+    id: "highlight",
     title: "Highlight",
     badge: "highlight",
     aliases: ["highlight", "mark", "hl"],
@@ -217,12 +233,12 @@ const ALL_COMMAND_ITEMS: CommandItem[] = [
   },
 ];
 
-interface CommandListProps {
+export interface CommandListProps {
   items: CommandItem[];
   command: (item: CommandItem) => void;
 }
 
-interface CommandListRef {
+export interface CommandListRef {
   onKeyDown: (props: { event: KeyboardEvent }) => boolean;
 }
 
@@ -251,13 +267,13 @@ function scoreItem(item: CommandItem, q: string): number {
   return 0;
 }
 
-const CommandList = forwardRef<CommandListRef, CommandListProps>(
+export const CommandList = forwardRef<CommandListRef, CommandListProps>(
   ({ items, command }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [prevItems, setPrevItems] = useState(items);
     const containerRef = useRef<HTMLDivElement>(null);
-    const mountTimeRef = useRef(Date.now());
     const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+    const ignorePointerRef = useRef<boolean>(false);
 
     // Synchronously reset selectedIndex when items list changes to avoid stale selection lag
     if (items !== prevItems) {
@@ -268,11 +284,19 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return;
+      if (selectedIndex === 0) {
+        container.scrollTop = 0;
+        return;
+      }
+      if (selectedIndex === items.length - 1) {
+        container.scrollTop = container.scrollHeight;
+        return;
+      }
       const selectedEl = container.children[selectedIndex] as HTMLElement;
-      if (selectedEl) {
+      if (selectedEl && typeof selectedEl.scrollIntoView === "function") {
         selectedEl.scrollIntoView({ block: "nearest" });
       }
-    }, [selectedIndex]);
+    }, [selectedIndex, items.length]);
 
     const selectItem = useCallback(
       (index: number) => {
@@ -284,19 +308,20 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
       [items, command]
     );
 
-    const handleMouseMove = useCallback((e: React.MouseEvent, index: number) => {
-      // Ignore initial synthetic mouse events right after menu appears so a mouse
-      // resting on screen does not automatically select the option below (e.g. Heading 2)
-      if (Date.now() - mountTimeRef.current < 150) return;
-
-      // Only change selection if mouse coordinates actually changed
-      if (
-        lastMousePosRef.current &&
-        lastMousePosRef.current.x === e.clientX &&
-        lastMousePosRef.current.y === e.clientY
-      ) {
-        return;
+    const handlePointerAction = useCallback((e: React.MouseEvent, index: number) => {
+      if (ignorePointerRef.current) {
+        if (!lastMousePosRef.current) {
+          lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+          return;
+        }
+        const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+        const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+        if (dx <= 2 && dy <= 2) {
+          return;
+        }
+        ignorePointerRef.current = false;
       }
+
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
       setSelectedIndex(index);
     }, []);
@@ -305,12 +330,16 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
       ref,
       () => ({
         onKeyDown: ({ event }: { event: KeyboardEvent }) => {
+          if (items.length === 0) return false;
+
           if (event.key === "ArrowUp") {
-            setSelectedIndex((prev) => Math.max(0, prev - 1));
+            ignorePointerRef.current = true;
+            setSelectedIndex((prev) => (prev - 1 + items.length) % items.length);
             return true;
           }
           if (event.key === "ArrowDown") {
-            setSelectedIndex((prev) => Math.min(items.length - 1, prev + 1));
+            ignorePointerRef.current = true;
+            setSelectedIndex((prev) => (prev + 1) % items.length);
             return true;
           }
           if (event.key === "Enter" || event.key === "Tab") {
@@ -338,22 +367,28 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
 
     return (
       <div className="slash-command-menu" ref={containerRef}>
-        {items.map((item, index) => (
-          <button
-            key={item.title}
-            className={`slash-command-item ${
-              index === selectedIndex ? "is-selected" : ""
-            }`}
-            onClick={() => selectItem(index)}
-            onMouseMove={(e) => handleMouseMove(e, index)}
-          >
-            <div className="slash-command-item-icon">{item.icon}</div>
-            <span className="slash-command-item-title">{item.title}</span>
-            {item.badge && (
-              <span className="slash-command-item-badge">/{item.badge}</span>
-            )}
-          </button>
-        ))}
+        {items.map((item, index) => {
+          const isSelected = index === selectedIndex;
+
+          return (
+            <button
+              key={item.title}
+              type="button"
+              className={`slash-command-item ${isSelected ? "is-selected" : ""}`}
+              onClick={() => selectItem(index)}
+              onMouseMove={(e) => handlePointerAction(e, index)}
+              onMouseEnter={(e) => handlePointerAction(e, index)}
+            >
+              <div className="slash-command-item-left">
+                <span className="slash-command-item-icon">{item.icon}</span>
+                <span className="slash-command-item-title">{item.title}</span>
+              </div>
+              {item.badge && (
+                <span className="slash-command-item-badge">/{item.badge}</span>
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -361,18 +396,107 @@ const CommandList = forwardRef<CommandListRef, CommandListProps>(
 
 CommandList.displayName = "CommandList";
 
+export function computeSlashMenuPlacementAndHeight(
+  clientRect: DOMRect | null | undefined,
+  itemCount: number,
+  windowHeight: number = typeof window !== "undefined" ? window.innerHeight : 600
+): { placement: "bottom-start" | "top-start"; maxHeight: number } {
+  const margin = 12;
+  const offset = 6;
+  const contentHeight = itemCount > 0 ? itemCount * 28 + 12 : 40;
+  // Comfortable height cap: ~348px (shows ~12 items comfortably with scrollbar)
+  const maxMenuCap = 348;
+  const idealHeight = Math.min(contentHeight, maxMenuCap);
+
+  if (!clientRect) {
+    return { placement: "bottom-start", maxHeight: idealHeight };
+  }
+
+  const spaceBelow = Math.max(0, windowHeight - clientRect.bottom - offset - margin);
+  const spaceAbove = Math.max(0, clientRect.top - offset - margin);
+
+  let placement: "bottom-start" | "top-start" = "bottom-start";
+  let availableSpace = spaceBelow;
+
+  if (spaceBelow >= idealHeight) {
+    // Fits comfortably below
+    placement = "bottom-start";
+    availableSpace = spaceBelow;
+  } else if (spaceAbove >= idealHeight) {
+    // Insufficient space below, but fits comfortably above -> flip to top
+    placement = "top-start";
+    availableSpace = spaceAbove;
+  } else {
+    // Neither side fits idealHeight: choose whichever side has more usable space
+    if (spaceAbove > spaceBelow) {
+      placement = "top-start";
+      availableSpace = spaceAbove;
+    } else {
+      placement = "bottom-start";
+      availableSpace = spaceBelow;
+    }
+  }
+
+  // Constrain maxHeight:
+  // Cannot exceed idealHeight (capped at 250px so it's half-sized with scrollbar,
+  // or exact contentHeight for filtered queries like /he)
+  // and cannot exceed availableSpace on chosen side.
+  const maxHeight =
+    idealHeight <= availableSpace
+      ? idealHeight
+      : Math.max(Math.min(40, idealHeight), availableSpace);
+
+  return { placement, maxHeight };
+}
+
 const renderItems = () => {
   let component: ReactRenderer<CommandListRef> | null = null;
   let popup: TippyInstance[] | null = null;
+  let latestProps: SuggestionProps<CommandItem> | null = null;
+
+  const updateMenuSizingAndPosition = (props: SuggestionProps<CommandItem>) => {
+    latestProps = props;
+    if (!props.clientRect || !popup?.[0]) return;
+    const rect = props.clientRect();
+    const itemCount = props.items?.length ?? 0;
+    const { placement, maxHeight } = computeSlashMenuPlacementAndHeight(rect, itemCount);
+
+    const menuEl = component?.element?.querySelector(".slash-command-menu") as HTMLElement | null;
+    if (menuEl) {
+      menuEl.style.maxHeight = `${maxHeight}px`;
+    }
+
+    const getReferenceClientRect = () => props.clientRect?.() || new DOMRect();
+    popup[0].setProps({
+      placement,
+      getReferenceClientRect,
+    });
+  };
+
+  const handleWindowResizeOrScroll = () => {
+    if (latestProps) {
+      updateMenuSizingAndPosition(latestProps);
+    }
+  };
 
   return {
     onStart: (props: SuggestionProps<CommandItem>) => {
+      latestProps = props;
       component = new ReactRenderer(CommandList, {
         props,
         editor: props.editor,
       });
 
       if (!props.clientRect) return;
+
+      const rect = props.clientRect();
+      const itemCount = props.items?.length ?? 0;
+      const { placement, maxHeight } = computeSlashMenuPlacementAndHeight(rect, itemCount);
+
+      const menuEl = component.element?.querySelector(".slash-command-menu") as HTMLElement | null;
+      if (menuEl) {
+        menuEl.style.maxHeight = `${maxHeight}px`;
+      }
 
       const getReferenceClientRect = () => props.clientRect?.() || new DOMRect();
 
@@ -383,20 +507,13 @@ const renderItems = () => {
         showOnCreate: true,
         interactive: true,
         trigger: "manual",
-        placement: "bottom-start",
+        placement,
         offset: [0, 6],
         animation: false,
         duration: [0, 0],
         popperOptions: {
           strategy: "fixed",
           modifiers: [
-            {
-              name: "flip",
-              options: {
-                fallbackPlacements: ["top-start", "bottom-end", "top-end"],
-                padding: 8,
-              },
-            },
             {
               name: "preventOverflow",
               options: {
@@ -408,14 +525,14 @@ const renderItems = () => {
           ],
         },
       });
+
+      window.addEventListener("resize", handleWindowResizeOrScroll);
+      window.addEventListener("scroll", handleWindowResizeOrScroll, { capture: true, passive: true });
     },
     onUpdate(props: SuggestionProps<CommandItem>) {
+      latestProps = props;
       component?.updateProps(props);
-      if (!props.clientRect) return;
-      const getReferenceClientRect = () => props.clientRect?.() || new DOMRect();
-      popup?.[0]?.setProps({
-        getReferenceClientRect,
-      });
+      updateMenuSizingAndPosition(props);
     },
     onKeyDown(props: SuggestionKeyDownProps) {
       if (props.event.key === "Escape") {
@@ -425,8 +542,11 @@ const renderItems = () => {
       return component?.ref?.onKeyDown(props) ?? false;
     },
     onExit() {
+      window.removeEventListener("resize", handleWindowResizeOrScroll);
+      window.removeEventListener("scroll", handleWindowResizeOrScroll, { capture: true });
       popup?.[0]?.destroy();
       component?.destroy();
+      latestProps = null;
     },
   };
 };

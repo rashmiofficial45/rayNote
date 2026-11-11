@@ -34,6 +34,8 @@ import {
   setStoredAccent,
   getStoredFont,
   setStoredFont,
+  getStoredTextOpacity,
+  setStoredTextOpacity,
   initTheme,
 } from "./lib/theme";
 import {
@@ -60,6 +62,7 @@ import {
   DEFAULT_COMMANDS,
   CommandRow,
   getStoredCommandsConfig,
+  detectShortcutConflict,
 } from "./lib/commandsConfig";
 
 type SettingsPane = "general" | "commands" | "aliases" | "storage" | "about";
@@ -78,6 +81,7 @@ export default function SettingsApp() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [accent, setAccent] = useState<AccentColor>(getStoredAccent);
   const [fontFamily, setFontFamily] = useState<string>(getStoredFont);
+  const [textOpacity, setTextOpacity] = useState<number>(getStoredTextOpacity);
 
   // Zoom State
   const [zoomLevel, setZoomLevel] = useState<number>(() => {
@@ -121,7 +125,17 @@ export default function SettingsApp() {
 
   // Header drag ref & single red close button hover state
   const headerRef = useRef<HTMLElement>(null);
+  const tabPillsRef = useRef<HTMLDivElement>(null);
   const [isCloseHovered, setIsCloseHovered] = useState(false);
+
+  // Keep active tab scrolled into view on narrow screens
+  useEffect(() => {
+    if (!tabPillsRef.current) return;
+    const activeEl = tabPillsRef.current.querySelector(".is-active") as HTMLElement | null;
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    }
+  }, [activePane]);
 
   // Initialize theme, storage stats, and real-time sync listeners on mount
   useEffect(() => {
@@ -132,6 +146,7 @@ export default function SettingsApp() {
       onThemeModeChange: setThemeMode,
       onAccentChange: setAccent,
       onFontChange: setFontFamily,
+      onTextOpacityChange: setTextOpacity,
       onZoomChange: setZoomLevel,
       onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: setEscLosesFocus,
@@ -214,6 +229,15 @@ export default function SettingsApp() {
   const shortcutChangePendingRef = useRef(false);
   const handleUpdateHotkey = useCallback(async (id: string, newHotkey: string) => {
     if (shortcutChangePendingRef.current) return;
+
+    // Detect conflict with another existing command
+    const conflict = detectShortcutConflict(newHotkey, id, commands);
+    if (conflict) {
+      setActionMessage(`"${newHotkey}" is already assigned to "${conflict.title}".`);
+      setTimeout(() => setActionMessage(null), 3500);
+      return;
+    }
+
     if (id === "toggle") {
       shortcutChangePendingRef.current = true;
       try {
@@ -414,6 +438,12 @@ export default function SettingsApp() {
     setStoredFont(font);
   };
 
+  const handleTextOpacityChange = (val: number) => {
+    const clamped = Math.min(100, Math.max(50, Math.round(val)));
+    setTextOpacity(clamped);
+    setStoredTextOpacity(clamped);
+  };
+
   // Zoom handlers
   const handleZoom = (level: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(level * 10) / 10));
@@ -551,47 +581,59 @@ export default function SettingsApp() {
         </div>
 
         {/* Tab Pills */}
-        <div className="settings-tab-pills" data-tauri-drag-region>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("general")}
-          >
-            <Sliders size={12} />
-            <span>General</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("commands")}
-          >
-            <Keyboard size={12} />
-            <span>Commands</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "aliases" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("aliases")}
-          >
-            <Tag size={12} />
-            <span>Aliases</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("storage")}
-          >
-            <Database size={12} />
-            <span>Storage</span>
-          </button>
-          <button
-            type="button"
-            className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
-            onClick={() => handlePaneChange("about")}
-          >
-            <Info size={12} />
-            <span>About</span>
-          </button>
+        <div className="settings-tab-pills-container" data-tauri-drag-region>
+          <div ref={tabPillsRef} className="settings-tab-pills" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "general"}
+              className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("general")}
+            >
+              <Sliders size={12} />
+              <span>General</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "commands"}
+              className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("commands")}
+            >
+              <Keyboard size={12} />
+              <span>Commands</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "aliases"}
+              className={`settings-tab-pill liquid-btn ${activePane === "aliases" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("aliases")}
+            >
+              <Tag size={12} />
+              <span>Aliases</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "storage"}
+              className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("storage")}
+            >
+              <Database size={12} />
+              <span>Storage</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activePane === "about"}
+              className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
+              onClick={() => handlePaneChange("about")}
+            >
+              <Info size={12} />
+              <span>About</span>
+            </button>
+          </div>
         </div>
 
         {/* Right spacer for symmetrical centering */}
@@ -606,7 +648,7 @@ export default function SettingsApp() {
             <img src="/app-icon.png" alt="rayNote" className="settings-hero-icon-img" />
           </div>
           <h1 className="settings-hero-title">rayNote</h1>
-          <p className="settings-hero-subtitle">Raycast-inspired notes accessory for macOS.</p>
+          <p className="settings-hero-subtitle text-[13.5px] [font-weight:500] text-[color:var(--text-muted)]">Raycast-inspired notes accessory for macOS.</p>
         </div>
 
         {actionMessage && (
@@ -623,8 +665,8 @@ export default function SettingsApp() {
               {/* Appearance Mode */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Appearance</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Appearance</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Choose between Dark, Light, or automatic macOS system appearance.
                   </div>
                 </div>
@@ -663,8 +705,8 @@ export default function SettingsApp() {
               {/* Accent Palette (6 Liquid Glass Themes) */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Accent Theme</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Accent Theme</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     6 liquid glass curated palettes. Dynamically illuminates aura and controls.
                   </div>
                 </div>
@@ -694,8 +736,8 @@ export default function SettingsApp() {
               {/* Font Family Selection */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Editor Typography</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Editor Typography</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Select your preferred writing font with full Apple Color Emoji fallback.
                   </div>
                 </div>
@@ -713,6 +755,44 @@ export default function SettingsApp() {
                   </select>
                 </div>
               </div>
+
+              <div className="settings-card-divider" />
+
+              {/* Text Opacity Slider */}
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Text Opacity</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                    Reduce eye strain by softening text contrast across the app.
+                  </div>
+                </div>
+                <div className="settings-row-action">
+                  <div className="settings-opacity-control">
+                    <button
+                      type="button"
+                      className="settings-stepper-btn liquid-btn"
+                      onClick={() => handleTextOpacityChange(100)}
+                      disabled={textOpacity === 100}
+                      title="Reset Opacity to 100%"
+                    >
+                      <RotateCcw size={13} />
+                    </button>
+                    <input
+                      type="range"
+                      min={50}
+                      max={100}
+                      step={1}
+                      value={textOpacity}
+                      onChange={(e) => handleTextOpacityChange(Number(e.target.value))}
+                      className="settings-range-slider"
+                      aria-label="Text Opacity"
+                    />
+                    <span className="settings-opacity-display">
+                      {textOpacity}%
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Window & Zoom Card (Raycast Style) */}
@@ -720,8 +800,8 @@ export default function SettingsApp() {
               {/* Show Menu Bar Icon */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Show Menu Bar Icon</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Show Menu Bar Icon</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Display the rayNote icon in the macOS menu bar for quick notes, settings, and options.
                   </div>
                 </div>
@@ -742,8 +822,8 @@ export default function SettingsApp() {
               {/* Escape Key Loses Focus */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Escape Key Loses Focus</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Escape Key Loses Focus</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     When enabled, pressing Escape in Notes makes the window lose focus instead of hiding.
                   </div>
                 </div>
@@ -766,8 +846,8 @@ export default function SettingsApp() {
               {/* Zoom Level */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Zoom</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Zoom</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Adjust the zoom level in the Notes content.
                   </div>
                 </div>
@@ -819,147 +899,95 @@ export default function SettingsApp() {
               </span>
             </div>
 
-            <div className="settings-card commands-table-card">
-              {commands
-                .filter((c) => c.category === "commands")
-                .map((cmd, idx, arr) => {
-                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
-                  const isCustom = cmd.hotkey !== defaultHotkey;
-                  const isRecording = recordingCommandId === cmd.id;
+            {[
+              { title: "Application & Window Commands", category: "commands" as const, symbol: "⌘" },
+              { title: "Text Formatting", category: "formatting" as const, symbol: "B" },
+              { title: "Document Editing", category: "editing" as const, symbol: "E" },
+              { title: "Extensions", category: "extensions" as const, symbol: "✨" },
+            ].map(({ title, category, symbol }, secIdx) => {
+              const filtered = commands.filter((c) => c.category === category);
+              if (filtered.length === 0) return null;
 
-                  return (
-                    <React.Fragment key={cmd.id}>
-                      <div className="settings-command-row">
-                        <div className="settings-cmd-left">
-                          <div className="settings-cmd-icon">
-                            <span className="settings-cmd-icon-symbol">T</span>
-                          </div>
-                          <span className="settings-cmd-title">{cmd.title}</span>
-                        </div>
+              return (
+                <div key={category} className="settings-command-section" style={{ marginTop: secIdx === 0 ? 0 : 20 }}>
+                  <div className="settings-section-header" style={{ marginBottom: 8 }}>
+                    <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {title}
+                    </h3>
+                  </div>
+                  <div className="settings-card commands-table-card">
+                    {filtered.map((cmd, idx, arr) => {
+                      const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
+                      const isCustom = cmd.hotkey !== defaultHotkey;
+                      const isRecording = recordingCommandId === cmd.id;
 
-                        <div className="settings-cmd-right">
-                          <div className="settings-cmd-kbd-wrapper">
-                            <button
-                              type="button"
-                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                startRecording(cmd.id);
-                              }}
-                              title="Double-click to record shortcut"
-                            >
-                              {isRecording ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span className="recording-pulse-dot" />
-                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
-                                </span>
-                              ) : (
-                                cmd.hotkey || "None"
-                              )}
-                            </button>
-                            {isCustom && !isRecording && (
+                      return (
+                        <React.Fragment key={cmd.id}>
+                          <div className="settings-command-row">
+                            <div className="settings-cmd-left">
+                              <div className="settings-cmd-icon">
+                                {category === "extensions" ? (
+                                  <Sparkles size={12} />
+                                ) : (
+                                  <span className="settings-cmd-icon-symbol">{symbol}</span>
+                                )}
+                              </div>
+                              <span className="settings-cmd-title">{cmd.title}</span>
+                            </div>
+
+                            <div className="settings-cmd-right">
+                              <div className="settings-cmd-kbd-wrapper">
+                                <button
+                                  type="button"
+                                  className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    startRecording(cmd.id);
+                                  }}
+                                  title="Double-click to record shortcut"
+                                >
+                                  {isRecording ? (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="recording-pulse-dot" />
+                                      <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
+                                    </span>
+                                  ) : (
+                                    cmd.hotkey || "None"
+                                  )}
+                                </button>
+                                {isCustom && !isRecording && (
+                                  <button
+                                    type="button"
+                                    className="settings-cmd-reset-btn liquid-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResetHotkey(cmd.id);
+                                    }}
+                                    title="Reset to default shortcut"
+                                  >
+                                    <RotateCcw size={11} />
+                                  </button>
+                                )}
+                              </div>
+
                               <button
                                 type="button"
-                                className="settings-cmd-reset-btn liquid-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResetHotkey(cmd.id);
-                                }}
-                                title="Reset to default shortcut"
+                                className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
+                                onClick={() => handleToggleCommand(cmd.id)}
+                                aria-label={`Toggle ${cmd.title}`}
                               >
-                                <RotateCcw size={11} />
+                                {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
                               </button>
-                            )}
+                            </div>
                           </div>
-
-                          <button
-                            type="button"
-                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                            onClick={() => handleToggleCommand(cmd.id)}
-                            aria-label={`Toggle ${cmd.title}`}
-                          >
-                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </div>
-                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                    </React.Fragment>
-                  );
-                })}
-            </div>
-
-            <div className="settings-section-header" style={{ marginTop: 24 }}>
-              <h2>Extensions & Formatting</h2>
-            </div>
-
-            <div className="settings-card commands-table-card">
-              {commands
-                .filter((c) => c.category === "extensions")
-                .map((cmd, idx, arr) => {
-                  const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
-                  const isCustom = cmd.hotkey !== defaultHotkey;
-                  const isRecording = recordingCommandId === cmd.id;
-
-                  return (
-                    <React.Fragment key={cmd.id}>
-                      <div className="settings-command-row">
-                        <div className="settings-cmd-left">
-                          <div className="settings-cmd-icon">
-                            <Sparkles size={12} />
-                          </div>
-                          <span className="settings-cmd-title">{cmd.title}</span>
-                        </div>
-
-                        <div className="settings-cmd-right">
-                          <div className="settings-cmd-kbd-wrapper">
-                            <button
-                              type="button"
-                              className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""}`}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation();
-                                startRecording(cmd.id);
-                              }}
-                              title="Double-click to record shortcut"
-                            >
-                              {isRecording ? (
-                                <span className="flex items-center gap-1.5">
-                                  <span className="recording-pulse-dot" />
-                                  <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
-                                </span>
-                              ) : (
-                                cmd.hotkey || "None"
-                              )}
-                            </button>
-                            {isCustom && !isRecording && (
-                              <button
-                                type="button"
-                                className="settings-cmd-reset-btn liquid-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleResetHotkey(cmd.id);
-                                }}
-                                title="Reset to default shortcut"
-                              >
-                                <RotateCcw size={11} />
-                              </button>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                            onClick={() => handleToggleCommand(cmd.id)}
-                            aria-label={`Toggle ${cmd.title}`}
-                          >
-                            {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                          </button>
-                        </div>
-                      </div>
-                      {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                    </React.Fragment>
-                  );
-                })}
-            </div>
+                          {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -1121,8 +1149,8 @@ export default function SettingsApp() {
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">SQLite Database Storage</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">SQLite Database Storage</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     All notes are stored strictly locally in high-performance SQLite WAL mode.
                   </div>
                 </div>
@@ -1142,11 +1170,11 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Total Notes</div>
-                  <div className="settings-row-desc">Active notes currently stored.</div>
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Total Notes</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">Active notes currently stored.</div>
                 </div>
                 <div className="settings-row-action">
-                  <span className="settings-stat-badge">
+                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">
                     {storageStats ? `${storageStats.notes_count} notes` : "Loading..."}
                   </span>
                 </div>
@@ -1156,8 +1184,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Export All Notes</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Export All Notes</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Download every note as a clean GitHub-Flavored Markdown (.md) file.
                   </div>
                 </div>
@@ -1178,8 +1206,8 @@ export default function SettingsApp() {
             <div className="settings-card danger-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title danger-title">Danger Zone</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title danger-title text-[13.5px] [font-weight:600]">Danger Zone</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Permanently delete all notes from your local SQLite database.
                   </div>
                 </div>
@@ -1235,13 +1263,13 @@ export default function SettingsApp() {
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">rayNote</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">rayNote</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Version 0.1.0 • macOS Apple Silicon (Universal)
                   </div>
                 </div>
                 <div className="settings-row-action">
-                  <span className="settings-stat-badge">v0.1.0</span>
+                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">v0.1.0</span>
                 </div>
               </div>
 
@@ -1249,8 +1277,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Architecture</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Architecture</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Ultra-lightweight: 1 primary NSPanel WebView during normal editing.
                     Settings runs on a standard macOS NSWindow on demand and destroys cleanly on close.
                   </div>
@@ -1261,8 +1289,8 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title">Tech Stack</div>
-                  <div className="settings-row-desc">
+                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Tech Stack</div>
+                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
                     Tauri 2 • Rust • SQLite (WAL mode) • React 19 • TipTap Editor • Liquid Glass Design
                   </div>
                 </div>
