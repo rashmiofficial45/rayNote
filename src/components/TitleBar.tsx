@@ -269,7 +269,7 @@ export function TitleBar({
           title={`Copy Note as Markdown (${copyMarkdownHotkey})`}
           aria-label="Copy Note as Markdown"
         >
-          <FileText size={19} />
+          <FileText size={17} />
         </button>
         <button
           className="title-bar-btn delete-btn"
@@ -277,7 +277,7 @@ export function TitleBar({
           title={`Delete Note (${deleteHotkey})`}
           aria-label="Delete Note"
         >
-          <Trash2 size={19} />
+          <Trash2 size={17} />
         </button>
         <button
           className="title-bar-btn command-palette-btn"
@@ -285,7 +285,7 @@ export function TitleBar({
           title={`Command Palette (${commandPaletteHotkey})`}
           aria-label="Command Palette"
         >
-          <Command size={19} />
+          <Command size={17} />
         </button>
       </div>
     </div>

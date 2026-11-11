@@ -488,16 +488,17 @@ body,
   top: 0;
   left: 0;
   right: 0;
-  height: 58px;
+  height: 52px;
   pointer-events: none;
   z-index: 15;
   background: linear-gradient(
     180deg,
-    rgba(var(--app-bg-rgb), 1) 0%,
-    rgba(var(--app-bg-rgb), 0.96) 28%,
-    rgba(var(--app-bg-rgb), 0.72) 58%,
-    rgba(var(--app-bg-rgb), 0.28) 84%,
-    rgba(var(--app-bg-rgb), 0) 100%
+    rgba(var(--app-bg-rgb), 1) 0px,
+    rgba(var(--app-bg-rgb), 0.98) 3px,
+    rgba(var(--app-bg-rgb), 0.85) 9px,
+    rgba(var(--app-bg-rgb), 0.55) 20px,
+    rgba(var(--app-bg-rgb), 0.22) 42px,
+    rgba(var(--app-bg-rgb), 0) 52px
   );
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
@@ -604,14 +605,16 @@ body,
 }
 
 .title-bar-right {
-  --title-action-size: 34px;
-  display: flex;
+  --title-action-size: 30px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  justify-self: end;
   position: relative;
   border: 1px solid var(--glass-panel-border);
   border-radius: 9999px;
-  padding: 2px 0;
+  padding: 3px;
+  gap: 2px;
   background: var(--glass-menu-bg);
   -webkit-backdrop-filter: var(--glass-menu-blur);
   backdrop-filter: var(--glass-menu-blur);
@@ -660,8 +663,9 @@ body,
 
 .title-bar-btn {
   position: relative;
-  flex: 0 0 var(--title-action-size);
+  width: var(--title-action-size);
   height: var(--title-action-size);
+  flex: 0 0 var(--title-action-size);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -671,31 +675,18 @@ body,
   color: var(--text-primary);
   cursor: pointer;
   -webkit-app-region: no-drag;
+  transition: background-color 0.14s cubic-bezier(0.16, 1, 0.3, 1),
+              color 0.14s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.title-bar-right::before {
-  content: "";
-  position: absolute;
-  left: calc((100% - 3 * var(--title-action-size)) / 2);
-  width: var(--title-action-size);
-  height: var(--title-action-size);
-  border-radius: 9999px;
-  pointer-events: none;
+.title-bar-btn:hover {
   background: var(--btn-liquid-bg-hover);
-  opacity: 0;
-  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.12s ease;
+  color: var(--text-primary);
 }
 
-.title-bar-right:has(> .title-bar-btn:hover)::before {
-  opacity: 1;
-}
-
-.title-bar-right:has(> .delete-btn:hover)::before {
-  transform: translateX(var(--title-action-size));
-}
-
-.title-bar-right:has(> .command-palette-btn:hover)::before {
-  transform: translateX(calc(2 * var(--title-action-size)));
+.title-bar-btn:active {
+  transform: scale(0.92);
 }
 
 body:not(:has(.command-overlay)) .title-bar-right:has(> .title-bar-btn:focus-visible) {
@@ -706,17 +697,7 @@ body:not(:has(.command-overlay)) .title-bar-right:has(> .title-bar-btn:focus-vis
 
 .title-bar-btn:focus-visible {
   outline: 2px solid var(--color-accent);
-  outline-offset: -3px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .title-bar-right::before {
-    transition: none;
-  }
-}
-
-.title-bar-btn:active svg {
-  transform: scale(0.95);
+  outline-offset: -2px;
 }
 
 /* ── Close Button (Single Red X — macOS Style) ─────────────────────── */
