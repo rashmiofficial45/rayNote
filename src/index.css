@@ -491,15 +491,19 @@ body,
   height: 52px;
   pointer-events: none;
   z-index: 15;
+  opacity: 1;
+
   background: linear-gradient(
     180deg,
     rgba(var(--app-bg-rgb), 1) 0px,
-    rgba(var(--app-bg-rgb), 0.98) 3px,
-    rgba(var(--app-bg-rgb), 0.85) 9px,
-    rgba(var(--app-bg-rgb), 0.55) 20px,
-    rgba(var(--app-bg-rgb), 0.22) 42px,
+    rgba(var(--app-bg-rgb), 1) 24px,
+    rgba(var(--app-bg-rgb), 0.95) 38px,
+    rgba(var(--app-bg-rgb), 0.85) 42px,
+    rgba(var(--app-bg-rgb), 0.75) 46px,
+    rgba(var(--app-bg-rgb), 0.38) 49px,
     rgba(var(--app-bg-rgb), 0) 52px
   );
+
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
 }
@@ -837,7 +841,7 @@ body:not(:has(.command-overlay)) .title-bar-right:has(> .title-bar-btn:focus-vis
 .tiptap {
   outline: none;
   min-height: auto;
-  padding-top: 58px;
+  padding-top: 50px;
   padding-bottom: 60px;
   padding-left: var(--editor-padding-left);
   /* Do not count the slider as part of padding:
