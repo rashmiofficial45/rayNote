@@ -1,3 +1,4 @@
+import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import { getStoredCommandsConfig } from "../lib/commandsConfig";
 import { Extension } from "@tiptap/react";
 import Suggestion, { SuggestionProps, SuggestionKeyDownProps, SuggestionOptions, findSuggestionMatch } from "@tiptap/suggestion";
@@ -7,7 +8,7 @@ import "@tiptap/extension-underline";
 import tippy, { Instance as TippyInstance } from "tippy.js";
 import {
   forwardRef,
-  useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useState,
   useCallback,
@@ -273,6 +274,7 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
     const [prevItems, setPrevItems] = useState(items);
     const containerRef = useRef<HTMLDivElement>(null);
     const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
+    const selectionFromPointer = useRef(false);
     const ignorePointerRef = useRef<boolean>(false);
 
     // Synchronously reset selectedIndex when items list changes to avoid stale selection lag
@@ -281,7 +283,11 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
       setSelectedIndex(0);
     }
 
-    useEffect(() => {
+    useLayoutEffect(() => {
+      if (selectionFromPointer.current) {
+        selectionFromPointer.current = false;
+        return;
+      }
       const container = containerRef.current;
       if (!container) return;
       if (selectedIndex === 0) {
@@ -293,10 +299,8 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
         return;
       }
       const selectedEl = container.children[selectedIndex] as HTMLElement;
-      if (selectedEl && typeof selectedEl.scrollIntoView === "function") {
-        selectedEl.scrollIntoView({ block: "nearest" });
-      }
-    }, [selectedIndex, items.length]);
+      revealMenuItem(container, selectedEl);
+    }, [selectedIndex, items]);
 
     const selectItem = useCallback(
       (index: number) => {
@@ -323,8 +327,11 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
       }
 
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-      setSelectedIndex(index);
-    }, []);
+      if (index !== selectedIndex) {
+        selectionFromPointer.current = true;
+        setSelectedIndex(index);
+      }
+    }, [selectedIndex]);
 
     useImperativeHandle(
       ref,
@@ -334,12 +341,12 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
 
           if (event.key === "ArrowUp") {
             ignorePointerRef.current = true;
-            setSelectedIndex((prev) => (prev - 1 + items.length) % items.length);
+            setSelectedIndex((prev) => nextMenuIndex(prev, items.length, -1, event.repeat));
             return true;
           }
           if (event.key === "ArrowDown") {
             ignorePointerRef.current = true;
-            setSelectedIndex((prev) => (prev + 1) % items.length);
+            setSelectedIndex((prev) => nextMenuIndex(prev, items.length, 1, event.repeat));
             return true;
           }
           if (event.key === "Enter" || event.key === "Tab") {
@@ -377,7 +384,6 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
               className={`slash-command-item ${isSelected ? "is-selected" : ""}`}
               onClick={() => selectItem(index)}
               onMouseMove={(e) => handlePointerAction(e, index)}
-              onMouseEnter={(e) => handlePointerAction(e, index)}
             >
               <div className="slash-command-item-left">
                 <span className="slash-command-item-icon">{item.icon}</span>

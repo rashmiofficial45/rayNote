@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { Editor } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 import { copyToClipboard } from "../lib/clipboard";
@@ -37,6 +38,8 @@ export function FloatingCodeBlockToolbar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hoveredPreRef = useRef<HTMLElement | null>(null);
   const activeBlockRef = useRef<ActiveBlockState | null>(null);
+  const menuMousePosRef = useRef<{ x: number; y: number } | null>(null);
+  const selectionFromPointer = useRef(false);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   activeBlockRef.current = activeBlock;
 
@@ -460,16 +463,14 @@ export function FloatingCodeBlockToolbar({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         e.stopPropagation();
-        lastMousePosRef.current = null;
-        setSelectedIndex((prev) => Math.min(filteredLanguages.length - 1, prev + 1));
+        setSelectedIndex((prev) => nextMenuIndex(prev, filteredLanguages.length, 1, e.repeat));
         return;
       }
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
         e.stopPropagation();
-        lastMousePosRef.current = null;
-        setSelectedIndex((prev) => Math.max(0, prev - 1));
+        setSelectedIndex((prev) => nextMenuIndex(prev, filteredLanguages.length, -1, e.repeat));
         return;
       }
 
@@ -485,15 +486,19 @@ export function FloatingCodeBlockToolbar({
     [isOpen, filteredLanguages, selectedIndex, handleSelectLanguage, editor]
   );
 
-  // Scroll active item into view
-  useEffect(() => {
-    if (!isOpen || !menuRef.current) return;
-    const items = menuRef.current.querySelectorAll(".code-lang-item");
-    const activeItem = items[selectedIndex] as HTMLElement | undefined;
-    if (activeItem) {
-      activeItem.scrollIntoView({ block: "nearest" });
+  useLayoutEffect(() => {
+    if (selectionFromPointer.current) {
+      selectionFromPointer.current = false;
+      return;
     }
-  }, [selectedIndex, isOpen]);
+    const list = menuRef.current;
+    if (!isOpen || !list) return;
+    if (selectedIndex === 0) {
+      list.scrollTop = 0;
+      return;
+    }
+    revealMenuItem(list, list.querySelectorAll<HTMLElement>(".code-lang-item")[selectedIndex]);
+  }, [selectedIndex, isOpen, filteredLanguages]);
 
   if (!activeBlock || !document.body.contains(activeBlock.dom)) return null;
 
@@ -579,15 +584,16 @@ export function FloatingCodeBlockToolbar({
                         }}
                         onClick={(e) => handleSelectLanguage(lang.value, e)}
                         onMouseMove={(e) => {
-                          if (!lastMousePosRef.current) {
-                            lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                          if (!menuMousePosRef.current) {
+                            menuMousePosRef.current = { x: e.clientX, y: e.clientY };
                             return;
                           }
-                          const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
-                          const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+                          const dx = Math.abs(e.clientX - menuMousePosRef.current.x);
+                          const dy = Math.abs(e.clientY - menuMousePosRef.current.y);
                           if (dx > 2 || dy > 2) {
-                            lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+                            menuMousePosRef.current = { x: e.clientX, y: e.clientY };
                             if (selectedIndex !== idx) {
+                              selectionFromPointer.current = true;
                               setSelectedIndex(idx);
                             }
                           }

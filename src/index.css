@@ -693,7 +693,7 @@ body,
   transform: scale(0.92);
 }
 
-body:not(:has(.command-overlay)) .title-bar-right:has(> .title-bar-btn:focus-visible) {
+body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .title-bar-btn:focus-visible) {
   opacity: 1 !important;
   pointer-events: auto !important;
   transform: translateY(0) !important;
@@ -1895,9 +1895,13 @@ pre.notefast-code-block:hover {
   animation: fadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Eliminate background bleed-through blocks and smudges when any modal is open */
-body:has(.command-overlay) .title-bar-right,
-body:has(.command-overlay) .title-bar-btn,
+/* Hide the glass and its controls together while a popup is open. */
+body:has(.command-overlay, .smart-search-overlay) .title-bar-right,
+body:has(.command-overlay, .smart-search-overlay) .title-bar-right > .title-bar-btn {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 body:has(.command-overlay) .close-btn-x,
 body:has(.command-overlay) .format-corner-btn,
 body:has(.command-overlay) .doc-tick-slider-wrapper,
@@ -1907,29 +1911,81 @@ body:has(.command-overlay) .editor-char-count {
   transition: opacity 0.15s ease;
 }
 
-.command-palette {
-  width: min(92vw, 475px);
-  max-height: min(500px, calc(100dvh - 64px));
-  background: var(--modal-bg);
-  backdrop-filter: blur(36px) saturate(210%);
-  -webkit-backdrop-filter: blur(36px) saturate(210%);
-  border: 1px solid var(--modal-border);
-  border-radius: 20px;
-  box-shadow: var(--modal-shadow), 0 20px 50px rgba(0, 0, 0, 0.35);
+.command-overlay:has(> .command-palette),
+.smart-search-overlay {
+  padding-top: 24px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  animation: none;
+}
+
+.command-palette,
+.smart-search-modal {
+  --picker-solid: #25262a;
+  --picker-frost: rgb(26 27 30 / 44%);
+  --picker-sheen: none;
+  --picker-rim: rgb(255 255 255 / 16%);
+  --picker-edge-light: rgb(255 255 255 / 23%);
+  --picker-shadow: rgb(0 0 0 / 21%);
+  --picker-control: rgb(255 255 255 / 6%);
+  width: min(420px, calc(100% - 24px));
+  max-height: min(480px, calc(100dvh - 36px));
+  background: var(--picker-solid);
+  border: 1px solid var(--picker-rim);
+  border-radius: 34px;
+  box-shadow: inset 0 1px 0 var(--picker-edge-light),
+              inset 0 -1px 0 var(--picker-rim),
+              0 8px 24px var(--picker-shadow);
   overflow: hidden;
-  animation: overlayIn 0.12s ease-out;
   display: flex;
   flex-direction: column;
 }
 
-.command-search {
+:is([data-theme="light"], [data-resolved-theme="light"]) :is(.command-palette, .smart-search-modal) {
+  --picker-solid: #f3f2ef;
+  --picker-frost: rgb(246 246 245 / 28%);
+  --picker-sheen: linear-gradient(155deg, rgb(255 255 255 / 24%), transparent 58%);
+  --picker-rim: rgb(255 255 255 / 88%);
+  --picker-edge-light: #fff;
+  --picker-shadow: rgb(50 43 36 / 12%);
+  --picker-control: rgb(255 255 255 / 46%);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .command-palette,
+  .smart-search-modal {
+    background: var(--picker-sheen) var(--picker-frost);
+    backdrop-filter: blur(12px) saturate(145%);
+    -webkit-backdrop-filter: blur(12px) saturate(145%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .command-palette,
+  .smart-search-modal {
+    background: var(--picker-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+.command-search,
+.smart-search-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--separator);
-  background: var(--surface-glass);
+  gap: 8px;
+  margin: 11px 11px 5px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: var(--picker-control);
   flex-shrink: 0;
+}
+
+.command-search:focus-within,
+.smart-search-header:focus-within {
+  border-color: var(--color-accent-border);
 }
 
 .command-search input {
@@ -1954,29 +2010,36 @@ body:has(.command-overlay) .editor-char-count {
 .command-view-switch-btn {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
+  padding: 4px 9px;
+  background: var(--picker-control);
+  border: 1px solid var(--picker-rim);
   border-radius: 9999px;
-  box-shadow: var(--btn-liquid-shadow);
-  color: var(--text-muted);
+  color: var(--color-accent-text, var(--color-accent));
   font-size: 10.5px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
   white-space: nowrap;
 }
 
 .command-view-switch-btn:hover {
-  background: var(--color-accent);
-  border-color: var(--color-accent-hover);
-  color: #ffffff;
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
+  color: var(--text-primary);
+}
+
+.command-palette {
+  padding-bottom: 12px;
 }
 
 .command-list {
+  min-height: 0;
   max-height: 360px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 6px 10px 8px;
+  scroll-padding-block: 6px 8px;
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
 }
 
 .command-item {
@@ -1989,12 +2052,12 @@ body:has(.command-overlay) .editor-char-count {
   max-height: 38px;
   box-sizing: border-box;
   width: 100%;
-  border-radius: 9px;
+  border-radius: 18px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.08s ease;
+  transition: none;
   text-align: left;
   font-family: inherit;
   font-size: 12.5px;
@@ -2007,31 +2070,33 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .command-item.is-selected {
-  background: var(--color-accent-muted, rgba(56, 189, 248, 0.16));
-  border-color: var(--color-accent-border, rgba(56, 189, 248, 0.28));
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
-.command-item-icon {
-  width: 24px;
+.command-item-icon,
+.smart-search-item-icon {
+  width: 26px;
   height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  color: var(--text-primary);
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: all 0.1s ease;
 }
 
-.command-item.is-selected .command-item-icon {
-  color: var(--text-primary);
-  background: var(--color-accent-muted, rgba(56, 189, 248, 0.2));
-  border-color: var(--color-accent-border, rgba(56, 189, 248, 0.4));
+.command-item-icon > svg,
+.smart-search-item-icon > svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.15;
+  color: inherit !important;
+}
+
+.command-item.is-selected .command-item-icon,
+.smart-search-item.is-selected .smart-search-item-icon,
+.smart-search-item-icon:has(> .smart-search-pin-icon) {
+  color: var(--color-accent-text, var(--color-accent));
 }
 
 .command-item-text {
@@ -2077,9 +2142,6 @@ body:has(.command-overlay) .editor-char-count {
   color: var(--color-accent-text, var(--color-accent));
   white-space: nowrap;
   text-transform: lowercase;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .command-item-shortcut {
@@ -2098,7 +2160,6 @@ body:has(.command-overlay) .editor-char-count {
   padding: 0 4px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
   border-radius: 5px;
   color: var(--text-secondary);
   font-size: 9.5px;
@@ -2212,10 +2273,7 @@ body:has(.command-overlay) .editor-char-count {
   border: none;
   background: transparent;
   cursor: default;
-  transition:
-    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 80ms ease,
-    color 120ms ease;
+  transition: transform 80ms ease;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 450;
@@ -5664,40 +5722,10 @@ body:has(.command-overlay) .editor-char-count {
 .smart-search-overlay {
   position: fixed;
   inset: 0;
-  background: var(--overlay-dim);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   z-index: 110;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 48px;
-  animation: fadeIn 0.1s ease-out;
-}
-
-.smart-search-modal {
-  width: min(92vw, 475px);
-  max-height: 500px;
-  background: var(--modal-bg);
-  backdrop-filter: blur(36px) saturate(210%);
-  -webkit-backdrop-filter: blur(36px) saturate(210%);
-  border: 1px solid var(--modal-border);
-  border-radius: 20px;
-  box-shadow: var(--modal-shadow), 0 20px 50px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
-  animation: overlayIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
-  display: flex;
-  flex-direction: column;
-}
-
-.smart-search-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--separator);
-  background: var(--surface-glass);
-  flex-shrink: 0;
 }
 
 .smart-search-icon {
@@ -5733,7 +5761,6 @@ body:has(.command-overlay) .editor-char-count {
   border-radius: 9999px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
   color: var(--text-muted);
   cursor: pointer;
   transition: all 0.1s ease;
@@ -5750,7 +5777,6 @@ body:has(.command-overlay) .editor-char-count {
   padding: 3px 8px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
   border-radius: 9999px;
   font-size: 10.5px;
   font-weight: 500;
@@ -5760,9 +5786,13 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .smart-search-list {
+  min-height: 0;
   max-height: 360px;
   overflow-y: auto;
-  padding: 6px;
+  padding: 6px 10px 8px;
+  scroll-padding-block: 6px 8px;
+  scrollbar-gutter: stable both-edges;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -5775,47 +5805,20 @@ body:has(.command-overlay) .editor-char-count {
   padding: 6px 10px;
   min-height: 44px;
   box-sizing: border-box;
-  border-radius: 9px;
+  border-radius: 22px;
   border: 1px solid transparent;
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
-  transition: background 0.08s ease, border-color 0.08s ease, color 0.08s ease;
   text-align: left;
 }
 
 /* Strictly ONLY one item is highlighted - single deliberate selection */
 .smart-search-item.is-selected {
-  background: var(--color-accent-muted, rgba(56, 189, 248, 0.16));
-  border-color: var(--color-accent-border, rgba(56, 189, 248, 0.28));
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
   color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
-
-.smart-search-item-icon {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 7px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
-  color: var(--text-muted);
-  flex-shrink: 0;
-  transition: all 0.1s ease;
-}
-
-.smart-search-item.is-selected .smart-search-item-icon {
-  color: var(--text-primary);
-  background: var(--color-accent-muted, rgba(56, 189, 248, 0.2));
-  border-color: var(--color-accent-border, rgba(56, 189, 248, 0.4));
-}
-
-.smart-search-pin-icon {
-  color: #f59e0b;
 }
 
 .smart-search-item-body {
@@ -5847,11 +5850,11 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 .smart-search-highlight {
-  background: var(--color-accent-muted, rgba(56, 189, 248, 0.22));
+  background: var(--color-accent-muted);
   color: var(--text-primary);
   font-weight: 600;
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: 5px;
 }
 
 .smart-search-empty {
@@ -5883,7 +5886,6 @@ body:has(.command-overlay) .editor-char-count {
   justify-content: center;
   padding: 7px 12px;
   border-top: 1px solid var(--separator);
-  background: var(--surface-glass);
   font-size: 10.5px;
   font-weight: 450;
   color: var(--text-muted);
@@ -5944,10 +5946,7 @@ body:has(.command-overlay) .editor-char-count {
   text-align: left;
   white-space: nowrap;
   outline: none;
-  transition:
-    background 120ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 80ms ease,
-    color 120ms ease;
+  transition: transform 80ms ease;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -6120,6 +6119,7 @@ body:has(.command-overlay) .editor-char-count {
   .code-lang-liquid-menu,
   .bottom-toolbar-expanded-menu,
   .command-palette,
+  .smart-search-modal,
   .shortcuts-modal-container,
   .settings-card,
   .settings-header-bar {
@@ -6133,6 +6133,7 @@ body:has(.command-overlay) .editor-char-count {
   .editor-context-submenu,
   .slash-command-menu,
   .command-palette,
+  .smart-search-modal,
   .shortcuts-modal-container,
   .bottom-toolbar-expanded-menu {
     animation: none !important;

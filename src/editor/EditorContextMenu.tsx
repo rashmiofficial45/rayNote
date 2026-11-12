@@ -1,3 +1,4 @@
+import { nextMenuIndex } from "../lib/menuNavigation";
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Editor } from "@tiptap/react";
@@ -634,13 +635,13 @@ export function EditorContextMenu({
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ignorePointerRef.current = true;
-          setSubmenuHighlightedIndex((prev) => (prev + 1) % subItems.length);
+          setSubmenuHighlightedIndex((prev) => nextMenuIndex(prev, subItems.length, 1, e.repeat));
           return;
         }
         if (e.key === "ArrowUp") {
           e.preventDefault();
           ignorePointerRef.current = true;
-          setSubmenuHighlightedIndex((prev) => (prev - 1 + subItems.length) % subItems.length);
+          setSubmenuHighlightedIndex((prev) => nextMenuIndex(prev, subItems.length, -1, e.repeat));
           return;
         }
         if (e.key === "ArrowLeft") {
@@ -663,13 +664,13 @@ export function EditorContextMenu({
       if (e.key === "ArrowDown") {
         e.preventDefault();
         ignorePointerRef.current = true;
-        setHighlightedIndex((prev) => (prev + 1) % selectableItems.length);
+        setHighlightedIndex((prev) => nextMenuIndex(prev, selectableItems.length, 1, e.repeat));
         return;
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
         ignorePointerRef.current = true;
-        setHighlightedIndex((prev) => (prev - 1 + selectableItems.length) % selectableItems.length);
+        setHighlightedIndex((prev) => nextMenuIndex(prev, selectableItems.length, -1, e.repeat));
         return;
       }
       if (e.key === "ArrowRight") {

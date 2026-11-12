@@ -1,5 +1,6 @@
+import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "../lib/storage";
-import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { NoteSummary, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 
 const PaletteSubViews = lazy(() => import("./PaletteSubViews"));
@@ -868,6 +869,7 @@ export function CommandPalette({
   };
 
   const listRef = useRef<HTMLDivElement>(null);
+  const selectionFromPointer = useRef(false);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleItemMouseMove = useCallback((idx: number, e: React.MouseEvent) => {
@@ -875,9 +877,12 @@ export function CommandPalette({
     const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
     if (dx > 3 || dy > 3) {
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-      setSelectedIndex((prev) => (prev === idx ? prev : idx));
+      if (idx !== selectedIndex) {
+        selectionFromPointer.current = true;
+        setSelectedIndex(idx);
+      }
     }
-  }, []);
+  }, [selectedIndex]);
 
   const isSubView =
     view === "sub_appearance" ||
@@ -910,14 +915,21 @@ export function CommandPalette({
     setSelectedIndex(0);
   }, [search, view]);
 
-  // Auto-scroll selected item into view instantly
-  useEffect(() => {
-    if (!listRef.current) return;
-    const selectedEl = listRef.current.querySelector(".is-selected") as HTMLElement | null;
-    if (selectedEl) {
-      selectedEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+  // Hover updates the highlight without moving the list under the pointer.
+  useLayoutEffect(() => {
+    if (selectionFromPointer.current) {
+      selectionFromPointer.current = false;
+      return;
     }
-  }, [selectedIndex]);
+    const list = listRef.current;
+    if (!list) return;
+    if (selectedIndex === 0) {
+      list.scrollTop = 0;
+      return;
+    }
+    const selectedEl = list.querySelector<HTMLElement>(".is-selected");
+    revealMenuItem(list, selectedEl);
+  }, [isOpen, search, selectedIndex, view]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -941,17 +953,21 @@ export function CommandPalette({
         return;
       }
       if (e.key === "ArrowDown") {
+        const { repeat } = e;
         e.preventDefault();
         e.stopPropagation();
-        lastMousePosRef.current = { x: 0, y: 0 };
-        setSelectedIndex((i) => Math.min(currentItems.length - 1, i + 1));
+        if (currentItems.length > 0) {
+          setSelectedIndex((i) => nextMenuIndex(i, currentItems.length, 1, repeat));
+        }
         return;
       }
       if (e.key === "ArrowUp") {
+        const { repeat } = e;
         e.preventDefault();
         e.stopPropagation();
-        lastMousePosRef.current = { x: 0, y: 0 };
-        setSelectedIndex((i) => Math.max(0, i - 1));
+        if (currentItems.length > 0) {
+          setSelectedIndex((i) => nextMenuIndex(i, currentItems.length, -1, repeat));
+        }
         return;
       }
       if (e.key === "Backspace" && isSubView && !search) {

@@ -124,6 +124,26 @@ describe("SlashCommand Menu Highlighting & Minimal UI", () => {
     expect(selected[0].querySelector(".slash-command-item-title")?.textContent).toBe(items[1].title);
   });
 
+  it("keeps held arrows at the boundary and wraps on the next press", () => {
+    const items: CommandItem[] = (SlashCommand.options as any).suggestion.items({ query: "" });
+    const ref = createRef<CommandListRef>();
+    act(() => root.render(<CommandList ref={ref} items={items} command={vi.fn()} />));
+
+    const press = (key: string, repeat = false) => act(() => {
+      ref.current?.onKeyDown({ event: new KeyboardEvent("keydown", { key, repeat }) });
+    });
+    const selectedTitle = () => host.querySelector(".is-selected .slash-command-item-title")?.textContent;
+
+    press("ArrowUp", true);
+    expect(selectedTitle()).toBe(items[0].title);
+    press("ArrowUp");
+    expect(selectedTitle()).toBe(items[items.length - 1].title);
+    press("ArrowDown", true);
+    expect(selectedTitle()).toBe(items[items.length - 1].title);
+    press("ArrowDown");
+    expect(selectedTitle()).toBe(items[0].title);
+  });
+
   it("coordinates pointer hover with keyboard navigation without dual highlights", async () => {
     const getItems = (SlashCommand.options as any).suggestion.items;
     const items: CommandItem[] = getItems({ query: "" });

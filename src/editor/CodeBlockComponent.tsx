@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
 import { Copy, Check, ChevronDown, Search } from "lucide-react";
 import { copyToClipboard } from "../lib/clipboard";
@@ -41,6 +42,7 @@ export function CodeBlockComponent({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const selectionFromPointer = useRef(false);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   const currentLang = (node?.attrs?.language || "bash").toLowerCase();
@@ -159,18 +161,14 @@ export function CodeBlockComponent({
     if (e.key === "ArrowDown") {
       e.preventDefault();
       e.stopPropagation();
-      lastMousePosRef.current = null;
-      setSelectedIndex((prev) =>
-        Math.min(filteredLanguages.length - 1, prev + 1)
-      );
+      setSelectedIndex((prev) => nextMenuIndex(prev, filteredLanguages.length, 1, e.repeat));
       return;
     }
 
     if (e.key === "ArrowUp") {
       e.preventDefault();
       e.stopPropagation();
-      lastMousePosRef.current = null;
-      setSelectedIndex((prev) => Math.max(0, prev - 1));
+      setSelectedIndex((prev) => nextMenuIndex(prev, filteredLanguages.length, -1, e.repeat));
       return;
     }
 
@@ -184,15 +182,19 @@ export function CodeBlockComponent({
     }
   }, [isOpen, filteredLanguages, selectedIndex, handleSelectLanguage]);
 
-  // Scroll active item into view when selectedIndex changes
-  useEffect(() => {
-    if (!isOpen || !menuRef.current) return;
-    const items = menuRef.current.querySelectorAll(".code-lang-item");
-    const activeItem = items[selectedIndex] as HTMLElement | undefined;
-    if (activeItem) {
-      activeItem.scrollIntoView({ block: "nearest" });
+  useLayoutEffect(() => {
+    if (selectionFromPointer.current) {
+      selectionFromPointer.current = false;
+      return;
     }
-  }, [selectedIndex, isOpen]);
+    const list = menuRef.current;
+    if (!isOpen || !list) return;
+    if (selectedIndex === 0) {
+      list.scrollTop = 0;
+      return;
+    }
+    revealMenuItem(list, list.querySelectorAll<HTMLElement>(".code-lang-item")[selectedIndex]);
+  }, [selectedIndex, isOpen, filteredLanguages]);
 
   return (
     <NodeViewWrapper className="code-block-wrapper">
@@ -290,6 +292,7 @@ export function CodeBlockComponent({
                             if (dx > 2 || dy > 2) {
                               lastMousePosRef.current = { x: e.clientX, y: e.clientY };
                               if (selectedIndex !== idx) {
+                                selectionFromPointer.current = true;
                                 setSelectedIndex(idx);
                               }
                             }

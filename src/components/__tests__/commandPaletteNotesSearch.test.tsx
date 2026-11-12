@@ -143,4 +143,43 @@ describe("CommandPalette Notes Search Integration", () => {
     expect(container.textContent).toContain("Groceries & Shopping");
     expect(container.textContent).toContain("coffee beans");
   });
+
+  it("holds at the last command during key repeat and wraps on a fresh press", () => {
+    act(() => root.render(
+      <CommandPalette
+        isOpen
+        notes={mockNotes}
+        activeNoteId={null}
+        zoomLevel={1}
+        onClose={vi.fn()}
+        onNewNote={vi.fn()}
+        onDuplicateNote={vi.fn()}
+        onSelectNote={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onTogglePin={vi.fn()}
+        onGoBack={vi.fn()}
+        onGoForward={vi.fn()}
+      />
+    ));
+
+    const input = container.querySelector("input")!;
+    const rows = [...container.querySelectorAll(".command-item")];
+    const list = container.querySelector<HTMLElement>(".command-list")!;
+    const press = (key: string, repeat = false) => act(() => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key, repeat, bubbles: true }));
+    });
+
+    press("ArrowUp");
+    expect(container.querySelector(".is-selected")).toBe(rows[rows.length - 1]);
+    press("ArrowDown", true);
+    expect(container.querySelector(".is-selected")).toBe(rows[rows.length - 1]);
+    press("ArrowDown");
+    expect(container.querySelector(".is-selected")).toBe(rows[0]);
+
+    press("ArrowDown");
+    list.scrollTop = 20;
+    act(() => rows[0].dispatchEvent(new MouseEvent("mousemove", { clientX: 30, clientY: 30, bubbles: true })));
+    expect(container.querySelector(".is-selected")).toBe(rows[0]);
+    expect(list.scrollTop).toBe(20);
+  });
 });

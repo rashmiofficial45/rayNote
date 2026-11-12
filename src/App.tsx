@@ -141,11 +141,12 @@ function App() {
   const deletingNoteRef = useRef<string | null>(null);
 
   const [isBootReady, setIsBootReady] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isSmartSearchOpen, setIsSmartSearchOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<"palette" | "notes" | "shortcuts" | "find" | null>(null);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "settings">("actions");
-  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
-  const [isFindOpen, setIsFindOpen] = useState(false);
+  const closePalette = useCallback(() => setActivePanel((panel) => panel === "palette" ? null : panel), []);
+  const closeSmartSearch = useCallback(() => setActivePanel((panel) => panel === "notes" ? null : panel), []);
+  const closeShortcuts = useCallback(() => setActivePanel((panel) => panel === "shortcuts" ? null : panel), []);
+  const closeFind = useCallback(() => setActivePanel((panel) => panel === "find" ? null : panel), []);
   const [isLoading, setIsLoading] = useState(() => {
     try {
       const cached = safeLocalStorageGetItem("notefast_cached_notes");
@@ -516,6 +517,13 @@ function App() {
   // Local Markdown File Import & Preview States
   const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
   const [droppedFilePrompt, setDroppedFilePrompt] = useState<{ file: File; text: string } | null>(null);
+
+  const hasBlockingDialog = Boolean(deleteConfirm || droppedFilePrompt || previewFile || switchConflict);
+  const visiblePanel = hasBlockingDialog ? null : activePanel;
+
+  useEffect(() => {
+    if (hasBlockingDialog) setActivePanel(null);
+  }, [hasBlockingDialog]);
   const [isDragOver, setIsDragOver] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const viewFileInputRef = useRef<HTMLInputElement>(null);
@@ -1131,7 +1139,7 @@ function App() {
     (view: "actions" | "settings" = "actions") => {
       // 1. Open palette immediately (0ms) with existing cached recents
       setPaletteInitialView(view);
-      setIsCommandPaletteOpen(true);
+      setActivePanel("palette");
 
       // 2. Concurrently flush in-flight editor/title saves and replace with fresh recents once drained
       const pendingFlush = flushEditorNow();
@@ -1150,7 +1158,7 @@ function App() {
 
   const handleOpenSmartSearch = useCallback(() => {
     // 1. Open SmartSearch immediately (0ms) with existing cached recents
-    setIsSmartSearchOpen(true);
+    setActivePanel("notes");
 
     // 2. Concurrently flush in-flight editor/title saves and replace with fresh recents once drained
     const pendingFlush = flushEditorNow();
@@ -1732,9 +1740,13 @@ function App() {
       // Command Palette (Cmd+K)
       if (isTriggered("search", "⌘K")) {
         e.preventDefault();
+        if (hasBlockingDialog) {
+          e.stopPropagation();
+          return;
+        }
         e.stopPropagation();
-        if (isCommandPaletteOpen && paletteInitialView === "actions") {
-          setIsCommandPaletteOpen(false);
+        if (visiblePanel === "palette" && paletteInitialView === "actions") {
+          closePalette();
         } else {
           handleOpenCommandPalette("actions");
         }
@@ -1744,9 +1756,13 @@ function App() {
       // Dedicated Smart Document Search & Quick Switcher (Cmd+P)
       if (isTriggered("browse", "⌘P")) {
         e.preventDefault();
+        if (hasBlockingDialog) {
+          e.stopPropagation();
+          return;
+        }
         e.stopPropagation();
-        if (isSmartSearchOpen) {
-          setIsSmartSearchOpen(false);
+        if (visiblePanel === "notes") {
+          closeSmartSearch();
         } else {
           handleOpenSmartSearch();
         }
@@ -1774,7 +1790,11 @@ function App() {
       // Find in Note
       if (isTriggered("find", "⌘F")) {
         e.preventDefault();
-        setIsFindOpen(true);
+        if (hasBlockingDialog) {
+          e.stopPropagation();
+          return;
+        }
+        setActivePanel("find");
         return;
       }
 
@@ -1887,7 +1907,11 @@ function App() {
       // Toggle Shortcuts Cheatsheet
       if (isTriggered("shortcuts_help", "⌘/")) {
         e.preventDefault();
-        setIsShortcutsModalOpen((prev) => !prev);
+        if (hasBlockingDialog) {
+          e.stopPropagation();
+          return;
+        }
+        setActivePanel((panel) => panel === "shortcuts" ? null : "shortcuts");
         return;
       }
 
@@ -1912,17 +1936,21 @@ function App() {
           setDeleteConfirm(null);
           return;
         }
-        if (isShortcutsModalOpen) {
-          setIsShortcutsModalOpen(false);
+        if (visiblePanel === "shortcuts") {
+          closeShortcuts();
           return;
         }
-        if (isSmartSearchOpen) {
-          setIsSmartSearchOpen(false);
+        if (visiblePanel === "notes") {
+          closeSmartSearch();
           return;
         }
-        if (isCommandPaletteOpen) return; // Palette handles its own subview Escape hierarchy.
-        if (isFindOpen) {
-          setIsFindOpen(false);
+        if (visiblePanel === "palette") {
+          // Let the palette handle Escape from its own controls, including subviews.
+          if (!(e.target instanceof Element && e.target.closest(".command-palette"))) closePalette();
+          return;
+        }
+        if (visiblePanel === "find") {
+          closeFind();
           return;
         }
         if (!escLosesFocus) {
@@ -1965,10 +1993,15 @@ function App() {
     handleZoomIn,
     handleZoomOut,
     handleResetZoom,
-    isShortcutsModalOpen,
-    isSmartSearchOpen,
-    isCommandPaletteOpen,
-    isFindOpen,
+    visiblePanel,
+    hasBlockingDialog,
+    paletteInitialView,
+    handleOpenCommandPalette,
+    handleOpenSmartSearch,
+    closePalette,
+    closeSmartSearch,
+    closeShortcuts,
+    closeFind,
   ]);
 
   if (isLoading) {
@@ -2147,16 +2180,16 @@ function App() {
           onSwitchConflict={(info) => setSwitchConflict(info)}
           discardedNoteId={discardedNoteId}
           zoomLevel={zoomLevel}
-          isFindOpen={isFindOpen}
-          onCloseFind={() => setIsFindOpen(false)}
+          isFindOpen={visiblePanel === "find"}
+          onCloseFind={closeFind}
         />
       </div>
 
 
-      {isCommandPaletteOpen && (
+      {visiblePanel === "palette" && (
         <CommandPalette
-          isOpen={isCommandPaletteOpen}
-          onClose={() => setIsCommandPaletteOpen(false)}
+          isOpen
+          onClose={closePalette}
           notes={notes}
           activeNoteId={activeNoteId}
           initialView={paletteInitialView}
@@ -2167,7 +2200,7 @@ function App() {
           onTogglePin={handleTogglePin}
           onGoBack={handleGoBack}
           onGoForward={handleGoForward}
-          onFindInNote={() => setIsFindOpen(true)}
+          onFindInNote={() => setActivePanel("find")}
           onCopyNoteAsMarkdown={handleCopyNoteAsMarkdown}
           onCopyNoteAsText={handleCopyNoteAsText}
           onCopyDeeplink={handleCopyDeeplink}
@@ -2179,7 +2212,7 @@ function App() {
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
-          onShowShortcuts={() => setIsShortcutsModalOpen(true)}
+          onShowShortcuts={() => setActivePanel("shortcuts")}
           onTriggerImportFile={handleTriggerImportFile}
           onTriggerViewFile={handleTriggerViewFile}
           zoomLevel={zoomLevel}
@@ -2202,13 +2235,13 @@ function App() {
       )}
 
       <ShortcutsModal
-        isOpen={isShortcutsModalOpen}
-        onClose={() => setIsShortcutsModalOpen(false)}
+        isOpen={visiblePanel === "shortcuts"}
+        onClose={closeShortcuts}
       />
 
       <SmartSearch
-        isOpen={isSmartSearchOpen}
-        onClose={() => setIsSmartSearchOpen(false)}
+        isOpen={visiblePanel === "notes"}
+        onClose={closeSmartSearch}
         onSelectNote={handleSelectNote}
         activeNoteId={activeNoteId}
         notes={notes}

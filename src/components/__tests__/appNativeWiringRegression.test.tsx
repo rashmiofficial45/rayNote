@@ -10,10 +10,10 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undef
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}), emit: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ isFocused: () => Promise.resolve(true), onFocusChanged: () => Promise.resolve(() => {}), setFocus: () => Promise.resolve() }) }));
 vi.mock('../TitleBar', () => ({ TitleBar: (props: any) => <button data-open-palette onClick={props.onOpenCommandPalette}>Palette</button> }));
-vi.mock('../NoteEditor', () => ({ NoteEditor: () => <textarea data-editor /> }));
+vi.mock('../NoteEditor', () => ({ NoteEditor: ({ isFindOpen }: { isFindOpen: boolean }) => <textarea data-editor data-find-open={isFindOpen} /> }));
 vi.mock('../WindowResizeHandles', () => ({ WindowResizeHandles: () => null }));
-vi.mock('../SmartSearch', () => ({ SmartSearch: () => null, clearCachedRecentSearchResults: vi.fn() }));
-vi.mock('../ShortcutsModal', () => ({ ShortcutsModal: () => null }));
+vi.mock('../SmartSearch', () => ({ SmartSearch: ({ isOpen }: { isOpen: boolean }) => isOpen ? <input data-note-switcher /> : null, clearCachedRecentSearchResults: vi.fn() }));
+vi.mock('../ShortcutsModal', () => ({ ShortcutsModal: ({ isOpen }: { isOpen: boolean }) => isOpen ? <div data-shortcuts /> : null }));
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement; let root: Root;
 beforeEach(() => {
@@ -47,6 +47,39 @@ describe('App native wiring and Escape precedence', () => {
     expect(handler).toBeDefined();
     await act(async () => { await handler!({ event: 'new-note', id: 1, payload: undefined }); });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+  it('replaces the active panel when using shortcuts or the palette Notes button', async () => {
+    await act(async () => root.render(<App />));
+    const shortcut = async (key: string, metaKey = true) => {
+      await act(async () => {
+        const target = document.activeElement ?? window;
+        target.dispatchEvent(new KeyboardEvent('keydown', { key, metaKey, bubbles: true, cancelable: true }));
+      });
+    };
+    const expectOnly = (selector?: string) => {
+      const open = host.querySelectorAll('.command-palette, [data-note-switcher], [data-shortcuts], [data-find-open="true"]');
+      expect(Array.from(open)).toEqual(selector ? [host.querySelector(selector)] : []);
+    };
+
+    await shortcut('k');
+    expectOnly('.command-palette');
+    await shortcut('p');
+    expectOnly('[data-note-switcher]');
+    await shortcut('k');
+    expectOnly('.command-palette');
+
+    await act(async () => host.querySelector<HTMLButtonElement>('.command-view-switch-btn')!.click());
+    expectOnly('[data-note-switcher]');
+    await shortcut('Escape', false);
+    expectOnly();
+
+    await shortcut('k');
+    await shortcut('/');
+    expectOnly('[data-shortcuts]');
+    await shortcut('f');
+    expectOnly('[data-find-open="true"]');
+    await shortcut('Escape', false);
+    expectOnly();
   });
   it('returns from palette appearance submenu before closing the palette (B31)', async () => {
     await act(async () => root.render(<App />));

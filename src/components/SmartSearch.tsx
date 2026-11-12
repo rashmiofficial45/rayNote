@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import {
   SearchResult,
   NoteSummary,
@@ -66,6 +67,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const requestIdRef = useRef<number>(0);
+  const selectionFromPointer = useRef(false);
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Focus input and reset query on modal open with instant 0ms note list
@@ -173,16 +175,19 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     return () => clearTimeout(timer);
   }, [query, isOpen, notes]);
 
-  // Keep selected item visible in list
-  useEffect(() => {
-    if (listRef.current && results.length > 0) {
-      const selectedEl = listRef.current.querySelector(
-        `[data-index="${selectedIndex}"]`
-      ) as HTMLElement | null;
-      if (selectedEl) {
-        selectedEl.scrollIntoView({ block: "nearest" });
-      }
+  // Hover updates the highlight without moving the list under the pointer.
+  useLayoutEffect(() => {
+    if (selectionFromPointer.current) {
+      selectionFromPointer.current = false;
+      return;
     }
+    const list = listRef.current;
+    if (!list || results.length === 0) return;
+    if (selectedIndex === 0) {
+      list.scrollTop = 0;
+      return;
+    }
+    revealMenuItem(list, list.querySelector<HTMLElement>(`[data-index="${selectedIndex}"]`));
   }, [selectedIndex, results]);
 
   const handleSelectCurrent = useCallback(
@@ -215,19 +220,21 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
       return;
     }
     if (e.key === "ArrowDown") {
+      const { repeat } = e;
       e.preventDefault();
       e.stopPropagation();
       if (results.length > 0) {
-        setSelectedIndex((prev) => (prev + 1) % results.length);
+        setSelectedIndex((prev) => nextMenuIndex(prev, results.length, 1, repeat));
       }
       return;
     }
 
     if (e.key === "ArrowUp") {
+      const { repeat } = e;
       e.preventDefault();
       e.stopPropagation();
       if (results.length > 0) {
-        setSelectedIndex((prev) => (prev - 1 + results.length) % results.length);
+        setSelectedIndex((prev) => nextMenuIndex(prev, results.length, -1, repeat));
       }
       return;
     }
@@ -256,6 +263,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
     ) {
       mousePosRef.current = { x: e.clientX, y: e.clientY };
       if (selectedIndex !== index) {
+        selectionFromPointer.current = true;
         setSelectedIndex(index);
       }
     }
