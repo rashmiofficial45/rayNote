@@ -1,4 +1,4 @@
-import { Command, Trash2, FileText, AlertTriangle } from "lucide-react";
+import { Command, Trash2, FileText, AlertTriangle, Maximize2, Minimize2, Hand } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +9,8 @@ import { useSaveStatus } from "../lib/saveStatusStore";
 
 interface TitleBarProps {
   title: string;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onNewNote: () => void;
   onOpenCommandPalette: () => void;
   onOpenSmartSearch?: () => void;
@@ -22,6 +24,8 @@ interface TitleBarProps {
 
 export function TitleBar({
   title,
+  isFullscreen = false,
+  onToggleFullscreen,
   onOpenCommandPalette,
   onOpenSmartSearch: _onOpenSmartSearch,
   onDeleteNote,
@@ -29,6 +33,8 @@ export function TitleBar({
   onOpenSaveConflict,
 }: TitleBarProps) {
   const titleBarRef = useRef<HTMLDivElement>(null);
+  // On macOS the expanded panel is still a regular, movable window.
+  const canDragWindow = !isFullscreen || /Macintosh/.test(navigator.userAgent);
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
   const storeTitle = useNoteTitle();
   const saveStatus = useSaveStatus();
@@ -72,7 +78,7 @@ export function TitleBar({
       e.preventDefault();
       window.getSelection()?.removeAllRanges();
 
-      if (e.button === 0) {
+      if (e.button === 0 && canDragWindow) {
         setIsTitleBarHovered(false);
         setIsCloseHovered(false);
         invoke("start_native_drag").catch((err) => {
@@ -112,7 +118,7 @@ export function TitleBar({
       titleBar.removeEventListener("dblclick", handleDblClick);
       titleBar.removeEventListener("wheel", handleWheel);
     };
-  }, []);
+  }, [canDragWindow]);
 
   // Hide the panel (Cmd+W behavior — stays alive in background)
   const handleClose = () => {
@@ -192,6 +198,7 @@ export function TitleBar({
     <div
       ref={titleBarRef}
       className={`title-bar ${isTitleBarHovered ? "is-hovered" : ""}`}
+      data-window-draggable={canDragWindow ? "" : undefined}
       onMouseEnter={() => setIsTitleBarHovered(true)}
       onMouseLeave={() => {
         setIsTitleBarHovered(false);
@@ -210,7 +217,7 @@ export function TitleBar({
         window.getSelection()?.removeAllRanges();
       }}
     >
-      {/* Left: Single enlarged red X button */}
+      {/* Left: Window controls */}
       <div
         className="title-bar-left"
         onMouseEnter={() => setIsCloseHovered(true)}
@@ -240,10 +247,22 @@ export function TitleBar({
             />
           </svg>
         </button>
+        {onToggleFullscreen && (
+          <button
+            type="button"
+            className="fullscreen-btn"
+            onClick={onToggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+          </button>
+        )}
       </div>
 
       {/* Center: Note title */}
       <div className="title-text flex items-center justify-center gap-2 min-w-0">
+        {canDragWindow && <Hand className="title-drag-hint" size={14} aria-hidden="true" />}
         <span className="title-text-content">{displayTitle || "Untitled"}</span>
         {saveStatus.isSaveBlocked && (
           <button

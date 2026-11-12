@@ -451,5 +451,9 @@ export function SmoothCaret({
     };
   }, [scheduleCaretUpdate]);
 
-  return <div ref={caretRef} className="notefast-smooth-caret" />;
+  return (
+    <div className="notefast-smooth-caret-layer" aria-hidden="true">
+      <div ref={caretRef} className="notefast-smooth-caret" />
+    </div>
+  );
 }

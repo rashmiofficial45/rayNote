@@ -18,7 +18,7 @@ import { safeLocalStorageGetItem } from "./lib/storage";
  *   and alias modifications immediately across Tauri windows.
  */
 
-import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { CommandPalette } from "./components/CommandPalette";
 import { NoteEditor } from "./components/NoteEditor";
@@ -141,6 +141,85 @@ function App() {
   const deletingNoteRef = useRef<string | null>(null);
 
   const [isBootReady, setIsBootReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fullscreenPending = useRef(false);
+  const fullscreenScrollAnchor = useRef<{
+    scroller: HTMLElement;
+    block: Element;
+    offset: number;
+    atEnd: boolean;
+  } | null>(null);
+  useLayoutEffect(() => {
+    const anchor = fullscreenScrollAnchor.current;
+    fullscreenScrollAnchor.current = null;
+    if (!anchor) return;
+    const { scroller, block, offset, atEnd } = anchor;
+    function restoreScroll() {
+      const content = block.parentElement;
+      if (!content || !scroller.contains(block)) return;
+      const bounds = block.getBoundingClientRect();
+      const viewport = scroller.getBoundingClientRect();
+      const target = scroller.scrollTop + bounds.top - viewport.top
+        - Math.max(offset, 52 - bounds.height);
+      const contentBottom = content.getBoundingClientRect().bottom;
+      const lastPage = Math.max(0, scroller.scrollTop + contentBottom - viewport.bottom);
+      scroller.scrollTo({ top: atEnd ? lastPage : Math.max(0, Math.min(target, lastPage)), behavior: "instant" });
+    }
+    restoreScroll();
+    const observer = new ResizeObserver(() => {
+      restoreScroll();
+      observer.disconnect();
+    });
+    observer.observe(scroller);
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => {
+        // WKWebView can apply the native viewport size after the IPC reply.
+        restoreScroll();
+        scroller.removeAttribute("data-fullscreen-resizing");
+      });
+    });
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      scroller.removeAttribute("data-fullscreen-resizing");
+    };
+  }, [isFullscreen]);
+  const toggleFullscreen = useCallback(async () => {
+    if (fullscreenPending.current) return;
+    fullscreenPending.current = true;
+    const scroller = document.querySelector<HTMLElement>(".app-shell [data-scroll-container]");
+    try {
+      const content = scroller?.querySelector(".tiptap");
+      if (scroller && content?.children.length) {
+        scroller.setAttribute("data-fullscreen-resizing", "");
+        const viewport = scroller.getBoundingClientRect();
+        const { top } = viewport;
+        const blocks = content.children;
+        // Find the first block below the header without walking the whole note.
+        let first = 0;
+        let last = blocks.length - 1;
+        while (first < last) {
+          const middle = (first + last) >>> 1;
+          if (blocks[middle].getBoundingClientRect().bottom <= top + 52) first = middle + 1;
+          else last = middle;
+        }
+        const block = blocks[first];
+        fullscreenScrollAnchor.current = {
+          scroller,
+          block,
+          offset: block.getBoundingClientRect().top - top,
+          atEnd: content.getBoundingClientRect().bottom <= viewport.bottom + 2,
+        };
+      }
+      setIsFullscreen(await invoke<boolean>("toggle_note_fullscreen"));
+    } catch (error) {
+      fullscreenScrollAnchor.current = null;
+      scroller?.removeAttribute("data-fullscreen-resizing");
+      console.error("Failed to toggle fullscreen:", error);
+    } finally {
+      fullscreenPending.current = false;
+    }
+  }, []);
   const [activePanel, setActivePanel] = useState<"palette" | "notes" | "shortcuts" | "find" | null>(null);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "settings">("actions");
   const closePalette = useCallback(() => setActivePanel((panel) => panel === "palette" ? null : panel), []);
@@ -2016,7 +2095,7 @@ function App() {
 
   return (
     <div
-      className={`app-shell ${isCursorInPage ? "is-cursor-in-page is-interactive" : "is-idle"}`}
+      className={`app-shell ${isCursorInPage ? "is-cursor-in-page is-interactive" : "is-idle"}${isFullscreen ? " is-fullscreen" : ""}`}
       inert={isClearingNotes}
       aria-busy={isClearingNotes}
       onMouseEnter={() => setIsMouseOverApp(true)}
@@ -2028,7 +2107,7 @@ function App() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <WindowResizeHandles />
+      {!isFullscreen && <WindowResizeHandles />}
 
       {/* Drag & drop visual overlay */}
       {isDragOver && (
@@ -2044,6 +2123,8 @@ function App() {
       )}
 
       <TitleBar
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
         title={activeNote ? getNoteTitle(activeNote.title, activeNote.preview) : "rayNote"}
         onNewNote={handleNewNote}
         onOpenCommandPalette={() => handleOpenCommandPalette("actions")}

@@ -276,7 +276,7 @@ pub fn start_native_drag(window: tauri::WebviewWindow) -> Result<(), String> {
                 );
 
                 use tauri::Manager;
-                if window.label() == "main" {
+                if window.label() == "main" && !is_panel_fullscreen() {
                     if let Ok(app_dir) = window.app_handle().path().app_data_dir() {
                         let state_file = app_dir.join("window_state.json");
                         let json = serde_json::json!({
@@ -341,6 +341,72 @@ pub fn get_native_window_frame(window: tauri::WebviewWindow) -> Result<NativeWin
     }
 }
 
+#[cfg(target_os = "macos")]
+thread_local! {
+    static WINDOWED_FRAME: std::cell::Cell<Option<tauri_nspanel::objc2_foundation::NSRect>> =
+        const { std::cell::Cell::new(None) };
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn is_panel_fullscreen() -> bool {
+    WINDOWED_FRAME.with(|frame| frame.get().is_some())
+}
+
+#[tauri::command]
+pub async fn toggle_note_fullscreen(window: tauri::WebviewWindow) -> Result<bool, String> {
+    if window.label() != "main" {
+        return Err("Fullscreen is available only for the note window".into());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use objc2::msg_send;
+        use objc2::runtime::AnyObject;
+        use tauri_nspanel::objc2_foundation::NSRect;
+
+        let (reply, mut result) = tauri::async_runtime::channel(1);
+        let panel_window = window.clone();
+        window.run_on_main_thread(move || {
+            let outcome = (|| {
+                let ptr = panel_window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
+                let panel = unsafe { ptr.as_ref() }.ok_or("Note window is unavailable")?;
+
+                WINDOWED_FRAME.with(|windowed_frame| unsafe {
+                    if let Some(frame) = windowed_frame.get() {
+                        let _: () = msg_send![panel, setFrame: frame, display: true];
+                        windowed_frame.set(None);
+                        return Ok(false);
+                    }
+
+                    let screen: *mut AnyObject = msg_send![panel, screen];
+                    let screen = screen.as_ref().ok_or("Note window has no active display")?;
+                    let frame: NSRect = msg_send![panel, frame];
+                    let mut expanded_frame: NSRect = msg_send![screen, visibleFrame];
+                    const DISPLAY_MARGIN: f64 = 12.0;
+                    expanded_frame.origin.x += DISPLAY_MARGIN;
+                    expanded_frame.origin.y += DISPLAY_MARGIN;
+                    expanded_frame.size.width -= 2.0 * DISPLAY_MARGIN;
+                    expanded_frame.size.height -= 2.0 * DISPLAY_MARGIN;
+
+                    windowed_frame.set(Some(frame));
+                    let _: () = msg_send![panel, setFrame: expanded_frame, display: true];
+                    Ok(true)
+                })
+            })();
+            let _ = reply.try_send(outcome);
+        }).map_err(|e| e.to_string())?;
+
+        result.recv().await.ok_or_else(|| "Fullscreen update was interrupted".to_string())?
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let enabled = !window.is_fullscreen().map_err(|e| e.to_string())?;
+        window.set_fullscreen(enabled).map_err(|e| e.to_string())?;
+        Ok(enabled)
+    }
+}
+
 #[tauri::command]
 pub fn set_native_window_frame(
     window: tauri::WebviewWindow,
@@ -352,6 +418,9 @@ pub fn set_native_window_frame(
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
+        if is_panel_fullscreen() {
+            return Ok(());
+        }
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
         use tauri_nspanel::objc2_foundation::{NSPoint, NSSize, NSRect};

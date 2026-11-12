@@ -515,6 +515,14 @@ pub fn run() {
                 let win_clone = win.clone();
                 let app_dir_clone = app_dir.clone();
                 win.on_window_event(move |event| {
+                    #[cfg(target_os = "macos")]
+                    if commands::is_panel_fullscreen() {
+                        return;
+                    }
+                    #[cfg(not(target_os = "macos"))]
+                    if win_clone.is_fullscreen().unwrap_or(false) {
+                        return;
+                    }
                     if let tauri::WindowEvent::Resized(physical_size) = event {
                         if physical_size.width > 0 && physical_size.height > 0 {
                             let scale = win_clone.scale_factor().unwrap_or(1.0);
@@ -594,6 +602,7 @@ pub fn run() {
             get_drag_diagnostics,
             get_native_window_frame,
             set_native_window_frame,
+            toggle_note_fullscreen,
             hide_window,
             save_window_size,
             quit_app,

@@ -909,9 +909,27 @@ export function Editor({
   // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    const content = editor?.view.dom;
+    if (!container || !content) return;
+
+    let maxContentScroll = Infinity;
+    const clampScroll = () => {
+      if (container.scrollTop > maxContentScroll) {
+        container.scrollTop = maxContentScroll;
+      }
+    };
+    const updateScrollLimit = () => {
+      const viewport = container.getBoundingClientRect();
+      const contentBottom = content.getBoundingClientRect().bottom;
+      maxContentScroll = Math.max(0, Math.ceil(container.scrollTop + contentBottom - viewport.bottom));
+      clampScroll();
+    };
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollLimit);
+    observer?.observe(container);
+    observer?.observe(content);
 
     const handleScroll = () => {
+      clampScroll();
       if (container.scrollLeft !== 0) {
         container.scrollLeft = 0;
       }
@@ -921,8 +939,11 @@ export function Editor({
     };
 
     container.addEventListener("scroll", handleScroll, { passive: true });
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, []);
+    return () => {
+      observer?.disconnect();
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, [editor]);
 
 
   // Register lightweight zero-overhead diagnostic metrics for memory profiling
@@ -1270,7 +1291,7 @@ export function Editor({
       >
         <div
           style={zoomLevel && zoomLevel !== 1 ? ({ zoom: zoomLevel } as React.CSSProperties) : undefined}
-          className="relative"
+          className="editor-content-frame relative"
         >
           <SmoothCaret
             editor={editor}

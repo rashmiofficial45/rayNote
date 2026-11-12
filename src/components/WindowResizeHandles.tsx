@@ -34,6 +34,7 @@ const MIN_WIDTH = 320;
 const MIN_HEIGHT = 400;
 
 export function WindowResizeHandles() {
+  const handlesRef = useRef<HTMLDivElement>(null);
   const activeDragRef = useRef<ActiveDrag | null>(null);
   const pendingDownRef = useRef<{ pointerId: number; released: boolean } | null>(null);
 
@@ -119,6 +120,7 @@ export function WindowResizeHandles() {
       const pointerId = e.pointerId;
       const pending = { pointerId, released: false };
       pendingDownRef.current = pending;
+      handlesRef.current?.setAttribute("data-window-resizing", "");
 
       try {
         el.setPointerCapture(pointerId);
@@ -155,6 +157,11 @@ export function WindowResizeHandles() {
           await getCurrentWindow().startResizeDragging(direction);
         } catch {
           // Ignored
+        } finally {
+          if (pendingDownRef.current === pending) {
+            pendingDownRef.current = null;
+            handlesRef.current?.removeAttribute("data-window-resizing");
+          }
         }
       }
     },
@@ -171,6 +178,7 @@ export function WindowResizeHandles() {
         if (drag.rafId !== null) cancelAnimationFrame(drag.rafId);
         activeDragRef.current = null;
         pendingDownRef.current = null;
+        handlesRef.current?.removeAttribute("data-window-resizing");
         return;
       }
 
@@ -208,7 +216,13 @@ export function WindowResizeHandles() {
       }
 
       const drag = activeDragRef.current;
-      if (!drag || drag.pointerId !== e.pointerId) return;
+      if (!drag || drag.pointerId !== e.pointerId) {
+        if (pendingDownRef.current?.pointerId === e.pointerId) {
+          pendingDownRef.current = null;
+          handlesRef.current?.removeAttribute("data-window-resizing");
+        }
+        return;
+      }
 
       e.preventDefault();
       e.stopPropagation();
@@ -226,6 +240,7 @@ export function WindowResizeHandles() {
 
       const finalFrame = drag.lastFrame;
       activeDragRef.current = null;
+      const completedDrag = pendingDownRef.current;
 
       // Commit and save final frame to persistence
       invoke("set_native_window_frame", {
@@ -234,13 +249,18 @@ export function WindowResizeHandles() {
         width: finalFrame.width,
         height: finalFrame.height,
         save: true,
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => {
+        if (pendingDownRef.current === completedDrag) {
+          pendingDownRef.current = null;
+          handlesRef.current?.removeAttribute("data-window-resizing");
+        }
+      });
     },
     []
   );
 
   return (
-    <div className="window-resize-container" aria-hidden="true">
+    <div ref={handlesRef} className="window-resize-container" aria-hidden="true">
       {/* 4 Perimeter Edges (strictly 4px at the outer boundary) */}
       <div
         className="window-resize-handle edge-n"

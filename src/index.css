@@ -476,6 +476,21 @@ body,
   cursor: default;
 }
 
+.title-bar[data-window-draggable] {
+  cursor: -webkit-grab;
+  cursor: grab;
+}
+
+.title-bar[data-window-draggable]:active {
+  cursor: -webkit-grabbing;
+  cursor: grabbing;
+}
+
+.title-drag-hint {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
 @media (min-width: 480px) {
   .title-bar {
     grid-template-columns: 114px minmax(0, 1fr) 114px;
@@ -545,7 +560,6 @@ body,
   user-select: none;
   text-align: center;
   pointer-events: none;
-  cursor: default;
   min-width: 0;
   max-width: 100%;
   width: 100%;
@@ -624,6 +638,7 @@ body,
   backdrop-filter: var(--glass-menu-blur);
   box-shadow: var(--glass-menu-highlight), 0 1px 4px rgba(0, 0, 0, 0.08);
   -webkit-app-region: no-drag;
+  cursor: default;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);
@@ -745,6 +760,40 @@ body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .
   background: #e0382e;
 }
 
+.fullscreen-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: #28c840;
+  color: #093510;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.fullscreen-btn:hover {
+  background: #38d450;
+}
+
+.fullscreen-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-left:has(> .fullscreen-btn:focus-visible),
+.app-shell.is-fullscreen:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-left {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: none !important;
+}
+
+body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
+  visibility: hidden;
+}
+
 /* ── Command Popover ─────────────────────────────────── */
 .command-popover {
   position: absolute;
@@ -832,6 +881,12 @@ body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .
 }
 
 /* ── Tiptap Editor Container ──────────────────────────── */
+.app-shell:has(.window-resize-container[data-window-resizing]) .editor-content-frame,
+[data-fullscreen-resizing] .editor-content-frame {
+  /* During reflow, stale overlay bounds must not extend the native scroll range. */
+  overflow: clip;
+}
+
 .editor-wrapper {
   contain: layout style;
   max-width: 100%;
@@ -882,6 +937,13 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 /* ── Smooth Caret (VS Code Fluid Gliding & Breathing Pulse) ───── */
+.notefast-smooth-caret-layer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  pointer-events: none;
+}
+
 .notefast-smooth-caret {
   position: absolute;
   top: 0;
