@@ -1,3 +1,4 @@
+import { isValidZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./zoom";
 import { emit, listen, UnlistenFn } from "@tauri-apps/api/event";
 import {
   ThemeMode,
@@ -13,7 +14,8 @@ export type SettingsSyncPayload =
   | { type: "accent"; value: AccentColor }
   | { type: "font"; value: string }
   | { type: "text_opacity"; value: number }
-  | { type: "zoom"; value: number }
+  | { type: "zoom"; mode: ZoomMode; value: number }
+  | { type: "zoom_mode"; value: ZoomMode }
   | { type: "esc_loses_focus"; value: boolean }
   | { type: "always_on_top"; value: boolean }
   | { type: "menu_bar"; value: boolean }
@@ -70,7 +72,8 @@ export interface SettingsSyncCallbacks {
   onAccentChange?: (accent: AccentColor) => void;
   onFontChange?: (fontId: string) => void;
   onTextOpacityChange?: (opacity: number) => void;
-  onZoomChange?: (zoom: number) => void;
+  onZoomChange?: (zoom: number, mode: ZoomMode) => void;
+  onZoomModeChange?: (mode: ZoomMode) => void;
   onEscLosesFocusChange?: (val: boolean) => void;
   onMenuBarChange?: (value: boolean) => void;
   onAlwaysOnTopChange?: (val: boolean) => void;
@@ -113,7 +116,10 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
         callbacks?.onTextOpacityChange?.(payload.value);
         break;
       case "zoom":
-        callbacks?.onZoomChange?.(payload.value);
+        if (isValidZoom(payload.value)) callbacks?.onZoomChange?.(payload.value, payload.mode);
+        break;
+      case "zoom_mode":
+        callbacks?.onZoomModeChange?.(payload.value);
         break;
       case "esc_loses_focus":
         callbacks?.onEscLosesFocusChange?.(payload.value);
@@ -189,9 +195,11 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
     } else if (e.key === "notefast_text_opacity" && e.newValue) {
       const parsed = parseInt(e.newValue, 10);
       if (!isNaN(parsed)) handlePayload({ type: "text_opacity", value: parsed });
-    } else if (e.key === "notefast_zoom_level" && e.newValue) {
-      const parsed = parseFloat(e.newValue);
-      if (!isNaN(parsed)) handlePayload({ type: "zoom", value: parsed });
+    } else if ((e.key === ZOOM_KEYS.windowed || e.key === ZOOM_KEYS.fullscreen) && e.newValue) {
+      const mode = e.key === ZOOM_KEYS.fullscreen ? "fullscreen" : "windowed";
+      handlePayload({ type: "zoom", mode, value: Number(e.newValue) });
+    } else if (e.key === ZOOM_MODE_KEY && (e.newValue === "windowed" || e.newValue === "fullscreen")) {
+      handlePayload({ type: "zoom_mode", value: e.newValue });
     } else if (e.key === "notefast_esc_loses_focus" && e.newValue) {
       handlePayload({ type: "esc_loses_focus", value: e.newValue === "true" });
     } else if (e.key === "notefast_show_menubar" && e.newValue) {

@@ -1,3 +1,4 @@
+import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestEditorFlush } from "./lib/editorFlush";
 import { requestClearAllNotes } from "./lib/noteDeletion";
@@ -84,14 +85,13 @@ export default function SettingsApp() {
   const [textOpacity, setTextOpacity] = useState<number>(getStoredTextOpacity);
 
   // Zoom State
-  const [zoomLevel, setZoomLevel] = useState<number>(() => {
-    const saved = safeLocalStorageGetItem("notefast_zoom_level");
-    if (saved) {
-      const parsed = parseFloat(saved);
-      if (!isNaN(parsed) && parsed >= 0.6 && parsed <= 2.0) return parsed;
-    }
-    return 1.2;
-  });
+  const [zoomMode, setZoomMode] = useState<ZoomMode>(() =>
+    safeLocalStorageGetItem(ZOOM_MODE_KEY) === "fullscreen" ? "fullscreen" : "windowed");
+  const [zoomLevels, setZoomLevels] = useState(() => ({
+    windowed: readZoom("windowed"),
+    fullscreen: readZoom("fullscreen"),
+  }));
+  const zoomLevel = zoomLevels[zoomMode];
 
   // Toggles State
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
@@ -147,7 +147,9 @@ export default function SettingsApp() {
       onAccentChange: setAccent,
       onFontChange: setFontFamily,
       onTextOpacityChange: setTextOpacity,
-      onZoomChange: setZoomLevel,
+      onZoomChange: (value, mode) => setZoomLevels((levels) =>
+        levels[mode] === value ? levels : { ...levels, [mode]: value }),
+      onZoomModeChange: setZoomMode,
       onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: setEscLosesFocus,
       onCommandsConfigChange: setCommands,
@@ -447,10 +449,9 @@ export default function SettingsApp() {
   // Zoom handlers
   const handleZoom = (level: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(level * 10) / 10));
-    setZoomLevel(clamped);
-    safeLocalStorageSetItem("notefast_zoom_level", clamped.toString());
-    broadcastSync({ type: "zoom", value: clamped });
-    window.dispatchEvent(new CustomEvent("notefast_zoom_changed", { detail: { zoom: clamped } }));
+    setZoomLevels((levels) => ({ ...levels, [zoomMode]: clamped }));
+    safeLocalStorageSetItem(ZOOM_KEYS[zoomMode], String(clamped));
+    broadcastSync({ type: "zoom", mode: zoomMode, value: clamped });
   };
 
   // Toggle handlers
@@ -848,7 +849,7 @@ export default function SettingsApp() {
                 <div className="settings-row-text">
                   <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Zoom</div>
                   <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Adjust the zoom level in the Notes content.
+                    Adjust note zoom for {zoomMode === "fullscreen" ? "fullscreen" : "windowed"} mode.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -856,7 +857,7 @@ export default function SettingsApp() {
                     <button
                       type="button"
                       className="settings-stepper-btn liquid-btn"
-                      onClick={() => handleZoom(1.2)}
+                      onClick={() => handleZoom(DEFAULT_ZOOM)}
                       title="Reset Zoom to 120%"
                     >
                       <RotateCcw size={13} />

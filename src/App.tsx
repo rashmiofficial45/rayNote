@@ -1,3 +1,4 @@
+import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { safeLocalStorageGetItem } from "./lib/storage";
@@ -237,16 +238,17 @@ function App() {
     return true;
   });
   const [deleteConfirm, setDeleteConfirm] = useState<{ noteId: string; agreed: boolean } | null>(null);
-  const [zoomLevel, setZoomLevel] = useState<number>(() => {
-    const saved = safeLocalStorageGetItem("notefast_zoom_level");
-    if (saved) {
-      const parsed = parseFloat(saved);
-      if (!isNaN(parsed) && parsed >= 0.6 && parsed <= 2.0) {
-        return parsed;
-      }
-    }
-    return 1.2; // 120% default
-  });
+  const [zoomLevels, setZoomLevels] = useState(() => ({
+    windowed: readZoom("windowed"),
+    fullscreen: readZoom("fullscreen"),
+  }));
+  const zoomMode: ZoomMode = isFullscreen ? "fullscreen" : "windowed";
+  const zoomLevel = zoomLevels[zoomMode];
+  const setZoomLevel = useCallback((value: number) => {
+    setZoomLevels((levels) => ({ ...levels, [zoomMode]: value }));
+    safeLocalStorageSetItem(ZOOM_KEYS[zoomMode], String(value));
+    broadcastSync({ type: "zoom", mode: zoomMode, value });
+  }, [zoomMode]);
 
   const [switchConflict, setSwitchConflict] = useState<SwitchConflictInfo | null>(null);
   const [editorReloadKey, setEditorReloadKey] = useState(0);
@@ -326,13 +328,15 @@ function App() {
   const isCursorInPage = isWindowFocused && isMouseOverApp;
 
   useEffect(() => {
-    safeLocalStorageSetItem("notefast_zoom_level", zoomLevel.toString());
-  }, [zoomLevel]);
+    safeLocalStorageSetItem(ZOOM_MODE_KEY, zoomMode);
+    broadcastSync({ type: "zoom_mode", value: zoomMode });
+  }, [zoomMode]);
 
   // Synchronize settings changes across the entire app immediately
   useEffect(() => {
     return listenToSettingsSync({
-      onZoomChange: (val) => setZoomLevel(val),
+      onZoomChange: (value, mode) => setZoomLevels((levels) =>
+        levels[mode] === value ? levels : { ...levels, [mode]: value }),
       onEscLosesFocusChange: (val) => setEscLosesFocus(val),
       onAlwaysOnTopChange: (val) => {
         setAlwaysOnTop(val).catch(console.error);
@@ -1742,34 +1746,27 @@ function App() {
    * Increases editor typography scale by 10% (max 200%) and broadcasts change across windows.
    */
   const handleZoomIn = useCallback(() => {
-    setZoomLevel((prev) => {
-      const next = Math.min(Math.round((prev + 0.1) * 10) / 10, 2.0);
-      showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomIn size={14} />);
-      broadcastSync({ type: "zoom", value: next });
-      return next;
-    });
-  }, [showToast]);
+    const next = Math.min(Math.round((zoomLevel + 0.1) * 10) / 10, 2.0);
+    setZoomLevel(next);
+    showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomIn size={14} />);
+  }, [zoomLevel, setZoomLevel, showToast]);
 
   /**
    * Decreases editor typography scale by 10% (min 60%) and broadcasts change across windows.
    */
   const handleZoomOut = useCallback(() => {
-    setZoomLevel((prev) => {
-      const next = Math.max(Math.round((prev - 0.1) * 10) / 10, 0.6);
-      showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomOut size={14} />);
-      broadcastSync({ type: "zoom", value: next });
-      return next;
-    });
-  }, [showToast]);
+    const next = Math.max(Math.round((zoomLevel - 0.1) * 10) / 10, 0.6);
+    setZoomLevel(next);
+    showToast(`Zoom: ${Math.round(next * 100)}%`, <ZoomOut size={14} />);
+  }, [zoomLevel, setZoomLevel, showToast]);
 
   /**
    * Resets typography zoom to the 120% default setting.
    */
   const handleResetZoom = useCallback(() => {
-    setZoomLevel(1.2);
+    setZoomLevel(DEFAULT_ZOOM);
     showToast("Zoom: 120% (Default)", <RotateCcw size={14} />);
-    broadcastSync({ type: "zoom", value: 1.2 });
-  }, [showToast]);
+  }, [setZoomLevel, showToast]);
 
   /**
    * Master Global Keyboard Shortcuts Router:
@@ -2297,10 +2294,7 @@ function App() {
           onTriggerImportFile={handleTriggerImportFile}
           onTriggerViewFile={handleTriggerViewFile}
           zoomLevel={zoomLevel}
-          onSetZoom={(zoom) => {
-            setZoomLevel(zoom);
-            broadcastSync({ type: "zoom", value: zoom });
-          }}
+          onSetZoom={setZoomLevel}
           onPromptClearAllNotes={async () => {
             if (!window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) return;
             try {

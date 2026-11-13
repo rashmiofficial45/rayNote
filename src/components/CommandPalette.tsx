@@ -215,8 +215,6 @@ export function CommandPalette({
   const handleApplyZoom = (zoom: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(zoom * 10) / 10));
     onSetZoom?.(clamped);
-    safeLocalStorageSetItem("notefast_zoom_level", clamped.toString());
-    broadcastSync({ type: "zoom", value: clamped });
     onShowToast?.(`Zoom set to ${Math.round(clamped * 100)}%`, <ZoomIn size={14} />);
     onClose();
   };
@@ -776,6 +774,14 @@ export function CommandPalette({
       badge: Math.round(zoomLevel * 100) === 160 ? "Selected" : undefined,
       icon: <ZoomIn size={14} />,
       action: () => handleApplyZoom(1.6),
+    },
+    {
+      id: "sub-z-180",
+      category: "Zoom Levels",
+      label: "180%",
+      badge: Math.round(zoomLevel * 100) === 180 ? "Selected" : undefined,
+      icon: <ZoomIn size={14} />,
+      action: () => handleApplyZoom(1.8),
     },
   ];
 
