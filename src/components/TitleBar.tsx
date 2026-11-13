@@ -1,4 +1,4 @@
-import { Command, Trash2, FileText, AlertTriangle, Maximize2, Minimize2, Hand } from "lucide-react";
+import { Command, Trash2, Copy, AlertTriangle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
@@ -80,7 +80,6 @@ export function TitleBar({
 
       if (e.button === 0 && canDragWindow) {
         setIsTitleBarHovered(false);
-        setIsCloseHovered(false);
         invoke("start_native_drag").catch((err) => {
           console.error("start_native_drag error:", err);
         });
@@ -127,7 +126,6 @@ export function TitleBar({
     });
   };
 
-  const [isCloseHovered, setIsCloseHovered] = useState(false);
   const [isTitleBarHovered, setIsTitleBarHovered] = useState(false);
   const isHoveredRef = useRef(false);
 
@@ -139,7 +137,6 @@ export function TitleBar({
         if (!focused) {
           isHoveredRef.current = false;
           setIsTitleBarHovered(false);
-          setIsCloseHovered(false);
         }
       })
       .then((fn) => {
@@ -158,9 +155,6 @@ export function TitleBar({
       if (isHoveredRef.current !== inPage) {
         isHoveredRef.current = inPage;
         setIsTitleBarHovered(inPage);
-        if (!inPage) {
-          setIsCloseHovered(false);
-        }
       }
     };
 
@@ -168,7 +162,6 @@ export function TitleBar({
       if (isHoveredRef.current) {
         isHoveredRef.current = false;
         setIsTitleBarHovered(false);
-        setIsCloseHovered(false);
       }
     };
 
@@ -200,10 +193,7 @@ export function TitleBar({
       className={`title-bar ${isTitleBarHovered ? "is-hovered" : ""}`}
       data-window-draggable={canDragWindow ? "" : undefined}
       onMouseEnter={() => setIsTitleBarHovered(true)}
-      onMouseLeave={() => {
-        setIsTitleBarHovered(false);
-        setIsCloseHovered(false);
-      }}
+      onMouseLeave={() => setIsTitleBarHovered(false)}
       onMouseDown={(e) => {
         const target = e.target as HTMLElement;
         if (!target.closest("button") && !target.closest(".command-popover")) {
@@ -218,31 +208,26 @@ export function TitleBar({
       }}
     >
       {/* Left: Window controls */}
-      <div
-        className="title-bar-left"
-        onMouseEnter={() => setIsCloseHovered(true)}
-        onMouseLeave={() => setIsCloseHovered(false)}
-      >
+      <div className="title-bar-left">
         <button
           onClick={handleClose}
-          onMouseEnter={() => setIsCloseHovered(true)}
-          onMouseLeave={() => setIsCloseHovered(false)}
-          className={`close-btn-x ${isCloseHovered ? "is-hovered" : ""}`}
+          className="close-btn-x"
           title={`Hide (${hideHotkey})`}
           aria-label="Hide rayNote"
         >
           <svg
-            width="10"
-            height="10"
+            width="11"
+            height="11"
             viewBox="0 0 10 10"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className="close-x-icon"
+            aria-hidden="true"
           >
             <path
               d="M2 2L8 8M8 2L2 8"
               stroke="#000000"
-              strokeWidth="2"
+              strokeWidth="2.7"
               strokeLinecap="round"
             />
           </svg>
@@ -255,14 +240,22 @@ export function TitleBar({
             title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           >
-            {isFullscreen ? <Minimize2 size={11} /> : <Maximize2 size={11} />}
+            {isFullscreen ? (
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M13.5 2.5 9.5 6.5m0-3.5v3.5H13M2.5 13.5l4-4m-3.5 0h3.5V13" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+                <path d="M11 1 5 2l5 5ZM1 11l6-1-5-5Z" />
+              </svg>
+            )}
           </button>
         )}
       </div>
 
       {/* Center: Note title */}
       <div className="title-text flex items-center justify-center gap-2 min-w-0">
-        {canDragWindow && <Hand className="title-drag-hint" size={14} aria-hidden="true" />}
         <span className="title-text-content">{displayTitle || "Untitled"}</span>
         {saveStatus.isSaveBlocked && (
           <button
@@ -288,7 +281,7 @@ export function TitleBar({
           title={`Copy Note as Markdown (${copyMarkdownHotkey})`}
           aria-label="Copy Note as Markdown"
         >
-          <FileText size={17} />
+          <Copy size={20} strokeWidth={2.35} aria-hidden="true" />
         </button>
         <button
           className="title-bar-btn delete-btn"
@@ -296,7 +289,7 @@ export function TitleBar({
           title={`Delete Note (${deleteHotkey})`}
           aria-label="Delete Note"
         >
-          <Trash2 size={17} />
+          <Trash2 size={20} strokeWidth={2.35} aria-hidden="true" />
         </button>
         <button
           className="title-bar-btn command-palette-btn"
@@ -304,7 +297,7 @@ export function TitleBar({
           title={`Command Palette (${commandPaletteHotkey})`}
           aria-label="Command Palette"
         >
-          <Command size={17} />
+          <Command size={20} strokeWidth={2.35} aria-hidden="true" />
         </button>
       </div>
     </div>

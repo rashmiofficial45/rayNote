@@ -454,8 +454,12 @@ body,
 
 /* ── Title Bar ────────────────────────────────────────── */
 .title-bar {
+  --title-action-size: 36px;
+  --title-action-gap: 2px;
+  --title-action-padding: 4px;
+  --title-action-width: calc(3 * var(--title-action-size) + 2 * var(--title-action-gap) + 2 * var(--title-action-padding) + 2px);
   display: grid;
-  grid-template-columns: minmax(28px, 114px) minmax(0, 1fr) 114px;
+  grid-template-columns: 44px minmax(0, 1fr) var(--title-action-width);
   align-items: center;
   height: 52px;
   position: absolute;
@@ -463,7 +467,7 @@ body,
   left: 0;
   right: 0;
   z-index: 30;
-  padding: 0 clamp(12px, 2.5vw, 14px) 0 18px;
+  padding: 0 6px 0 18px;
   gap: 10px;
   box-sizing: border-box;
   background: transparent;
@@ -486,14 +490,9 @@ body,
   cursor: grabbing;
 }
 
-.title-drag-hint {
-  flex-shrink: 0;
-  color: var(--text-muted);
-}
-
 @media (min-width: 480px) {
   .title-bar {
-    grid-template-columns: 114px minmax(0, 1fr) 114px;
+    grid-template-columns: var(--title-action-width) minmax(0, 1fr) var(--title-action-width);
   }
 }
 
@@ -623,26 +622,35 @@ body,
 }
 
 .title-bar-right {
-  --title-action-size: 30px;
   display: inline-flex;
+  align-self: start;
+  margin-top: 6px;
   align-items: center;
   justify-content: center;
   justify-self: end;
   position: relative;
   border: 1px solid var(--glass-panel-border);
   border-radius: 9999px;
-  padding: 3px;
-  gap: 2px;
+  padding: var(--title-action-padding);
+  gap: var(--title-action-gap);
   background: var(--glass-menu-bg);
   -webkit-backdrop-filter: var(--glass-menu-blur);
   backdrop-filter: var(--glass-menu-blur);
-  box-shadow: var(--glass-menu-highlight), 0 1px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--glass-menu-highlight), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.10);
   -webkit-app-region: no-drag;
   cursor: default;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media not (prefers-reduced-transparency: reduce) {
+    .title-bar-right {
+      background: color-mix(in srgb, var(--glass-menu-bg) 55%, transparent);
+    }
+  }
 }
 
 /* Reveal menubar options and red close button when cursor enters the page */
@@ -738,7 +746,8 @@ body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .
   position: relative;
 }
 
-.close-btn-x .close-x-icon {
+.close-btn-x .close-x-icon,
+.title-bar .fullscreen-btn > svg {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.1s ease-in-out;
@@ -751,8 +760,10 @@ body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .
 }
 
 .close-btn-x:hover .close-x-icon,
-.close-btn-x.is-hovered .close-x-icon {
-  opacity: 1 !important;
+.close-btn-x.is-hovered .close-x-icon,
+.title-bar .title-bar-left:hover > button > svg,
+.title-bar .title-bar-left:has(> button:focus-visible) > button > svg {
+  opacity: 1;
 }
 
 .close-btn-x:active {

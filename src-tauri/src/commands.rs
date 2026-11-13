@@ -428,10 +428,21 @@ pub fn set_native_window_frame(
         let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
         unsafe {
             if let Some(ns_win) = ns_window_ptr.as_ref() {
-                let frame = NSRect {
+                let mut frame = NSRect {
                     origin: NSPoint { x, y },
                     size: NSSize { width, height },
                 };
+                // Use the window's current display, so dragging an edge across
+                // a display boundary cannot grow the window onto that display.
+                let screen: *mut AnyObject = msg_send![ns_win, screen];
+                let screen = screen.as_ref().ok_or("Window has no active display")?;
+                let bounds: NSRect = msg_send![screen, visibleFrame];
+                let (x, y, width, height) = crate::window_geometry::reachable_frame(
+                    (x, y, width, height),
+                    &[(bounds.origin.x, bounds.origin.y, bounds.size.width, bounds.size.height)],
+                );
+                frame.origin = NSPoint { x, y };
+                frame.size = NSSize { width, height };
                 let _: () = msg_send![ns_win, setFrame: frame, display: true];
 
                 if save && window.label() == "main" {
