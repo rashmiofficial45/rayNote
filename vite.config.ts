@@ -23,6 +23,9 @@ export default defineConfig(() => ({
   build: {
     chunkSizeWarningLimit: 1500,
   },
+  test: {
+    exclude: ["**/node_modules/**", "**/dist/**", "**/unslop/**", "**/.git/**"],
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

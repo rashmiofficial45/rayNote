@@ -72,7 +72,7 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
         let buttons: usize = msg_send![objc2::class!(NSEvent), pressedMouseButtons];
         if buttons != 0 { return; }
         let window_number: isize = msg_send![ns_win, windowNumber];
-        let top_window: isize = msg_send![objc2::class!(NSWindow), windowNumberAtPoint: mouse_loc belowWindowWithWindowNumber: 0isize];
+        let top_window: isize = msg_send![objc2::class!(NSWindow), windowNumberAtPoint: mouse_loc, belowWindowWithWindowNumber: 0isize];
         if top_window != window_number { return; }
         if let Some(settings) = app.get_webview_window("settings") {
             if settings.is_focused().unwrap_or(false) { return; }
