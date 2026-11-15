@@ -168,17 +168,17 @@
   --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.10);
   --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 
-  --text-primary-base: #f8fafc;
-  --text-secondary-base: #cbd5e1;
-  --text-muted-base: #94a3b8;
-  --text-subtle-base: #64748b;
-  --placeholder-base: #8f9eb3;
+  --text-primary-base: #ffffff;
+  --text-secondary-base: #e2e8f0;
+  --text-muted-base: #a0aec0;
+  --text-subtle-base: #718096;
+  --placeholder-base: #94a3b8;
 
-  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), transparent);
-  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), transparent);
-  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), transparent);
-  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), transparent);
-  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), transparent);
+  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), var(--app-bg));
 
   --input-bg: #1d1d23;
   --border-primary: rgba(255, 255, 255, 0.10);
@@ -240,17 +240,17 @@
   --surface-glass-inner: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95);
   --surface-glass-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
 
-  --text-primary-base: #0f172a;
-  --text-secondary-base: #334155;
-  --text-muted-base: #475569;
-  --text-subtle-base: #64748b;
-  --placeholder-base: #576579;
+  --text-primary-base: #090d16;
+  --text-secondary-base: #1e293b;
+  --text-muted-base: #334155;
+  --text-subtle-base: #475569;
+  --placeholder-base: #64748b;
 
-  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), transparent);
-  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), transparent);
-  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), transparent);
-  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), transparent);
-  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), transparent);
+  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-muted: color-mix(in srgb, var(--text-muted-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --text-subtle: color-mix(in srgb, var(--text-subtle-base) var(--app-text-opacity, 100%), var(--app-bg));
+  --placeholder: color-mix(in srgb, var(--placeholder-base) var(--app-text-opacity, 100%), var(--app-bg));
 
   --input-bg: #f1f5f9;
   --border-primary: rgba(0, 0, 0, 0.10);
@@ -339,12 +339,39 @@ html, body, #root {
   overflow: hidden;
   background: transparent;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  text-rendering: geometricPrecision;
+  font-synthesis: none;
+  font-feature-settings: 'cv02' 1, 'cv03' 1, 'cv04' 1, 'cv11' 1, 'kern' 1;
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
   overscroll-behavior-x: none !important;
+}
+
+/* ── Crisp Font Rendering (Light & Dark) ──────────────── */
+.light,
+[data-theme="light"],
+[data-resolved-theme="light"],
+.light .app-shell,
+[data-theme="light"] .app-shell,
+[data-resolved-theme="light"] .app-shell,
+.light .settings-window-root,
+[data-theme="light"] .settings-window-root,
+[data-resolved-theme="light"] .settings-window-root {
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
+}
+
+.dark,
+[data-theme="dark"],
+[data-resolved-theme="dark"],
+.dark .app-shell,
+[data-theme="dark"] .app-shell,
+[data-resolved-theme="dark"] .app-shell,
+.dark .settings-window-root,
+[data-theme="dark"] .settings-window-root,
+[data-resolved-theme="dark"] .settings-window-root {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Smooth Theme Cross-Fade View Transitions ─────────── */
@@ -926,6 +953,24 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
   overflow-x: hidden;
   overflow-wrap: anywhere;
   word-break: break-word;
+  text-rendering: geometricPrecision;
+  font-synthesis: none;
+}
+
+.dark .tiptap,
+[data-theme="dark"] .tiptap,
+[data-resolved-theme="dark"] .tiptap {
+  font-weight: 430;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.light .tiptap,
+[data-theme="light"] .tiptap,
+[data-resolved-theme="light"] .tiptap {
+  font-weight: 400;
+  -webkit-font-smoothing: subpixel-antialiased;
+  -moz-osx-font-smoothing: auto;
 }
 
 .tiptap p,
@@ -2015,6 +2060,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 /* ── Unified Liquid Glass Tokens (Dark Theme) ── */
+.trash-dialog,
 .command-palette,
 .smart-search-modal,
 .shortcuts-modal-container {
@@ -2029,7 +2075,7 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 /* ── Unified Liquid Glass Tokens (Light Theme) ── */
-:is([data-theme="light"], [data-resolved-theme="light"]) :is(.command-palette, .smart-search-modal, .shortcuts-modal-container) {
+:is([data-theme="light"], [data-resolved-theme="light"]) :is(.command-palette, .smart-search-modal, .shortcuts-modal-container, .trash-dialog) {
   --picker-solid: rgba(255, 255, 255, 0.90);
   --picker-frost: rgba(255, 255, 255, 0.08);
   --picker-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.20) 32%, transparent 60%);
@@ -3152,9 +3198,11 @@ body:has(.command-overlay) .editor-char-count {
 /* ── HUD Toast Notification (iOS 26 Liquid Pill) ───────── */
 .notefast-toast {
   position: fixed;
-  bottom: 58px;
-  left: 50%;
-  transform: translateX(-50%);
+  inset: auto auto clamp(16px, 9dvh, 58px) 50%;
+  margin: 0;
+  translate: -50% 0;
+  max-width: calc(100% - 24px);
+  white-space: normal;
   z-index: 1000;
   padding: 7px 16px;
   background: var(--surface-glass-elevated);
@@ -3332,140 +3380,6 @@ body:has(.command-overlay) .editor-char-count {
   .shortcuts-modal-container {
     background: var(--modal-bg);
   }
-}
-
-/* ── Delete Confirmation Dialog ───────────────────────── */
-.delete-confirm-dialog {
-  width: 320px;
-  background: var(--modal-bg);
-  backdrop-filter: blur(36px) saturate(210%);
-  -webkit-backdrop-filter: blur(36px) saturate(210%);
-  border: 1px solid var(--modal-border);
-  border-radius: 24px;
-  box-shadow: var(--modal-shadow);
-  padding: 20px;
-  animation: overlayIn 0.12s ease-out;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.delete-confirm-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.delete-confirm-header svg {
-  color: #f87171;
-}
-
-.delete-confirm-text {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
-
-.delete-confirm-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  font-size: 12.5px;
-  color: var(--text-secondary);
-  padding: 8px 12px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  border-radius: 14px;
-  transition: border-color 0.1s ease;
-}
-
-.delete-confirm-checkbox:hover {
-  border-color: var(--color-accent);
-}
-
-.delete-confirm-checkbox input[type="checkbox"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 1.5px solid var(--btn-liquid-border);
-  border-radius: 5px;
-  background: var(--btn-liquid-bg);
-  cursor: pointer;
-  transition: all 0.1s ease;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.delete-confirm-checkbox input[type="checkbox"]:checked {
-  background: #ef4444;
-  border-color: #ef4444;
-}
-
-.delete-confirm-checkbox input[type="checkbox"]:checked::after {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 5px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 1.5px 1.5px 0;
-  transform: rotate(45deg);
-}
-
-.delete-confirm-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 2px;
-}
-
-.delete-confirm-cancel {
-  padding: 6px 14px;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  border-radius: 9999px;
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.12s ease;
-  font-family: inherit;
-}
-
-.delete-confirm-cancel:hover {
-  background: var(--btn-liquid-bg-hover);
-  color: var(--text-primary);
-}
-
-.delete-confirm-btn {
-  padding: 6px 14px;
-  background: #ef4444;
-  border: 1px solid #dc2626;
-  border-radius: 9999px;
-  color: #ffffff;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.12s ease;
-  font-family: inherit;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.35);
-}
-
-.delete-confirm-btn:hover:not(:disabled) {
-  background: #dc2626;
-  transform: scale(1.02);
-}
-
-.delete-confirm-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
 }
 
 /* ── Character Count (Subtle iOS Status Bottom Center) ────── */
@@ -6381,3 +6295,316 @@ body:has(.command-overlay) .editor-char-count {
 
 
 
+
+/* Trash uses a single frosted surface above the editor. */
+.trash-dialog {
+  --trash-inset: clamp(8px, 3dvh, 20px);
+  --trash-tint: rgb(21 23 31 / 31%);
+  --trash-reflection: rgb(255 255 255 / 20%);
+  --trash-rim: rgb(255 255 255 / 39%);
+  position: fixed;
+  inset: var(--trash-inset) 0 auto;
+  margin: 0 auto;
+  box-sizing: border-box;
+  width: min(460px, calc(100% - 2 * var(--trash-inset)));
+  max-height: min(620px, calc(100dvh - 2 * var(--trash-inset)));
+  padding: clamp(6px, 2vw, 10px);
+  overflow: hidden;
+  border: 1px solid var(--trash-rim);
+  border-radius: 32px;
+  background: var(--picker-solid);
+  box-shadow: inset 0 1px 0 var(--picker-edge-light),
+              inset 0 -1px 0 var(--trash-reflection),
+              0 12px 36px -12px rgb(0 0 0 / 30%);
+  color: var(--text-primary);
+}
+
+:is([data-theme="light"], [data-resolved-theme="light"]) .trash-dialog {
+  --trash-tint: rgb(247 249 252 / 36%);
+  --trash-reflection: rgb(255 255 255 / 55%);
+  --trash-rim: rgb(255 255 255 / 85%);
+}
+
+.trash-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.trash-dialog::backdrop {
+  background: transparent;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .trash-dialog {
+    background: radial-gradient(ellipse at 12% 0%, var(--trash-reflection), transparent 58%), var(--trash-tint);
+    backdrop-filter: blur(var(--trash-blur, 16px)) saturate(170%);
+    -webkit-backdrop-filter: blur(var(--trash-blur, 16px)) saturate(170%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .trash-dialog {
+    background: var(--app-bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+.trash-header,
+.trash-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trash-header {
+  flex-shrink: 0;
+  justify-content: space-between;
+  padding: 3px 6px 8px 12px;
+}
+
+.trash-count {
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.trash-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 15px;
+  font-weight: 650;
+  margin: 0;
+}
+
+.trash-header h2 svg {
+  color: var(--color-accent);
+}
+
+.trash-dialog button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--picker-control-border);
+  border-radius: 999px;
+  background: var(--picker-control);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.trash-dialog .trash-actions button,
+.trash-dialog .trash-close,
+.trash-dialog .trash-clear-search {
+  border-color: color-mix(in srgb, var(--text-primary) 25%, transparent);
+  background: color-mix(in srgb, var(--app-bg) 78%, transparent);
+  font-weight: 600;
+}
+
+.trash-dialog .trash-actions button:not(:disabled):hover,
+.trash-dialog .trash-close:hover,
+.trash-dialog .trash-clear-search:not(:disabled):hover {
+  background: color-mix(in srgb, var(--app-bg) 67%, var(--text-primary) 13%);
+}
+
+.trash-dialog .trash-actions .trash-destructive {
+  border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.move-trash-dialog {
+  --trash-inset: clamp(24px, 10dvh, 44px);
+  --trash-tint: rgb(22 25 34 / 23%);
+  --trash-reflection: rgb(255 255 255 / 17%);
+  --trash-blur: 12px;
+}
+
+:is([data-theme="light"], [data-resolved-theme="light"]) .move-trash-dialog {
+  --trash-tint: rgb(247 249 252 / 25%);
+  --trash-reflection: rgb(255 255 255 / 37%);
+}
+
+.move-trash-dialog .trash-header h2 {
+  font-size: 17px;
+}
+
+.move-trash-dialog .trash-confirmation p {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.move-trash-dialog .trash-actions button {
+  min-height: 36px;
+  padding-inline: 12px;
+  font-size: 14px;
+}
+
+.move-trash-dialog::backdrop {
+  background: rgb(0 0 0 / 4%);
+}
+
+.trash-dialog .trash-close {
+  width: 32px;
+  padding: 0;
+}
+
+.trash-dialog button:not(:disabled):hover {
+  background: var(--btn-liquid-bg-hover);
+}
+
+.trash-dialog button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.trash-dialog button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.trash-list {
+  min-height: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px;
+  margin: 0;
+  list-style: none;
+}
+
+.trash-search.smart-search-header {
+  min-height: 40px;
+  margin: 0 5px 5px;
+}
+
+.trash-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.trash-dialog .trash-clear-search {
+  min-height: 26px;
+  width: 26px;
+  padding: 0;
+}
+
+.trash-row.smart-search-item {
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 44px;
+  padding: 4px 6px;
+  cursor: default;
+}
+
+.trash-note-heading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+  padding-inline-start: 4px;
+}
+
+.trash-row:focus-within {
+  background: var(--color-accent-muted);
+  border-color: var(--color-accent-border);
+}
+
+.trash-initial-placeholder {
+  min-height: 44px;
+  margin: 2px 4px;
+  border-radius: 22px;
+  background: var(--picker-control);
+}
+
+.trash-no-results {
+  text-align: center;
+}
+
+.trash-actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.trash-dialog .trash-destructive {
+  color: #fca5a5;
+}
+
+:is([data-theme="light"], [data-resolved-theme="light"]) .trash-dialog .trash-destructive {
+  color: #a82020;
+}
+
+.trash-confirmation {
+  overflow: auto;
+  padding: 4px 12px 12px;
+}
+
+.trash-confirmation p {
+  margin: 0 0 12px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.trash-empty,
+.trash-feedback {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.trash-empty p {
+  margin: 0 0 8px;
+}
+
+.trash-error {
+  font-weight: 600;
+}
+
+.notefast-toast[popover]:not(:popover-open) {
+  display: none;
+}
+
+@supports not selector(:popover-open) {
+  .trash-dialog > .notefast-toast {
+    position: absolute;
+    bottom: 12px;
+  }
+}
+
+.trash-empty-state {
+  display: grid;
+  min-height: 0;
+  overflow: auto;
+  justify-items: center;
+  align-content: safe center;
+  gap: 12px;
+  padding: clamp(16px, 6dvh, 32px) 12px;
+  text-align: center;
+}
+
+.trash-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  aspect-ratio: 1;
+  border: 1px solid var(--trash-rim);
+  border-radius: 21px;
+  background: var(--picker-control);
+  box-shadow: inset 0 1px 0 var(--trash-reflection);
+  color: var(--color-accent);
+}
+
+.trash-empty-state p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 550;
+}

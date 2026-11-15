@@ -21,6 +21,8 @@ import { safeLocalStorageGetItem } from "./lib/storage";
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { TitleBar } from "./components/TitleBar";
+import { MoveToTrashDialog } from "./components/MoveToTrashDialog";
+import { TrashDialog } from "./components/TrashDialog";
 import { CommandPalette } from "./components/CommandPalette";
 import { NoteEditor } from "./components/NoteEditor";
 import { Toast, ToastData } from "./components/Toast";
@@ -78,7 +80,7 @@ import { noteCache } from "./lib/noteCache";
 import { titleStore } from "./lib/titleStore";
 import { blockSelectionPluginKey } from "./extensions/BlockSelection";
 import { broadcastSync, listenToSettingsSync, matchesEvent, nativeShortcut } from "./lib/settingsSync";
-import { getStoredCommandsConfig, CommandRow } from "./lib/commandsConfig";
+import { getStoredCommandsConfig, OPEN_TRASH_HOTKEY, CommandRow } from "./lib/commandsConfig";
 import {
   Check,
   Copy,
@@ -138,6 +140,7 @@ function App() {
   // Active fetch tracker to guard against out-of-order SQLite responses
   const activeFetchIdRef = useRef(0);
   const [isClearingNotes, setIsClearingNotes] = useState(false);
+  const [moveToTrash, setMoveToTrash] = useState<{ id: string; title: string } | null>(null);
   const clearingNotesRef = useRef<Promise<void> | null>(null);
   const deletingNoteRef = useRef<string | null>(null);
 
@@ -221,7 +224,7 @@ function App() {
       fullscreenPending.current = false;
     }
   }, []);
-  const [activePanel, setActivePanel] = useState<"palette" | "notes" | "shortcuts" | "find" | null>(null);
+  const [activePanel, setActivePanel] = useState<"palette" | "notes" | "shortcuts" | "find" | "trash" | null>(null);
   const [paletteInitialView, setPaletteInitialView] = useState<"actions" | "settings">("actions");
   const closePalette = useCallback(() => setActivePanel((panel) => panel === "palette" ? null : panel), []);
   const closeSmartSearch = useCallback(() => setActivePanel((panel) => panel === "notes" ? null : panel), []);
@@ -237,7 +240,6 @@ function App() {
     } catch { }
     return true;
   });
-  const [deleteConfirm, setDeleteConfirm] = useState<{ noteId: string; agreed: boolean } | null>(null);
   const [zoomLevels, setZoomLevels] = useState(() => ({
     windowed: readZoom("windowed"),
     fullscreen: readZoom("fullscreen"),
@@ -601,7 +603,7 @@ function App() {
   const [previewFile, setPreviewFile] = useState<PreviewFileData | null>(null);
   const [droppedFilePrompt, setDroppedFilePrompt] = useState<{ file: File; text: string } | null>(null);
 
-  const hasBlockingDialog = Boolean(deleteConfirm || droppedFilePrompt || previewFile || switchConflict);
+  const hasBlockingDialog = Boolean(droppedFilePrompt || previewFile || switchConflict);
   const visiblePanel = hasBlockingDialog ? null : activePanel;
 
   useEffect(() => {
@@ -1397,8 +1399,8 @@ function App() {
   );
 
   /**
-   * Deletes a note by ID:
-   * 1. Permanently removes row from SQLite.
+   * Moves a note to Trash by ID:
+   * 1. Moves the row out of the active SQLite library.
    * 2. Evicts note content from in-memory cache.
    * 3. Clears localStorage snapshot if it matches deleted ID.
    * 4. Selects the next available note if the deleted note was currently active.
@@ -1439,16 +1441,23 @@ function App() {
             clearActiveNoteSnapshot(id);
           }
         }
-        showToast("Note deleted", <Trash2 size={14} />);
+        showToast("Note moved to Trash", <Trash2 size={14} />);
       } catch (err) {
-        console.error("Failed to delete note:", err);
+        console.error("Failed to move note to Trash:", err);
+        showToast("Could not move note to Trash", <AlertTriangle size={14} />);
       } finally {
         deletingNoteRef.current = null;
         setIsClearingNotes(false);
       }
     },
-    [activeNoteId, handleSelectNote, showToast, flushPendingTitle]
+    [activeNoteId, handleSelectNote, showToast, flushPendingTitle, recentNotes]
   );
+
+  const requestMoveToTrash = useCallback((id: string) => {
+    if (deletingNoteRef.current || clearingNotesRef.current) return;
+    const note = activeNote?.id === id ? activeNote : notes.find((item) => item.id === id);
+    setMoveToTrash({ id, title: note?.title || "Untitled Note" });
+  }, [activeNote, notes]);
 
   const handleClearAllNotes = useCallback((): Promise<void> => {
     if (clearingNotesRef.current) return clearingNotesRef.current;
@@ -1491,7 +1500,7 @@ function App() {
         clearActiveNoteSnapshot();
         navigationHistoryRef.current = { ids: [], index: -1 };
       }
-      if (failures.length) throw new Error(`Could not delete ${failures.length} note(s). Remaining notes were kept.`);
+      if (failures.length) throw new Error(`Could not move ${failures.length} note(s) to Trash. Remaining notes were kept.`);
     })();
     clearingNotesRef.current = operation.finally(() => {
       clearingNotesRef.current = null;
@@ -1595,20 +1604,11 @@ function App() {
     }
   }, [activeNoteId]);
 
-  // Prompt confirmation before deleting
-  const promptDeleteNote = useCallback(
-    (id: string) => {
-      setDeleteConfirm({ noteId: id, agreed: false });
-    },
-    []
-  );
-
-  const confirmDelete = useCallback(() => {
-    if (deleteConfirm && deleteConfirm.agreed) {
-      handleDeleteNote(deleteConfirm.noteId);
-      setDeleteConfirm(null);
-    }
-  }, [deleteConfirm, handleDeleteNote]);
+  const closeTrash = useCallback(() => setActivePanel((panel) => panel === "trash" ? null : panel), []);
+  const refreshAfterRestore = useCallback(async () => {
+    clearCachedRecentSearchResults();
+    setRecentNotes(await getRecentNotes(30));
+  }, []);
 
   /**
    * Toggles the pin status of a note.
@@ -1781,6 +1781,7 @@ function App() {
         e.stopPropagation();
         return;
       }
+      if (moveToTrash) return;
       const isCmd = e.metaKey || e.ctrlKey;
 
       const getCmd = (id: string, defaultHotkey: string) => {
@@ -1796,6 +1797,17 @@ function App() {
         if (!cmd.enabled) return false;
         return matchesEvent(e, cmd.hotkey);
       };
+
+      if (isTriggered("open-trash", OPEN_TRASH_HOTKEY)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!hasBlockingDialog && !e.repeat) {
+          setActivePanel((panel) => panel === "trash" ? null : "trash");
+        }
+        return;
+      }
+
+      if (visiblePanel === "trash") return;
 
       // Hide NoteFast window
       if (isTriggered("hide", "⌘W")) {
@@ -1908,7 +1920,7 @@ function App() {
       if (isTriggered("delete", "⇧⌘⌫")) {
         e.preventDefault();
         if (activeNoteId) {
-          promptDeleteNote(activeNoteId);
+          requestMoveToTrash(activeNoteId);
         }
         return;
       }
@@ -1925,7 +1937,7 @@ function App() {
 
           if (!isEditingText && activeNoteId) {
             e.preventDefault();
-            promptDeleteNote(activeNoteId);
+            requestMoveToTrash(activeNoteId);
             return;
           }
         }
@@ -2008,10 +2020,6 @@ function App() {
           setPreviewFile(null);
           return;
         }
-        if (deleteConfirm) {
-          setDeleteConfirm(null);
-          return;
-        }
         if (visiblePanel === "shortcuts") {
           closeShortcuts();
           return;
@@ -2050,14 +2058,13 @@ function App() {
   }, [
     activeNoteId,
     commandsConfig,
-    deleteConfirm,
     droppedFilePrompt,
     previewFile,
     escLosesFocus,
     handleNewNote,
     handleDuplicateNote,
-    handleDeleteNote,
-    promptDeleteNote,
+    moveToTrash,
+    requestMoveToTrash,
     handleTogglePin,
     handleCopyNoteAsMarkdown,
     handleCopyDeeplink,
@@ -2127,7 +2134,7 @@ function App() {
         onOpenCommandPalette={() => handleOpenCommandPalette("actions")}
         onOpenSmartSearch={handleOpenSmartSearch}
         onDuplicateNote={handleDuplicateNote}
-        onDeleteNote={() => activeNoteId && promptDeleteNote(activeNoteId)}
+        onDeleteNote={() => { if (activeNoteId) requestMoveToTrash(activeNoteId); }}
         onCopyMarkdown={handleCopyNoteAsMarkdown}
         onTriggerImportFile={handleTriggerImportFile}
         onTriggerViewFile={handleTriggerViewFile}
@@ -2137,52 +2144,6 @@ function App() {
       {/* Top frosted glass blend scrim */}
       <div className="app-top-blend" aria-hidden="true" />
 
-      {/* Delete Confirmation Dialog */}
-      {deleteConfirm && (
-        <div className="command-overlay" onClick={() => setDeleteConfirm(null)}>
-          <div
-            className="delete-confirm-dialog"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="delete-confirm-header">
-              <Trash2 size={18} className="text-red-400" />
-              <span>Delete Note</span>
-            </div>
-            <p className="delete-confirm-text">
-              This action cannot be undone. The note will be permanently removed.
-            </p>
-            <label className="delete-confirm-checkbox">
-              <input
-                type="checkbox"
-                checked={deleteConfirm.agreed}
-                onChange={(e) =>
-                  setDeleteConfirm((prev) =>
-                    prev ? { ...prev, agreed: e.target.checked } : null
-                  )
-                }
-              />
-              <span>I confirm I want to delete this note</span>
-            </label>
-            <div className="delete-confirm-actions">
-              <button
-                className="delete-confirm-cancel"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="delete-confirm-btn"
-                disabled={!deleteConfirm.agreed}
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Dropped File Choice Modal (Upload vs View Only) */}
       {droppedFilePrompt && (
         <div className="command-overlay" onClick={() => setDroppedFilePrompt(null)}>
           <div className="drop-prompt-modal" onClick={(e) => e.stopPropagation()}>
@@ -2274,7 +2235,7 @@ function App() {
           onNewNote={handleNewNote}
           onDuplicateNote={handleDuplicateNote}
           onSelectNote={handleSelectNote}
-          onDeleteNote={handleDeleteNote}
+          onDeleteNote={requestMoveToTrash}
           onTogglePin={handleTogglePin}
           onGoBack={handleGoBack}
           onGoForward={handleGoForward}
@@ -2296,17 +2257,22 @@ function App() {
           zoomLevel={zoomLevel}
           onSetZoom={setZoomLevel}
           onPromptClearAllNotes={async () => {
-            if (!window.confirm("Are you sure you want to delete all notes? This cannot be undone.")) return;
+            if (!window.confirm("Move all notes to Trash? You can restore them from Trash.")) return;
             try {
               await handleClearAllNotes();
-              showToast("All notes cleared", <Trash2 size={14} />);
+              showToast("All notes moved to Trash", <Trash2 size={14} />);
             } catch (error) {
               console.error("Failed to clear notes:", error);
-              showToast("Failed to clear all notes", <AlertTriangle size={14} />);
+              showToast("Could not move all notes to Trash", <AlertTriangle size={14} />);
             }
           }}
+          onOpenTrash={() => setActivePanel("trash")}
           onOpenSmartSearch={handleOpenSmartSearch}
         />
+      )}
+
+      {visiblePanel === "trash" && (
+        <TrashDialog onClose={closeTrash} onRestored={refreshAfterRestore} onShowToast={showToast} toast={toast} />
       )}
 
       <ShortcutsModal
@@ -2372,6 +2338,15 @@ function App() {
         style={{ display: "none" }}
       />
 
+      {moveToTrash && (
+        <MoveToTrashDialog title={moveToTrash.title}
+          onCancel={() => setMoveToTrash(null)}
+          onConfirm={() => {
+            setMoveToTrash(null);
+            void handleDeleteNote(moveToTrash.id);
+          }} />
+      )}
+
       <SwitchConflictModal
         conflict={switchConflict}
         onSaveAsNewNote={handleConflictSaveAsNew}
@@ -2380,7 +2355,7 @@ function App() {
         onClose={() => setSwitchConflict(null)}
       />
 
-      <Toast toast={toast} />
+      {visiblePanel !== "trash" && <Toast toast={toast} />}
     </div>
   );
 }

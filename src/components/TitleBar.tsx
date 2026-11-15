@@ -286,8 +286,8 @@ export function TitleBar({
         <button
           className="title-bar-btn delete-btn"
           onClick={onDeleteNote}
-          title={`Delete Note (${deleteHotkey})`}
-          aria-label="Delete Note"
+          title={`Move Note to Trash (${deleteHotkey})`}
+          aria-label="Move Note to Trash"
         >
           <Trash2 size={20} strokeWidth={2.35} aria-hidden="true" />
         </button>

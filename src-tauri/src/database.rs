@@ -46,6 +46,12 @@ pub struct NoteSummary {
     pub is_pinned: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct TrashedNoteSummary {
+    pub id: String,
+    pub title: String,
+}
+
 /// Full note document containing the complete TipTap JSON/HTML or Markdown content payload.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Note {
@@ -245,6 +251,18 @@ impl Database {
             );
 
             CREATE INDEX IF NOT EXISTS idx_notes_updated_at ON notes(updated_at DESC);
+
+            CREATE TABLE IF NOT EXISTS trashed_notes (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                preview TEXT NOT NULL,
+                search_text TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                is_pinned INTEGER NOT NULL,
+                trashed_at TEXT NOT NULL
+            );
             "
         )?;
 
@@ -375,6 +393,18 @@ impl Database {
                 }
             }
             tx.pragma_update(None, "user_version", 4)?;
+            tx.commit()?;
+        }
+
+        if user_version < 6 {
+            let tx = writer.transaction()?;
+            // Trash filters loaded titles locally. Remove the old body index, not the notes.
+            tx.execute_batch(
+                "DROP TRIGGER IF EXISTS trashed_notes_fts_ai;
+                 DROP TRIGGER IF EXISTS trashed_notes_fts_ad;
+                 DROP TABLE IF EXISTS trashed_notes_fts;",
+            )?;
+            tx.pragma_update(None, "user_version", 6)?;
             tx.commit()?;
         }
 
@@ -1175,12 +1205,18 @@ impl Database {
         Ok(now)
     }
 
-    /// Permanently deletes a note from SQLite and removes it from meta_cache in-place.
+    /// Moves a note into Trash atomically. The active table's triggers remove it from search.
     pub fn delete_note(&self, id: &str) -> Result<()> {
-        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
-        {
-            conn.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
-        }
+        let mut conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = conn.transaction()?;
+        tx.execute(
+            "INSERT INTO trashed_notes (id, title, content, preview, search_text, created_at, updated_at, is_pinned, trashed_at)
+             SELECT id, title, content, preview, search_text, created_at, updated_at, is_pinned, ?2
+             FROM notes WHERE id = ?1",
+            params![id, chrono::Utc::now().to_rfc3339()],
+        )?;
+        tx.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+        tx.commit()?;
 
         // Bump cache generation and patch cache in-place inside the SAME write lock critical section
         if let Ok(mut lock) = self.meta_cache.write() {
@@ -1191,6 +1227,44 @@ impl Database {
             }
         }
 
+        Ok(())
+    }
+
+    pub fn list_trashed_notes(&self) -> Result<Vec<TrashedNoteSummary>> {
+        let conn = self.reader.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, title FROM trashed_notes ORDER BY trashed_at DESC, id ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(TrashedNoteSummary { id: row.get(0)?, title: row.get(1)? })
+        })?;
+        rows.collect()
+    }
+
+    pub fn restore_trashed_note(&self, id: &str) -> Result<()> {
+        let mut conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = conn.transaction()?;
+        let inserted = tx.execute(
+            "INSERT INTO notes (id, title, content, preview, search_text, created_at, updated_at, is_pinned)
+             SELECT id, title, content, preview, search_text, created_at, updated_at, is_pinned
+             FROM trashed_notes WHERE id = ?1",
+            params![id],
+        )?;
+        if inserted == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
+        tx.execute("DELETE FROM trashed_notes WHERE id = ?1", params![id])?;
+        tx.commit()?;
+        self.invalidate_cache();
+        Ok(())
+    }
+
+    pub fn purge_trashed_note(&self, id: &str) -> Result<()> {
+        let conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let deleted = conn.execute("DELETE FROM trashed_notes WHERE id = ?1", params![id])?;
+        if deleted == 0 {
+            return Err(rusqlite::Error::QueryReturnedNoRows);
+        }
         Ok(())
     }
 
@@ -1847,6 +1921,34 @@ mod tests {
         db.delete_note(&note_id).expect("delete_note failed");
         let deleted_search = db.search_documents("benchmark", 30).expect("search failed");
         assert!(deleted_search.is_empty());
+
+        assert!(db.get_note(&note_id).unwrap().is_none());
+        assert!(db.get_all_notes_with_content().unwrap().is_empty());
+        // Simulate a v5 database containing the former Trash body index.
+        db.writer.lock().unwrap().execute_batch(
+            "CREATE VIRTUAL TABLE trashed_notes_fts USING fts5(title, search_text, content='trashed_notes');
+             INSERT INTO trashed_notes_fts(trashed_notes_fts) VALUES ('rebuild');
+             PRAGMA user_version = 5;",
+        ).unwrap();
+        drop(db);
+
+        let db = Database::new(temp_dir.clone()).unwrap();
+        let trash = db.list_trashed_notes().unwrap();
+        assert_eq!(trash.len(), 1);
+        assert_eq!(trash[0].id, note_id);
+        assert_eq!(trash[0].title, "Benchmark Suite");
+        assert!(db.purge_trashed_note("unrelated").is_err());
+        db.restore_trashed_note(&note_id).unwrap();
+        assert!(db.list_trashed_notes().unwrap().is_empty());
+        assert!(db.get_note(&note_id).unwrap().unwrap().content.contains("memory telemetry"));
+        assert_eq!(db.search_documents("telemetry", 30).unwrap()[0].id, note_id);
+        assert!(db.purge_trashed_note(&note_id).is_err());
+        assert!(db.get_note(&note_id).unwrap().is_some());
+        db.delete_note(&note_id).unwrap();
+        db.delete_note(&note_id).unwrap();
+        db.purge_trashed_note(&note_id).unwrap();
+        assert!(db.list_trashed_notes().unwrap().is_empty());
+        assert!(db.restore_trashed_note(&note_id).is_err());
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

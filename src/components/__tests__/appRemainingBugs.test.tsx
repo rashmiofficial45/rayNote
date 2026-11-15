@@ -125,7 +125,8 @@ describe('Remaining App data-integrity and command regressions', () => {
     await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('a', summary('a')));
     await palette();
     vi.mocked(db.getRecentNotes).mockResolvedValue([summary('a')]);
-    await act(async () => { await state.palette.onDeleteNote('b'); });
+    await act(async () => state.palette.onDeleteNote('b'));
+    await act(async () => (host.querySelector('.move-trash-confirm') as HTMLButtonElement).click());
     await act(async () => state.palette.onGoBack());
     expect(state.editor.noteId).toBe('a');
   });

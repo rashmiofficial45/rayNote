@@ -94,7 +94,7 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     expect(host.textContent).toContain("Export All Notes");
     expect(host.textContent).toContain("Export Markdown");
     expect(host.textContent).toContain("Danger Zone");
-    expect(host.textContent).toContain("Clear All Notes");
+    expect(host.textContent).toContain("Move All to Trash");
 
     // 4. Click About tab
     await act(async () => {
@@ -117,21 +117,21 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
       pills[2].click();
     });
 
-    // Find Clear All Notes button
+    // Find Move All to Trash button
     const clearBtn = Array.from(host.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("Clear All Notes")
+      b.textContent?.includes("Move All to Trash")
     );
     expect(clearBtn).toBeDefined();
 
-    // Click Clear All Notes to enter confirmation state
+    // Click Move All to Trash to enter confirmation state
     await act(async () => {
       clearBtn?.click();
     });
 
-    // Confirmation group should appear with checkbox and Delete All button
-    expect(host.textContent).toContain("Confirm erase");
+    // Confirmation group should appear with checkbox and Move to Trash button
+    expect(host.textContent).toContain("Confirm move");
     const deleteBtn = Array.from(host.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("Delete All")
+      b.textContent?.includes("Move to Trash")
     );
     expect(deleteBtn).toBeDefined();
     expect(deleteBtn?.disabled).toBe(true);
@@ -151,7 +151,7 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     await act(async () => {
       cancelBtn?.click();
     });
-    expect(host.textContent).toContain("Clear All Notes");
+    expect(host.textContent).toContain("Move All to Trash");
   });
 
   it("has responsive layout container structure for cards and rows", async () => {

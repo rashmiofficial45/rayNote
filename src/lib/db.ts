@@ -242,7 +242,7 @@ export function registerExitFlushHandler(flushPendingCallback?: () => void): Pro
 }
 
 /**
- * Permanently removes a note and its corresponding full-text search index from SQLite.
+ * Moves a note to Trash and removes it from the active full-text search index.
  * Clears active note snapshot from localStorage when deleted ID matches the cached snapshot.
  */
 export async function deleteNote(id: string): Promise<void> {
@@ -263,6 +263,23 @@ export async function deleteNote(id: string): Promise<void> {
     }
   } catch {}
   return result;
+}
+
+export interface TrashedNoteSummary {
+  id: string;
+  title: string;
+}
+
+export function listTrashedNotes(): Promise<TrashedNoteSummary[]> {
+  return invoke("list_trashed_notes");
+}
+
+export function restoreTrashedNote(id: string): Promise<void> {
+  return invoke("restore_trashed_note", { id });
+}
+
+export function purgeTrashedNote(id: string): Promise<void> {
+  return invoke("purge_trashed_note", { id });
 }
 
 /**

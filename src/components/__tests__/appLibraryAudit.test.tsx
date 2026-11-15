@@ -76,10 +76,10 @@ describe('App library and selection regressions', () => {
     let finishFlush!: () => void;
     vi.spyOn(db, 'flushEditorNow').mockReturnValue(new Promise(resolve => { finishFlush = resolve; }));
     vi.spyOn(db, 'getRecentNotes').mockResolvedValue([two]);
-    let deletion!: Promise<void>;
-    await act(async () => { deletion = state.palette.onDeleteNote('one'); });
+    await act(async () => state.palette.onDeleteNote('one'));
+    await act(async () => (host.querySelector('.move-trash-confirm') as HTMLButtonElement).click());
     expect(deleted).not.toHaveBeenCalled();
-    await act(async () => { finishFlush(); await deletion; });
+    await act(async () => { finishFlush(); });
     expect(deleted).toHaveBeenCalledWith('one');
     expect(state.editor.discardedNoteId).toBe('one');
     expect(state.editor.noteId).toBe('two');

@@ -1,4 +1,4 @@
-use crate::database::{Database, Note, NoteSummary};
+use crate::database::{Database, Note, NoteSummary, TrashedNoteSummary};
 use crate::search::SearchResult;
 use std::sync::Arc;
 use tauri::State;
@@ -201,6 +201,32 @@ pub async fn delete_note(db: State<'_, Arc<Database>>, id: String) -> Result<(),
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn list_trashed_notes(
+    db: State<'_, Arc<Database>>,
+) -> Result<Vec<TrashedNoteSummary>, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || db.list_trashed_notes().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn restore_trashed_note(db: State<'_, Arc<Database>>, id: String) -> Result<(), String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || db.restore_trashed_note(&id).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn purge_trashed_note(db: State<'_, Arc<Database>>, id: String) -> Result<(), String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || db.purge_trashed_note(&id).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

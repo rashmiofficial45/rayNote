@@ -4,6 +4,7 @@ import { listenToSettingsSync } from "../lib/settingsSync";
 import {
   getStoredCommandsConfig,
   getCommandHotkey,
+  OPEN_TRASH_HOTKEY,
   splitHotkeyToKeys,
   CommandRow,
 } from "../lib/commandsConfig";
@@ -64,7 +65,8 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
       { keys: getKeys("settings", "⌘,"), description: "Open Settings / Preferences", category: "Navigation & App" },
       { keys: getKeys("hide", "⌘W"), description: "Hide Window (Run in Background)", category: "Navigation & App" },
       { keys: getKeys("quit", "⌘Q"), description: "Quit rayNote Completely", category: "Navigation & App" },
-      { keys: getKeys("delete", "⇧⌘⌫"), description: "Delete Current Note", category: "Navigation & App" },
+      { keys: getKeys("open-trash", OPEN_TRASH_HOTKEY), description: "Open Trash", category: "Navigation & App" },
+      { keys: getKeys("delete", "⇧⌘⌫"), description: "Move Current Note to Trash", category: "Navigation & App" },
     ];
 
     const formattingShortcuts: ShortcutItem[] = [

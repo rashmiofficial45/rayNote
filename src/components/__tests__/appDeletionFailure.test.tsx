@@ -40,6 +40,8 @@ describe('Deletion reconciliation and successful recovery ownership', () => {
     const deleted = vi.spyOn(db, 'deleteNote').mockResolvedValue();
     await openPalette(); vi.mocked(db.getRecentNotes).mockRejectedValue(new Error('Read unavailable'));
     await act(async () => state.palette.onDeleteNote('a'));
+    expect(deleted).not.toHaveBeenCalled();
+    await act(async () => (host.querySelector('.move-trash-confirm') as HTMLButtonElement).click());
     expect(deleted).toHaveBeenCalledWith('a');
     expect(state.editor.noteId).not.toBe('a');
     expect(state.palette.notes.some((note: db.NoteSummary) => note.id === 'a')).toBe(false);

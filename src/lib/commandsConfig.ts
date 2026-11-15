@@ -20,6 +20,8 @@ export interface CommandRow {
   category: "commands" | "extensions" | "formatting" | "editing";
 }
 
+export const OPEN_TRASH_HOTKEY = "⇧⌘T";
+
 export const DEFAULT_COMMANDS: CommandRow[] = [
   // App & Window Commands
   { id: "create", title: "Create Note", hotkey: "⌘N", enabled: true, category: "commands" },
@@ -28,6 +30,7 @@ export const DEFAULT_COMMANDS: CommandRow[] = [
   { id: "find", title: "Find in Note", hotkey: "⌘F", enabled: true, category: "commands" },
   { id: "duplicate", title: "Duplicate Note", hotkey: "⌘D", enabled: true, category: "commands" },
   { id: "pin", title: "Pin / Unpin Note", hotkey: "⇧⌘P", enabled: true, category: "commands" },
+  { id: "open-trash", title: "Open Trash", hotkey: OPEN_TRASH_HOTKEY, enabled: true, category: "commands" },
   { id: "delete", title: "Delete Note", hotkey: "⇧⌘⌫", enabled: true, category: "commands" },
   { id: "next_note", title: "Next Note in List", hotkey: "⌥↓", enabled: true, category: "commands" },
   { id: "prev_note", title: "Previous Note in List", hotkey: "⌥↑", enabled: true, category: "commands" },

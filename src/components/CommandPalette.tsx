@@ -54,6 +54,7 @@ import { getStoredAliases } from "../lib/aliases";
 import {
   getStoredCommandsConfig,
   getCommandHotkey,
+  OPEN_TRASH_HOTKEY,
   splitHotkeyToKeys,
   CommandRow,
 } from "../lib/commandsConfig";
@@ -90,6 +91,7 @@ export interface CommandPaletteProps {
   onTriggerImportFile?: () => void;
   onTriggerViewFile?: () => void;
   onPromptClearAllNotes?: () => void;
+  onOpenTrash?: () => void;
   onOpenSmartSearch?: () => void;
 }
 
@@ -139,6 +141,7 @@ export function CommandPalette({
   onTriggerImportFile,
   onTriggerViewFile,
   onPromptClearAllNotes,
+  onOpenTrash,
   onOpenSmartSearch,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
@@ -489,13 +492,21 @@ export function CommandPalette({
         invoke("open_app_data_folder").catch(console.error);
       },
     },
+    ...(onOpenTrash ? [{
+      id: "open-trash",
+      category: "Storage",
+      label: "Open Trash",
+      shortcut: getShortcut("open-trash", OPEN_TRASH_HOTKEY),
+      icon: <Trash2 size={14} />,
+      keywords: ["trash", "recover", "restore", "deleted notes"],
+      action: onOpenTrash,
+    }] : []),
     {
       id: "danger-clear-notes",
       category: "Storage",
-      label: "Clear All Notes…",
-      badge: "Danger",
+      label: "Move All Notes to Trash…",
       icon: <AlertTriangle size={14} className="text-red-400" />,
-      keywords: ["clear", "delete all", "erase", "danger", "reset", "wipe"],
+      keywords: ["clear", "delete all", "trash"],
       action: () => {
         onClose();
         onPromptClearAllNotes?.();
@@ -571,7 +582,7 @@ export function CommandPalette({
     {
       id: "delete-note",
       category: "Note Actions",
-      label: "Delete Note",
+      label: "Move Note to Trash",
       icon: <Trash2 size={14} className="text-red-400" />,
       shortcut: getShortcut("delete", "⇧⌘⌫"),
       disabled: !activeNoteId,

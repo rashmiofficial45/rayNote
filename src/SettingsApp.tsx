@@ -552,12 +552,12 @@ export default function SettingsApp() {
       setIsClearing(false);
       setClearAgreed(false);
       loadStorageStats();
-      setActionMessage("All notes cleared.");
+      setActionMessage("All notes moved to Trash.");
       setTimeout(() => setActionMessage(null), 3000);
 
     } catch (err) {
       console.error(err);
-      setActionMessage("Failed to clear notes.");
+      setActionMessage("Could not move all notes to Trash.");
     }
   };
 
@@ -1194,7 +1194,7 @@ export default function SettingsApp() {
                 <div className="settings-row-text">
                   <div className="settings-row-title danger-title text-[13.5px] [font-weight:600]">Danger Zone</div>
                   <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Permanently delete all notes from your local SQLite database.
+                    Move all notes to Trash. You can restore them from Actions → Open Trash.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -1205,7 +1205,7 @@ export default function SettingsApp() {
                       onClick={() => setIsClearing(true)}
                     >
                       <Trash2 size={13} />
-                      <span>Clear All Notes</span>
+                      <span>Move All to Trash</span>
                     </button>
                   ) : (
                     <div className="settings-danger-confirm-group">
@@ -1215,7 +1215,7 @@ export default function SettingsApp() {
                           checked={clearAgreed}
                           onChange={(e) => setClearAgreed(e.target.checked)}
                         />
-                        <span>Confirm erase</span>
+                        <span>Confirm move</span>
                       </label>
                       <button
                         type="button"
@@ -1223,7 +1223,7 @@ export default function SettingsApp() {
                         disabled={!clearAgreed}
                         onClick={handleClearAllNotes}
                       >
-                        Delete All
+                        Move to Trash
                       </button>
                       <button
                         type="button"
