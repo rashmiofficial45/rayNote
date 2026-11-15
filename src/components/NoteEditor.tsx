@@ -15,6 +15,7 @@ interface NoteEditorProps {
   onSwitchConflict?: (info: SwitchConflictInfo) => void;
   discardedNoteId?: string | null;
   zoomLevel: number;
+  showBlockControls?: boolean;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
 }
@@ -32,6 +33,7 @@ export function NoteEditor({
   onSwitchConflict,
   discardedNoteId,
   zoomLevel,
+  showBlockControls,
   isFindOpen,
   onCloseFind,
 }: NoteEditorProps) {
@@ -81,6 +83,7 @@ export function NoteEditor({
         onSwitchConflict={onSwitchConflict}
         discardedNoteId={discardedNoteId}
         zoomLevel={zoomLevel}
+        showBlockControls={showBlockControls}
         isFindOpen={isFindOpen}
         onCloseFind={onCloseFind}
       />

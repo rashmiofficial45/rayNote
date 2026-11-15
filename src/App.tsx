@@ -1995,6 +1995,7 @@ function App() {
       // Toggle Shortcuts Cheatsheet
       if (isTriggered("shortcuts_help", "⌘/")) {
         e.preventDefault();
+        if (isFullscreen && !window.dispatchEvent(new Event("raynote-open-block-menu", { cancelable: true }))) return;
         if (hasBlockingDialog) {
           e.stopPropagation();
           return;
@@ -2077,6 +2078,7 @@ function App() {
     handleZoomOut,
     handleResetZoom,
     visiblePanel,
+    isFullscreen,
     hasBlockingDialog,
     paletteInitialView,
     handleOpenCommandPalette,
@@ -2219,6 +2221,7 @@ function App() {
           onSwitchConflict={(info) => setSwitchConflict(info)}
           discardedNoteId={discardedNoteId}
           zoomLevel={zoomLevel}
+          showBlockControls={isFullscreen && !visiblePanel && !hasBlockingDialog && !moveToTrash}
           isFindOpen={visiblePanel === "find"}
           onCloseFind={closeFind}
         />

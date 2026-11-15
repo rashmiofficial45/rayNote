@@ -6609,3 +6609,98 @@ body:has(.command-overlay) .editor-char-count {
   font-size: 14px;
   font-weight: 550;
 }
+
+.app-shell.is-fullscreen .tiptap {
+  padding-left: max(var(--editor-padding-left), min(104px, 14vw));
+  padding-right: calc(max(var(--editor-padding-left), min(104px, 14vw)) + var(--slider-gutter-width));
+}
+
+.fullscreen-block-controls {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  user-select: none;
+}
+
+.fullscreen-block-controls button {
+  display: grid;
+  place-items: center;
+  width: 1em;
+  height: 1em;
+  padding: 0;
+  border: 0;
+  border-radius: 0.2em;
+  background: transparent;
+  font-size: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.fullscreen-block-controls button svg {
+  width: 0.6em;
+  height: 0.6em;
+}
+
+.fullscreen-block-controls button:hover,
+.fullscreen-block-controls button:focus-visible {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+}
+
+.fullscreen-block-controls button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.fullscreen-block-controls .fullscreen-block-grip {
+  cursor: grab;
+  touch-action: none;
+}
+
+.fullscreen-block-controls .fullscreen-block-grip:active {
+  cursor: grabbing;
+}
+
+.fullscreen-block-drop-target,
+.fullscreen-block-drop-line {
+  position: fixed;
+  pointer-events: none;
+}
+
+.fullscreen-block-drop-target {
+  z-index: 46;
+  border-radius: 6px;
+  background: var(--color-accent-subtle);
+}
+
+.fullscreen-block-drop-line {
+  z-index: 48;
+  height: 3px;
+  box-sizing: border-box;
+  border-inline: 4px solid transparent;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: var(--color-accent) padding-box;
+}
+
+.fullscreen-block-drag-preview {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 47;
+  width: max-content;
+  opacity: 0.58;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fullscreen-block-preview-content.tiptap {
+  padding: 0;
+  min-height: 0;
+}
+
+.fullscreen-block-preview-content > li {
+  list-style-position: inside;
+}

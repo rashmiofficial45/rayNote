@@ -24,6 +24,7 @@ import { SlashCommand } from "./SlashCommand";
 import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
+import { FullscreenBlockControls } from "./FullscreenBlockControls";
 import { FloatingCodeBlockToolbar } from "./FloatingCodeBlockToolbar";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import { useBlockDrag } from "../extensions/useBlockDrag";
@@ -152,6 +153,7 @@ interface EditorProps {
   onSwitchConflict?: (info: SwitchConflictInfo) => void;
   discardedNoteId?: string | null;
   zoomLevel?: number;
+  showBlockControls?: boolean;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
   onEditorReady?: (editor: any) => void;
@@ -222,6 +224,7 @@ export function Editor({
   onSwitchConflict,
   discardedNoteId,
   zoomLevel,
+  showBlockControls,
   isFindOpen,
   onCloseFind,
   onEditorReady,
@@ -1306,6 +1309,10 @@ export function Editor({
             zoomLevel={zoomLevel}
           />
         </div>
+        {showBlockControls && !contextMenuState && (
+          <FullscreenBlockControls key={noteId} editor={editor} zoomLevel={zoomLevel} scrollContainerRef={scrollContainerRef}
+            onMenu={(point) => setContextMenuState(resolveContextMenuState(editor, point))} />
+        )}
         {/* Notion-style Rubber-band Selection Box */}
         <div
           ref={selectionBoxRef}
