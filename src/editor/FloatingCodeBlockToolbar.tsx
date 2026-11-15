@@ -1,3 +1,4 @@
+import { useCodeLanguageMenuLayout } from "./useCodeLanguageMenuLayout";
 import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { Editor } from "@tiptap/react";
@@ -30,10 +31,10 @@ export function FloatingCodeBlockToolbar({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [openUpward, setOpenUpward] = useState(false);
 
   const toolbarRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuLayout = useCodeLanguageMenuLayout(isOpen, dropdownRef);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hoveredPreRef = useRef<HTMLElement | null>(null);
@@ -356,11 +357,6 @@ export function FloatingCodeBlockToolbar({
       setIsOpen((prev) => {
         const willOpen = !prev;
         if (willOpen) {
-          if (dropdownRef.current) {
-            const rect = dropdownRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUpward(spaceBelow < 260 && rect.top > 260);
-          }
           setSearchQuery("");
           const activeIdx = POPULAR_LANGUAGES.findIndex(
             (l) => l.value.toLowerCase() === currentLang
@@ -539,8 +535,9 @@ export function FloatingCodeBlockToolbar({
           {isOpen && (
             <div
               className={`slash-command-menu code-lang-liquid-menu ${
-                openUpward ? "is-upward" : ""
+                menuLayout?.upward ? "is-upward" : ""
               }`}
+              style={menuLayout?.style}
               onMouseDown={(e) => e.stopPropagation()}
               onKeyDown={handleKeyDown}
               role="listbox"

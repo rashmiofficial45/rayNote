@@ -1448,25 +1448,26 @@ html[data-smooth-caret="false"] .tiptap {
   opacity: 0.65;
 }
 
-/* Liquid Glass Language Dropdown Menu (Styled like / slash command submenu) */
-.code-lang-liquid-menu {
+/* The language picker shares the slash menu's row styles. */
+.slash-command-menu.code-lang-liquid-menu {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  width: 154px;
-  max-width: 170px;
-  padding: 6px;
-  background: var(--glass-menu-bg);
-  backdrop-filter: var(--glass-menu-blur);
-  -webkit-backdrop-filter: var(--glass-menu-blur);
-  border: 1px solid var(--glass-menu-border);
-  border-radius: 16px;
-  z-index: 9999;
-  box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
-  animation: editorContextMenuScaleIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  width: 216px;
+  min-width: 0;
+  max-width: calc(100vw - 16px);
+  padding: 7px;
+  background: color-mix(in srgb, var(--glass-menu-bg) 72%, var(--app-bg));
+  border-radius: 24px;
+  overflow: hidden;
+  contain: none;
 }
 
-.code-lang-liquid-menu.is-upward {
+.slash-command-menu.code-lang-liquid-menu::after {
+  display: none;
+}
+
+.slash-command-menu.code-lang-liquid-menu.is-upward {
   top: auto;
   bottom: calc(100% + 6px);
 }
@@ -1476,7 +1477,7 @@ html[data-smooth-caret="false"] .tiptap {
   align-items: center;
   gap: 6px;
   padding: 3.5px 7px;
-  border-radius: 8px;
+  border-radius: 999px;
   background: var(--glass-control-bg);
   border: 1px solid var(--glass-control-border);
   margin-bottom: 5px;
@@ -1511,6 +1512,8 @@ html[data-smooth-caret="false"] .tiptap {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding-bottom: 2px;
+  scroll-padding-block: 2px;
 }
 
 .code-lang-items-container::-webkit-scrollbar {
@@ -1534,7 +1537,7 @@ html[data-smooth-caret="false"] .tiptap {
   gap: 6px;
   padding: 3px 8px !important;
   min-height: 24px !important;
-  border-radius: 8px !important;
+  border-radius: 999px !important;
   font-size: 11.5px !important;
   color: var(--text-primary);
   cursor: pointer;
@@ -1549,7 +1552,7 @@ html[data-smooth-caret="false"] .tiptap {
 
 .code-lang-item.is-selected {
   background: var(--glass-item-selected-bg) !important;
-  border-color: transparent !important;
+  border-color: var(--color-accent-border) !important;
   color: var(--text-primary) !important;
 }
 
@@ -1700,36 +1703,34 @@ pre.notefast-code-block:hover {
 
 .floating-code-block-toolbar {
   pointer-events: auto;
-  animation: codeToolbarFadeIn 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  background: var(--surface-glass-elevated, rgba(22, 22, 26, 0.85));
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid var(--surface-glass-border, rgba(255, 255, 255, 0.08));
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 2px 3px;
   height: 22px;
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
+}
+
+/* Apply the toolbar glass to its own layer so the picker can sample code behind it. */
+.floating-code-block-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--surface-glass-elevated, rgba(22, 22, 26, 0.85));
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border: 1px solid var(--surface-glass-border, rgba(255, 255, 255, 0.08));
+  border-radius: inherit;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 
-[data-theme="light"] .floating-code-block-toolbar,
-.light .floating-code-block-toolbar {
+:is(.light, [data-theme="light"], [data-resolved-theme="light"]) .floating-code-block-toolbar::before {
   background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-@keyframes codeToolbarFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
 .code-block-pre::-webkit-scrollbar,

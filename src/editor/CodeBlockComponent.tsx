@@ -1,3 +1,4 @@
+import { useCodeLanguageMenuLayout } from "./useCodeLanguageMenuLayout";
 import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from "react";
 import { NodeViewWrapper, NodeViewContent, NodeViewProps } from "@tiptap/react";
@@ -37,9 +38,9 @@ export function CodeBlockComponent({
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [openUpward, setOpenUpward] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const menuLayout = useCodeLanguageMenuLayout(isOpen, dropdownRef);
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const selectionFromPointer = useRef(false);
@@ -90,11 +91,6 @@ export function CodeBlockComponent({
     setIsOpen((prev) => {
       const willOpen = !prev;
       if (willOpen) {
-        if (dropdownRef.current) {
-          const rect = dropdownRef.current.getBoundingClientRect();
-          const spaceBelow = window.innerHeight - rect.bottom;
-          setOpenUpward(spaceBelow < 260 && rect.top > 260);
-        }
         setSearchQuery("");
         // Highlight ONLY the currently active language initially (not index 0)
         const activeIdx = POPULAR_LANGUAGES.findIndex(
@@ -234,8 +230,9 @@ export function CodeBlockComponent({
             {isOpen && (
               <div
                 className={`slash-command-menu code-lang-liquid-menu ${
-                  openUpward ? "is-upward" : ""
+                  menuLayout?.upward ? "is-upward" : ""
                 }`}
+                style={menuLayout?.style}
                 onMouseDown={(e) => e.stopPropagation()}
                 onKeyDown={handleKeyDown}
                 role="listbox"
