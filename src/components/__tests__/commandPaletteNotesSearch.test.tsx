@@ -54,7 +54,7 @@ describe("CommandPalette Notes Search Integration", () => {
     vi.restoreAllMocks();
   });
 
-  it("finds and displays matching notes at the top when searching in Command Palette", () => {
+  it("does not show notes in Command Palette (notes are exclusive to Note Switcher)", () => {
     const onSelectNote = vi.fn();
     const onClose = vi.fn();
 
@@ -79,9 +79,9 @@ describe("CommandPalette Notes Search Integration", () => {
 
     const input = container.querySelector("input") as HTMLInputElement;
     expect(input).not.toBeNull();
-    expect(input.placeholder).toContain("Search notes, commands");
+    expect(input.placeholder).toContain("Search commands & settings");
 
-    // Type "Architecture" into search input
+    // Type "Architecture" into search input (which matches note title in mockNotes, but not commands)
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -91,26 +91,13 @@ describe("CommandPalette Notes Search Integration", () => {
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
-    // The note title and preview should be present
-    expect(container.textContent).toContain("System Architecture & Roadmap");
-    expect(container.textContent).toContain("Details about SQLite FTS5");
-
-    // Click the note item
-    const noteBtn = Array.from(container.querySelectorAll(".command-item")).find(
-      (btn) => btn.textContent?.includes("System Architecture")
-    ) as HTMLButtonElement;
-
-    expect(noteBtn).not.toBeNull();
-
-    act(() => {
-      noteBtn.click();
-    });
-
-    expect(onSelectNote).toHaveBeenCalledWith("note-1");
-    expect(onClose).toHaveBeenCalled();
+    // Notes must NOT appear in Command Palette
+    expect(container.textContent).not.toContain("System Architecture & Roadmap");
+    expect(container.textContent).not.toContain("Details about SQLite FTS5");
+    expect(container.textContent).toContain('No matching commands for "Architecture"');
   });
 
-  it("finds notes by content preview snippet", () => {
+  it("searches commands and actions cleanly without notes", () => {
     act(() => {
       root.render(
         <CommandPalette
@@ -136,12 +123,12 @@ describe("CommandPalette Notes Search Integration", () => {
         window.HTMLInputElement.prototype,
         "value"
       )?.set;
-      setter?.call(input, "coffee");
+      setter?.call(input, "Font");
       input.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
-    expect(container.textContent).toContain("Groceries & Shopping");
-    expect(container.textContent).toContain("coffee beans");
+    expect(container.textContent).toContain("Editor Font Family");
+    expect(container.textContent).not.toContain("Groceries & Shopping");
   });
 
   it("holds at the last command during key repeat and wraps on a fresh press", () => {

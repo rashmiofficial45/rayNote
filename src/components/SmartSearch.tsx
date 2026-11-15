@@ -69,6 +69,23 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
   const requestIdRef = useRef<number>(0);
   const selectionFromPointer = useRef(false);
   const mousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+
+  // Synchronously update recent notes when notes prop changes and query is empty
+  useEffect(() => {
+    if (!isOpen || query.trim() !== "") return;
+    if (notes && notes.length > 0) {
+      const mapped = notes.slice(0, 30).map(noteToSearchResult);
+      setResults(mapped);
+      cachedRecentNotes = mapped;
+      setSelectedIndex(0);
+    } else if (notes && notes.length === 0) {
+      setResults([]);
+      cachedRecentNotes = [];
+      setSelectedIndex(0);
+    }
+  }, [isOpen, notes, query]);
 
   // Focus input and reset query on modal open with instant 0ms note list
   useEffect(() => {
@@ -103,8 +120,9 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
 
     // Empty query -> show notes or cached recent documents immediately
     if (!trimmed) {
-      if (notes) {
-        const mapped = notes.slice(0, 30).map(noteToSearchResult);
+      const currentNotes = notesRef.current;
+      if (currentNotes && currentNotes.length > 0) {
+        const mapped = currentNotes.slice(0, 30).map(noteToSearchResult);
         setResults(mapped);
         cachedRecentNotes = mapped;
         setSelectedIndex(0);
@@ -126,34 +144,7 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
       return;
     }
 
-    // 0ms instant local in-memory filter: immediate keystroke responsiveness
-    const norm = trimmed.toLowerCase();
-    if (notes && notes.length > 0) {
-      const instantMatches = notes
-        .filter((n) => {
-          const t = (n.title || "").toLowerCase();
-          const p = (n.preview || "").toLowerCase();
-          return t.includes(norm) || p.includes(norm);
-        })
-        .slice(0, 30)
-        .map((n) => ({
-          id: n.id,
-          title: n.title,
-          snippet: n.preview || "",
-          score: 800,
-          match_type: "title_substring",
-          updated_at: n.updated_at,
-          is_pinned: n.is_pinned,
-        }));
-
-      setResults(instantMatches);
-      setSelectedIndex(0);
-    } else {
-      setResults([]);
-      setSelectedIndex(0);
-    }
-
-    // 20ms debounce: fast backend query across deep SQLite full-text content
+    // 10ms low-latency debounce: fast backend query across deep SQLite full-text content
     const timer = setTimeout(() => {
       searchDocuments(trimmed, 30)
         .then((res) => {
@@ -170,10 +161,10 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
             setSelectedIndex(0);
           }
         });
-    }, 20);
+    }, 10);
 
     return () => clearTimeout(timer);
-  }, [query, isOpen, notes]);
+  }, [query, isOpen]);
 
   // Hover updates the highlight without moving the list under the pointer.
   useLayoutEffect(() => {
@@ -366,11 +357,6 @@ export const SmartSearch: React.FC<SmartSearchProps> = ({
               </div>
             </div>
           ) : null}
-        </div>
-
-        {/* Ultra-Minimal Status Footer */}
-        <div className="smart-search-footer">
-          <span>↑↓ to navigate · ↵ to open · esc to close</span>
         </div>
       </div>
     </div>

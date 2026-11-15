@@ -59,15 +59,54 @@ export const ALL_PALETTE_COMMANDS: PaletteCommandDef[] = [
 
 const ALIASES_STORAGE_KEY = "notefast_command_aliases";
 
+export function getDefaultAliases(): Record<string, string> {
+  const defaults: Record<string, string> = {
+    create: "new",
+    browse: "browse",
+    search: "search",
+    find: "find",
+    duplicate: "dup",
+    pin: "pin",
+    delete: "del",
+    next_note: "next",
+    prev_note: "prev",
+    history_back: "back",
+    history_forward: "forward",
+    copy_markdown: "copymd",
+    copy_deeplink: "link",
+    export_note: "export",
+    zoom_in: "zoomin",
+    zoom_out: "zoomout",
+    reset_zoom: "zoomreset",
+    settings: "settings",
+    shortcuts_help: "keys",
+    hide: "hide",
+    quit: "quit",
+    bold: "bold",
+    italic: "italic",
+    code: "code",
+    highlight: "mark",
+    checklist: "todo",
+  };
+  ALL_PALETTE_COMMANDS.forEach((c) => {
+    if (c.defaultAlias) defaults[c.id] = c.defaultAlias;
+  });
+  return defaults;
+}
+
 export function getStoredAliases(): Record<string, string> {
   if (typeof window === "undefined") return {};
   try {
     const raw = safeLocalStorageGetItem(ALIASES_STORAGE_KEY);
-    if (!raw) return {};
+    if (!raw) {
+      const defaults = getDefaultAliases();
+      safeLocalStorageSetItem(ALIASES_STORAGE_KEY, JSON.stringify(defaults));
+      return defaults;
+    }
     return JSON.parse(raw);
   } catch (err) {
     console.error("Failed to parse stored aliases:", err);
-    return {};
+    return getDefaultAliases();
   }
 }
 

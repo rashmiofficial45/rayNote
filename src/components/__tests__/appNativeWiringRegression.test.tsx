@@ -90,6 +90,6 @@ describe('App native wiring and Escape precedence', () => {
     expect(input.placeholder).toContain('Choose appearance');
     await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
     expect(host.querySelector('.command-palette')).not.toBeNull();
-    expect(host.querySelector<HTMLInputElement>('.command-search input')?.placeholder).toBe('Search notes, commands & settings…');
+    expect(host.querySelector<HTMLInputElement>('.command-search input')?.placeholder).toBe('Search commands & settings…');
   });
 });

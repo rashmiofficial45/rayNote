@@ -45,7 +45,7 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     localStorage.clear();
   });
 
-  it("renders all 5 navigation tabs without clipping in a fluid container", async () => {
+  it("renders all 4 navigation tabs without clipping in a fluid container", async () => {
     await act(async () => {
       root.render(<SettingsApp />);
     });
@@ -54,10 +54,10 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     expect(pillsContainer).not.toBeNull();
 
     const pills = host.querySelectorAll(".settings-tab-pill");
-    expect(pills.length).toBe(5);
+    expect(pills.length).toBe(4);
 
     const tabNames = Array.from(pills).map((p) => p.textContent?.trim());
-    expect(tabNames).toEqual(["General", "Commands", "Aliases", "Storage", "About"]);
+    expect(tabNames).toEqual(["General", "Commands", "Storage", "About"]);
   });
 
   it("allows switching to each tab with active state and correct content rendered", async () => {
@@ -71,7 +71,7 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     expect(pills[0].classList.contains("is-active")).toBe(true);
     expect(host.textContent).toContain("Appearance");
 
-    // 2. Click Commands tab
+    // 2. Click Commands tab (unified Commands, Aliases, and Hotkeys)
     await act(async () => {
       pills[1].click();
     });
@@ -79,20 +79,15 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     expect(pills[0].classList.contains("is-active")).toBe(false);
     expect(host.textContent).toContain("Commands");
     expect(host.textContent).toContain("Application & Window Commands");
+    expect(host.querySelector(".settings-aliases-search-input")).not.toBeNull();
+    expect(host.textContent).toContain("Reset Defaults");
+    expect(host.querySelector(".settings-cmd-checkbox")).not.toBeNull();
 
-    // 3. Click Aliases tab
+    // 3. Click Storage tab
     await act(async () => {
       pills[2].click();
     });
     expect(pills[2].classList.contains("is-active")).toBe(true);
-    expect(host.querySelector(".settings-aliases-search-input")).not.toBeNull();
-    expect(host.textContent).toContain("Reset Defaults");
-
-    // 4. Click Storage tab
-    await act(async () => {
-      pills[3].click();
-    });
-    expect(pills[3].classList.contains("is-active")).toBe(true);
     expect(host.textContent).toContain("SQLite Database Storage");
     expect(host.textContent).toContain("Open in Finder");
     expect(host.textContent).toContain("Total Notes");
@@ -101,11 +96,11 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     expect(host.textContent).toContain("Danger Zone");
     expect(host.textContent).toContain("Clear All Notes");
 
-    // 5. Click About tab
+    // 4. Click About tab
     await act(async () => {
-      pills[4].click();
+      pills[3].click();
     });
-    expect(pills[4].classList.contains("is-active")).toBe(true);
+    expect(pills[3].classList.contains("is-active")).toBe(true);
     expect(host.textContent).toContain("rayNote");
     expect(host.textContent).toContain("Universal");
     expect(host.textContent).toContain("Tech Stack");
@@ -116,10 +111,10 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
       root.render(<SettingsApp />);
     });
 
-    // Switch to Storage tab
+    // Switch to Storage tab (index 2)
     const pills = host.querySelectorAll<HTMLButtonElement>(".settings-tab-pill");
     await act(async () => {
-      pills[3].click();
+      pills[2].click();
     });
 
     // Find Clear All Notes button

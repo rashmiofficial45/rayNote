@@ -121,7 +121,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
   const categories = ["Navigation & App", "Formatting", "Blocks & Lists", "Sharing & View"] as const;
 
   return (
-    <div className="command-overlay" onClick={onClose}>
+    <div className="command-overlay shortcuts-overlay" onClick={onClose}>
       <div
         className="shortcuts-modal-container"
         onClick={(e) => e.stopPropagation()}

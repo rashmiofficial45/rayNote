@@ -117,7 +117,7 @@ export function CommandPalette({
   zoomLevel,
   onNewNote,
   onDuplicateNote,
-  onSelectNote,
+  onSelectNote: _onSelectNote,
   onDeleteNote,
   onTogglePin,
   onGoBack,
@@ -158,6 +158,14 @@ export function CommandPalette({
   });
   const [aliases, setAliases] = useState<Record<string, string>>(getStoredAliases);
   const [commandsConfig, setCommandsConfig] = useState<CommandRow[]>(getStoredCommandsConfig);
+
+  // Sync settings when palette opens or when settings broadcast events fire
+  useEffect(() => {
+    if (isOpen) {
+      setAliases(getStoredAliases());
+      setCommandsConfig(getStoredCommandsConfig());
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     return listenToSettingsSync({
@@ -816,43 +824,37 @@ export function CommandPalette({
     });
   };
 
-  const noteActions: ActionItem[] = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q || view !== "actions") return [];
-
-    return (notes || [])
-      .filter((n) => {
-        const title = (n.title || "").toLowerCase();
-        const preview = (n.preview || "").toLowerCase();
-        return title.includes(q) || preview.includes(q);
-      })
-      .slice(0, 8)
-      .map((n) => {
-        const displayTitle = n.title?.trim()
-          ? n.title.trim()
-          : (n.preview?.trim() ? n.preview.trim().slice(0, 50) : "Untitled Note");
-        return {
-          id: `note-${n.id}`,
-          category: "Notes",
-          label: displayTitle,
-          subtitle: n.preview ? n.preview.slice(0, 60) : undefined,
-          icon: <FileText size={14} className={n.id === activeNoteId ? "text-amber-400" : "text-sky-400"} />,
-          badge: n.is_pinned ? "PINNED" : (n.id === activeNoteId ? "ACTIVE" : undefined),
-          action: () => {
-            onClose();
-            onSelectNote(n.id);
-          },
-        };
-      });
-  }, [search, view, notes, activeNoteId, onClose, onSelectNote]);
-
   const rawFilteredActions = filterList(actions);
   const filteredActions = useMemo(() => {
-    if (noteActions.length > 0) {
-      return [...noteActions, ...rawFilteredActions];
+    const q = search.toLowerCase().trim();
+    if (!q) return rawFilteredActions;
+
+    // Separate into:
+    // 1. Exact alias matches (e.g. typing "fo" matches command with alias "fo")
+    // 2. Prefix alias matches (e.g. typing "f" matches command with alias "fo")
+    // 3. Other command matches (by label, category, keyword, etc.)
+    const exactAliasActions: ActionItem[] = [];
+    const prefixAliasActions: ActionItem[] = [];
+    const otherCommandActions: ActionItem[] = [];
+
+    for (const action of rawFilteredActions) {
+      const alias = (aliases[action.id] || "").toLowerCase();
+      if (alias && alias === q) {
+        exactAliasActions.push(action);
+      } else if (alias && alias.startsWith(q)) {
+        prefixAliasActions.push(action);
+      } else {
+        otherCommandActions.push(action);
+      }
     }
-    return rawFilteredActions;
-  }, [noteActions, rawFilteredActions]);
+
+    // Commands matching aliases are prioritized at the top
+    if (exactAliasActions.length > 0 || prefixAliasActions.length > 0) {
+      return [...exactAliasActions, ...prefixAliasActions, ...otherCommandActions];
+    }
+
+    return otherCommandActions;
+  }, [search, rawFilteredActions, aliases]);
   const filteredAppearance = filterList(appearanceSubActions);
   const filteredAccents = filterList(accentSubActions);
   const filteredFonts = filterList(fontSubActions);
@@ -1020,7 +1022,7 @@ export function CommandPalette({
   if (!isOpen) return null;
 
   return (
-    <div className="command-overlay" onClick={onClose}>
+    <div className="command-overlay command-palette-overlay" onClick={onClose}>
       <div
         className="command-palette"
         onClick={(e) => e.stopPropagation()}
@@ -1050,7 +1052,7 @@ export function CommandPalette({
             onKeyDown={handleKeyDown}
             placeholder={
               view === "actions"
-                ? "Search notes, commands & settings…"
+                ? "Search commands & settings…"
                 : view === "sub_appearance"
                   ? "Choose appearance (Dark, Light, System)…"
                   : view === "sub_accents"
@@ -1097,16 +1099,14 @@ export function CommandPalette({
             filteredActions.map((item, idx) => {
               // Group divider header when category changes
               const prevItem = filteredActions[idx - 1];
-              const showCategoryHeader = !search.trim()
-                ? (!prevItem || prevItem.category !== item.category)
-                : (item.category === "Notes" && !prevItem) || (prevItem?.category === "Notes" && item.category !== "Notes");
+              const showCategoryHeader = !prevItem || prevItem.category !== item.category;
               const itemAlias = aliases[item.id];
 
               return (
                 <div key={item.id}>
                   {showCategoryHeader && (
                     <div className="command-category-header">
-                      {search.trim() && item.category !== "Notes" ? "Commands & Settings" : item.category}
+                      {item.category}
                     </div>
                   )}
                   <button
@@ -1172,7 +1172,7 @@ export function CommandPalette({
           {currentItems.length === 0 && (
             <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>
               {view === "actions"
-                ? `No matching notes or commands for "${search}"`
+                ? `No matching commands for "${search}"`
                 : "No matching options"}
             </div>
           )}
