@@ -77,6 +77,21 @@ describe("TitleBar UI Component", () => {
     expect(titleEl?.textContent).toBe("Untitled");
   });
 
+  it("shows the read-only icon before the title only for a read-only note", () => {
+    const renderTitle = (readOnly: boolean) => {
+      act(() => root.render(
+        <TitleBar title="Meeting notes" readOnly={readOnly}
+          onNewNote={() => {}} onOpenCommandPalette={() => {}} onDuplicateNote={() => {}}
+          onDeleteNote={() => {}} onCopyMarkdown={() => {}} />
+      ));
+    };
+    renderTitle(true);
+    const title = container.querySelector(".title-text-content");
+    expect(title?.previousElementSibling?.getAttribute("aria-label")).toBe("Read-only note");
+    renderTitle(false);
+    expect(container.querySelector('[aria-label="Read-only note"]')).toBeNull();
+  });
+
   it("clicking Copy Markdown button calls onCopyMarkdown", () => {
     const onCopyMarkdown = vi.fn();
 

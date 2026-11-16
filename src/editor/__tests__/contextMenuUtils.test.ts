@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { Editor } from "@tiptap/core";
 import { getExtensions } from "../extensions";
 import { resolveContextMenuState, executeContextMenuAction } from "../contextMenuUtils";
+import { blockSelectionPluginKey, getCachedAllBlocks } from "../../extensions/BlockSelection";
 import * as clipboardModule from "../../lib/clipboard";
 import * as openerModule from "@tauri-apps/plugin-opener";
 
@@ -23,6 +24,19 @@ describe("Editor Context Menu Detection and Execution Utilities", () => {
       extensions: getExtensions(),
       content: "<p>The quick brown fox jumps over the lazy dog.</p>",
     });
+  });
+
+  it("selects all blocks from the context menu without selecting the text range", async () => {
+    editor.commands.setContent("<h1>Title</h1><p>Introduction</p><ol><li><p>First</p></li><li><p>Second</p></li></ol><blockquote><p>Quote</p></blockquote>");
+    vi.spyOn(editor.view, "posAtCoords").mockReturnValue({ pos: 9, inside: 7 });
+    const menu = resolveContextMenuState(editor, { x: 100, y: 150 });
+    expect(menu).not.toBeNull();
+
+    await executeContextMenuAction(editor, "selectAll", menu!);
+
+    expect(editor.state.selection.empty).toBe(true);
+    expect(blockSelectionPluginKey.getState(editor.state)?.selectedPositions)
+      .toEqual(getCachedAllBlocks(editor.state.doc).map(block => block.pos));
   });
 
   it("detects text-selected context when right-clicking inside an active text selection", () => {

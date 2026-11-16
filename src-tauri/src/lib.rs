@@ -6,6 +6,8 @@ mod window_geometry;
 use database::Database;
 use commands::*;
 use tauri::Manager;
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[cfg(target_os = "macos")]
@@ -517,7 +519,12 @@ pub fn run() {
                 win.on_window_event(move |event| {
                     #[cfg(target_os = "macos")]
                     if commands::is_panel_fullscreen() {
-                        return;
+                        if !matches!(event, tauri::WindowEvent::Resized(_))
+                            || !commands::exit_panel_fullscreen_after_resize(&win_clone)
+                        {
+                            return;
+                        }
+                        let _ = win_clone.emit("note-fullscreen-exited-by-resize", ());
                     }
                     #[cfg(not(target_os = "macos"))]
                     if win_clone.is_fullscreen().unwrap_or(false) {

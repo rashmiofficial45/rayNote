@@ -157,9 +157,9 @@ describe("Menu Unification & Double-Highlight Prevention Regression Suite", () =
       editor.destroy();
     });
 
-    it("ensures exactly ONE item has .is-highlighted in primary menu and submenu", async () => {
+    it("keeps checklist completion and Select All without any insert options", async () => {
       const menuState: ContextMenuState = {
-        type: "no-selection",
+        type: "checklist",
         x: 100,
         y: 100,
         savedSelection: { from: 1, to: 1 },
@@ -169,63 +169,25 @@ describe("Menu Unification & Double-Highlight Prevention Regression Suite", () =
         isItalic: false,
         isBulletList: false,
         isOrderedList: false,
-        isTaskList: false,
+        isTaskList: true,
       };
 
       await act(async () => {
         root.render(<EditorContextMenu editor={editor} menuState={menuState} onClose={() => {}} />);
       });
 
-      // Press ArrowDown to navigate to first selectable item
-      await act(async () => {
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
-      });
-
-      let highlighted = document.querySelectorAll(".editor-context-menu-item.is-highlighted");
-      expect(highlighted.length).toBe(1);
-
-      // Arrow down to "Insert" which has a submenu
-      // No-selection menu items: Paste (0), Undo (1), Redo (2), Insert (3)
+      const menu = document.querySelector(".editor-context-menu")!;
+      expect(menu.textContent).toContain("Mark Completed");
+      expect(menu.textContent).not.toContain("Insert");
+      expect(menu.querySelector('[data-menu-item-id="selectAll"] svg')).not.toBeNull();
       await act(async () => {
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
         window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
       });
-
-      highlighted = document.querySelectorAll(".editor-context-menu-item.is-highlighted");
-      expect(highlighted.length).toBe(1);
-      expect(highlighted[0].textContent).toContain("Insert");
-
-      // Press ArrowRight to enter the submenu
-      await act(async () => {
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-      });
-
-      const submenu = document.querySelector(".editor-context-submenu");
-      expect(submenu).not.toBeNull();
-
-      // In the submenu, Heading 1 is highlighted.
-      // The parent "Insert" row has .is-submenu-open but NOT .is-highlighted!
-      const parentInsert = Array.from(document.querySelectorAll(".editor-context-menu-item")).find(
-        (el) => el.textContent?.includes("Insert") && !el.closest(".editor-context-submenu")
-      );
-      expect(parentInsert?.classList.contains("is-submenu-open")).toBe(true);
-      expect(parentInsert?.classList.contains("is-highlighted")).toBe(false);
-
-      // Across the ENTIRE page, exactly ONE element has .is-highlighted!
-      highlighted = document.querySelectorAll(".editor-context-menu-item.is-highlighted");
-      expect(highlighted.length).toBe(1);
-      expect(highlighted[0].textContent).toContain("Heading 1");
-
-      // Press ArrowDown in submenu to move to Heading 2
-      await act(async () => {
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
-      });
-
-      highlighted = document.querySelectorAll(".editor-context-menu-item.is-highlighted");
-      expect(highlighted.length).toBe(1);
-      expect(highlighted[0].textContent).toContain("Heading 2");
-      expect(parentInsert?.classList.contains("is-highlighted")).toBe(false);
+      const highlighted = menu.querySelectorAll(".is-highlighted");
+      expect(highlighted).toHaveLength(1);
+      expect(highlighted[0].textContent).toContain("Select All");
     });
 
     it("stationary pointer does NOT cause dual highlight in context menu", async () => {
@@ -247,8 +209,8 @@ describe("Menu Unification & Double-Highlight Prevention Regression Suite", () =
         root.render(<EditorContextMenu editor={editor} menuState={menuState} onClose={() => {}} />);
       });
 
-      const menuItems = document.querySelectorAll(".editor-context-menu-item");
-      const undoItem = menuItems[1]; // Undo
+      const undoItem = document.querySelector('[data-menu-item-id="undo"]')!;
+      expect(document.querySelector('[data-menu-item-id="selectAll"]')?.textContent).toContain("Select All");
 
       // Mouse rests over Undo at (120, 140)
       await act(async () => {

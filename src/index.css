@@ -594,7 +594,6 @@ body,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  overflow: hidden;
   white-space: nowrap !important;
 }
 
@@ -608,6 +607,14 @@ body,
   text-align: center;
   display: inline-block;
   pointer-events: auto;
+}
+
+.title-bar .title-text .title-read-only-icon {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  line-height: 1;
 }
 
 .save-status-indicator {

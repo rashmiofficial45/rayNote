@@ -12,16 +12,14 @@ import {
   List,
   ListOrdered,
   CheckSquare,
-  Code2,
-  Minus,
   Undo2,
   Redo2,
   Check,
   ExternalLink,
   Trash2,
-  Heading1,
-  Heading2,
-  ChevronRight,
+  Scan,
+  PencilOff,
+  Pencil,
 } from "lucide-react";
 import {
   ContextMenuState,
@@ -33,6 +31,8 @@ export interface EditorContextMenuProps {
   editor: Editor | null;
   menuState: ContextMenuState | null;
   onClose: () => void;
+  readOnly?: boolean;
+  onToggleReadOnly?: () => void;
 }
 
 interface MenuItemDef {
@@ -43,27 +43,19 @@ interface MenuItemDef {
   active?: boolean;
   disabled?: boolean;
   action?: string;
-  hasSubmenu?: boolean;
-  submenuItems?: MenuItemDef[];
 }
 
 export function EditorContextMenu({
   editor,
   menuState,
   onClose,
+  readOnly = false,
+  onToggleReadOnly,
 }: EditorContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const submenuRef = useRef<HTMLDivElement>(null);
 
-  const [activeSubmenuId, setActiveSubmenuId] = useState<string | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
-  const [submenuHighlightedIndex, setSubmenuHighlightedIndex] = useState<number>(-1);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [submenuPosition, setSubmenuPosition] = useState<{
-    x: number;
-    y: number;
-    side: "left" | "right";
-  } | null>(null);
   const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
   const ignorePointerRef = useRef<boolean>(false);
 
@@ -79,74 +71,23 @@ export function EditorContextMenu({
   // Close when editor is missing or destroyed
   useEffect(() => {
     if (!editor || editor.isDestroyed || !menuState) {
-      setActiveSubmenuId(null);
       setHighlightedIndex(-1);
     }
   }, [editor, menuState]);
 
   // Build items based on menuState type
-  const items: (MenuItemDef | "separator")[] = React.useMemo(() => {
+  const contextItems: (MenuItemDef | "separator")[] = React.useMemo(() => {
     if (!menuState || !editor) return [];
 
     const isEditable = editor.isEditable;
     const canUndo = menuState.canUndo;
     const canRedo = menuState.canRedo;
-
-    const insertSubmenu: MenuItemDef = {
-      id: "insert",
-      label: "Insert",
-      hasSubmenu: true,
-      submenuItems: [
-        {
-          id: "insertHeading1",
-          label: "Heading 1",
-          shortcut: getShortcut("heading1", "⌘⌥1"),
-          icon: <Heading1 size={13} />,
-          action: "insertHeading1",
-        },
-        {
-          id: "insertHeading2",
-          label: "Heading 2",
-          shortcut: getShortcut("heading2", "⌘⌥2"),
-          icon: <Heading2 size={13} />,
-          action: "insertHeading2",
-        },
-        {
-          id: "insertBulletList",
-          label: "Bullet List",
-          shortcut: getShortcut("bullet_list", "⇧⌘8"),
-          icon: <List size={13} />,
-          action: "insertBulletList",
-        },
-        {
-          id: "insertOrderedList",
-          label: "Numbered List",
-          shortcut: getShortcut("ordered_list", "⇧⌘7"),
-          icon: <ListOrdered size={13} />,
-          action: "insertOrderedList",
-        },
-        {
-          id: "insertChecklist",
-          label: "Checklist",
-          shortcut: getShortcut("checklist", "⇧⌘9"),
-          icon: <CheckSquare size={13} />,
-          action: "insertChecklist",
-        },
-        {
-          id: "insertCodeBlock",
-          label: "Code Block",
-          shortcut: getShortcut("code_block", "⌘⌥C"),
-          icon: <Code2 size={13} />,
-          action: "insertCodeBlock",
-        },
-        {
-          id: "insertDivider",
-          label: "Divider",
-          shortcut: getShortcut("divider", "---"),
-          icon: <Minus size={13} />,
-          action: "insertDivider",
-        },
-      ],
+    const selectAll: MenuItemDef = {
+      id: "selectAll",
+      label: "Select All",
+      shortcut: getShortcut("select_all", "⌘A"),
+      icon: <Scan size={13} />,
+      action: "selectAll",
     };
 
     // ── Context: Block Selection ──────────────────────────────
@@ -255,6 +196,7 @@ export function EditorContextMenu({
         });
       }
 
+      if (menuState.savedSelection.from === menuState.savedSelection.to) linkItems.push(selectAll);
       return linkItems;
     }
 
@@ -281,12 +223,7 @@ export function EditorContextMenu({
           action: "paste",
           disabled: !isEditable,
         },
-        {
-          id: "selectAll",
-          label: "Select All",
-          shortcut: getShortcut("select_all", "⌘A"),
-          action: "selectAll",
-        },
+        selectAll,
         "separator",
         {
           id: "undo",
@@ -318,13 +255,6 @@ export function EditorContextMenu({
           action: "toggleTaskItem",
           disabled: !isEditable,
         },
-        {
-          id: "insertTaskItem",
-          label: "Insert Checklist Item",
-          shortcut: "Enter",
-          action: "insertTaskItem",
-          disabled: !isEditable,
-        },
         "separator",
         {
           id: "paste",
@@ -334,12 +264,7 @@ export function EditorContextMenu({
           action: "paste",
           disabled: !isEditable,
         },
-        {
-          id: "selectAll",
-          label: "Select All",
-          shortcut: getShortcut("select_all", "⌘A"),
-          action: "selectAll",
-        },
+        selectAll,
         "separator",
         {
           id: "undo",
@@ -357,8 +282,6 @@ export function EditorContextMenu({
           action: "redo",
           disabled: !canRedo,
         },
-        "separator",
-        insertSubmenu,
       ];
     }
 
@@ -445,6 +368,7 @@ export function EditorContextMenu({
         action: "paste",
         disabled: !isEditable,
       },
+      selectAll,
       "separator",
       {
         id: "undo",
@@ -462,10 +386,27 @@ export function EditorContextMenu({
         action: "redo",
         disabled: !canRedo,
       },
-      "separator",
-      insertSubmenu,
     ];
   }, [menuState, editor, getShortcut]);
+
+  const items = React.useMemo(() => {
+    const available = readOnly
+      ? contextItems.filter(item => item !== "separator" &&
+          ["copy", "copyLink", "copyCode", "openLink", "clearBlockSelection", "selectAll"].includes(item.action ?? ""))
+      : contextItems;
+    if (!onToggleReadOnly || !menuState || menuState.type === "block-selection" ||
+        menuState.savedSelection.from !== menuState.savedSelection.to) return available;
+
+    const toggle: MenuItemDef = {
+      id: "toggleReadOnly",
+      label: readOnly ? "Enable Editing" : "Make Read-Only",
+      icon: readOnly
+        ? <Pencil size={13} strokeWidth={2.75} className="text-green-500" aria-hidden="true" />
+        : <PencilOff size={13} strokeWidth={2.75} className="text-red-500" aria-hidden="true" />,
+      action: "toggleReadOnly",
+    };
+    return available.length ? [...available, "separator" as const, toggle] : [toggle];
+  }, [contextItems, menuState, onToggleReadOnly, readOnly]);
 
   // Compute constrained screen position using layout measurements
   useLayoutEffect(() => {
@@ -500,76 +441,22 @@ export function EditorContextMenu({
 
     setMenuPosition({ x: posX, y: posY });
     setHighlightedIndex(-1);
-    setActiveSubmenuId(null);
   }, [menuState, items.length]);
-
-  // Dynamically compute submenu horizontal side and vertical coordinates
-  useLayoutEffect(() => {
-    if (!activeSubmenuId || !menuRef.current) {
-      setSubmenuPosition(null);
-      return;
-    }
-
-    const parentItemEl = menuRef.current.querySelector(
-      `[data-menu-item-id="${activeSubmenuId}"]`
-    ) as HTMLElement | null;
-    if (!parentItemEl) {
-      setSubmenuPosition(null);
-      return;
-    }
-
-    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 800;
-    const windowHeight = typeof window !== "undefined" ? window.innerHeight : 600;
-    const padding = 10;
-
-    const parentRect = parentItemEl.getBoundingClientRect();
-    const subRect = submenuRef.current?.getBoundingClientRect();
-    const subWidth = subRect && subRect.width > 0 ? subRect.width : 188;
-    const subHeight = subRect && subRect.height > 0 ? subRect.height : 240;
-
-    // Determine horizontal side: flip to left if insufficient room on right
-    const rightEdge = parentRect.right > 0 ? parentRect.right : menuPosition.x + 180;
-    const leftEdge = parentRect.left > 0 ? parentRect.left : menuPosition.x;
-    const spaceOnRight = windowWidth - rightEdge - padding;
-    const spaceOnLeft = leftEdge - padding;
-
-    let side: "left" | "right" = "right";
-    let posX: number;
-    if (spaceOnRight >= subWidth || spaceOnRight >= spaceOnLeft) {
-      side = "right";
-      posX = rightEdge + 4;
-    } else {
-      side = "left";
-      posX = Math.max(padding, leftEdge - subWidth - 4);
-    }
-
-    // Determine vertical offset: shift upwards if overflowing viewport bottom
-    const topEdge = parentRect.top > 0 ? parentRect.top : menuPosition.y + 60;
-    let posY = topEdge - 6;
-    if (posY + subHeight > windowHeight - padding) {
-      posY = Math.max(padding, windowHeight - subHeight - padding);
-    }
-    if (posY < padding) {
-      posY = padding;
-    }
-
-    setSubmenuPosition({ x: posX, y: posY, side });
-  }, [activeSubmenuId, menuPosition]);
 
   // Action dispatcher
   const handleItemClick = useCallback(
     async (item: MenuItemDef) => {
       if (item.disabled) return;
-      if (item.hasSubmenu) {
-        setActiveSubmenuId((prev) => (prev === item.id ? null : item.id));
-        return;
-      }
       if (!item.action || !editor || !menuState) return;
 
       onClose();
+      if (item.action === "toggleReadOnly") {
+        onToggleReadOnly?.();
+        return;
+      }
       await executeContextMenuAction(editor, item.action, menuState);
     },
-    [editor, menuState, onClose]
+    [editor, menuState, onClose, onToggleReadOnly]
   );
 
   // Outside click & window dismissal listeners
@@ -580,7 +467,6 @@ export function EditorContextMenu({
       const target = e.target as HTMLElement | null;
       if (!target) return;
       if (menuRef.current && menuRef.current.contains(target)) return;
-      if (submenuRef.current && submenuRef.current.contains(target)) return;
       onClose();
     };
 
@@ -625,41 +511,6 @@ export function EditorContextMenu({
         return;
       }
 
-      // If active in submenu
-      if (activeSubmenuId) {
-        const parentItem = items.find(
-          (i): i is MenuItemDef => i !== "separator" && i.id === activeSubmenuId
-        );
-        const subItems = parentItem?.submenuItems?.filter((s) => !s.disabled) || [];
-
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          ignorePointerRef.current = true;
-          setSubmenuHighlightedIndex((prev) => nextMenuIndex(prev, subItems.length, 1, e.repeat));
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          ignorePointerRef.current = true;
-          setSubmenuHighlightedIndex((prev) => nextMenuIndex(prev, subItems.length, -1, e.repeat));
-          return;
-        }
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          ignorePointerRef.current = true;
-          setActiveSubmenuId(null);
-          setSubmenuHighlightedIndex(-1);
-          return;
-        }
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (submenuHighlightedIndex >= 0 && submenuHighlightedIndex < subItems.length) {
-            handleItemClick(subItems[submenuHighlightedIndex]);
-          }
-          return;
-        }
-      }
-
       // Navigation in primary menu
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -671,18 +522,6 @@ export function EditorContextMenu({
         e.preventDefault();
         ignorePointerRef.current = true;
         setHighlightedIndex((prev) => nextMenuIndex(prev, selectableItems.length, -1, e.repeat));
-        return;
-      }
-      if (e.key === "ArrowRight") {
-        if (highlightedIndex >= 0 && highlightedIndex < selectableItems.length) {
-          const item = selectableItems[highlightedIndex];
-          if (item.hasSubmenu) {
-            e.preventDefault();
-            ignorePointerRef.current = true;
-            setActiveSubmenuId(item.id);
-            setSubmenuHighlightedIndex(0);
-          }
-        }
         return;
       }
       if (e.key === "Enter" || e.key === " ") {
@@ -700,236 +539,111 @@ export function EditorContextMenu({
     };
   }, [
     menuState,
-    activeSubmenuId,
     highlightedIndex,
-    submenuHighlightedIndex,
     selectableItems,
-    items,
     handleItemClick,
     onClose,
   ]);
 
-  const activeSubmenuDef = React.useMemo(() => {
-    return items.find(
-      (i): i is MenuItemDef => i !== "separator" && i.id === activeSubmenuId && Boolean(i.hasSubmenu)
-    );
-  }, [items, activeSubmenuId]);
-
   if (!menuState) return null;
 
-  return (
-    <>
-      {createPortal(
-        <div
-          ref={menuRef}
-          className="editor-context-menu"
-          style={{
-            left: `${menuPosition.x}px`,
-            top: `${menuPosition.y}px`,
-          }}
-          role="menu"
-          aria-label="Editor Context Menu"
-          onContextMenu={(e) => {
-            // Prevent recursive context menus on the context menu itself
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            // Essential: prevent blur on editor and keep selection intact!
-            e.preventDefault();
-          }}
-        >
-          {items.map((item, index) => {
-            if (item === "separator") {
-              return (
-                <div
-                  key={`sep-${index}`}
-                  className="editor-context-menu-separator"
-                  role="separator"
-                />
-              );
-            }
+  return createPortal(
+    <div
+      ref={menuRef}
+      className="editor-context-menu"
+      style={{
+        left: `${menuPosition.x}px`,
+        top: `${menuPosition.y}px`,
+      }}
+      role="menu"
+      aria-label="Editor Context Menu"
+      onContextMenu={(e) => {
+        // Prevent recursive context menus on the context menu itself
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onMouseDown={(e) => {
+        // Essential: prevent blur on editor and keep selection intact!
+        e.preventDefault();
+      }}
+    >
+      {items.map((item, index) => {
+        if (item === "separator") {
+          return (
+            <div
+              key={`sep-${index}`}
+              className="editor-context-menu-separator"
+              role="separator"
+            />
+          );
+        }
 
-            const isSelectedInPrimary = selectableItems[highlightedIndex]?.id === item.id;
-            const isSubmenuOpenForThis = activeSubmenuId === item.id;
-            // If submenu is actively being navigated by keyboard (submenuHighlightedIndex >= 0),
-            // the primary item retains only the subtle open-submenu indicator (.is-submenu-open),
-            // NEVER the active navigation highlight (.is-highlighted)!
-            const isHighlighted =
-              isSelectedInPrimary && (!isSubmenuOpenForThis || submenuHighlightedIndex === -1);
-            const isSubmenuOpen = isSubmenuOpenForThis;
+        const isHighlighted = selectableItems[highlightedIndex]?.id === item.id;
 
-            const handleItemPointer = (e: React.MouseEvent) => {
-              if (ignorePointerRef.current) {
-                if (!lastMousePosRef.current) {
-                  lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-                  return;
-                }
-                const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
-                const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
-                if (dx <= 2 && dy <= 2) {
-                  return;
-                }
-                ignorePointerRef.current = false;
-              }
-
+        const handleItemPointer = (e: React.MouseEvent) => {
+          if (ignorePointerRef.current) {
+            if (!lastMousePosRef.current) {
               lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-              const selIdx = selectableItems.findIndex((s) => s.id === item.id);
-              if (selIdx !== -1) setHighlightedIndex(selIdx);
-              if (item.hasSubmenu) {
-                setActiveSubmenuId(item.id);
-                setSubmenuHighlightedIndex(-1);
-              } else {
-                setActiveSubmenuId(null);
-                setSubmenuHighlightedIndex(-1);
-              }
-            };
-
-            const commonProps = {
-              "data-menu-item-id": item.id,
-              role: "menuitem",
-              className: `editor-context-menu-item ${isHighlighted ? "is-highlighted" : ""} ${isSubmenuOpen ? "is-submenu-open" : ""}`,
-              onMouseMove: handleItemPointer,
-              onMouseEnter: handleItemPointer,
-              onMouseOver: handleItemPointer,
-              onClick: () => handleItemClick(item),
-              onMouseDown: (e: React.MouseEvent) => {
-                e.preventDefault();
-              },
-            };
-
-            const content = (
-              <>
-                <div className="editor-context-menu-item-left">
-                  {item.icon && <span className="editor-context-menu-icon">{item.icon}</span>}
-                  <span className="editor-context-menu-label">{item.label}</span>
-                </div>
-
-                <div className="editor-context-menu-item-right">
-                  {item.active && (
-                    <span className="editor-context-menu-active-check" title="Active">
-                      <Check size={11} strokeWidth={2.8} />
-                    </span>
-                  )}
-                  {item.shortcut && (
-                    <span className="editor-context-menu-shortcut">{item.shortcut}</span>
-                  )}
-                  {item.hasSubmenu && (
-                    <span className="editor-context-menu-submenu-arrow">
-                      <ChevronRight size={12} strokeWidth={2} />
-                    </span>
-                  )}
-                </div>
-              </>
-            );
-
-            if (item.hasSubmenu) {
-              return (
-                <div
-                  key={item.id}
-                  tabIndex={-1}
-                  aria-haspopup="true"
-                  aria-expanded={activeSubmenuId === item.id}
-                  {...commonProps}
-                >
-                  {content}
-                </div>
-              );
+              return;
             }
+            const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
+            const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
+            if (dx <= 2 && dy <= 2) {
+              return;
+            }
+            ignorePointerRef.current = false;
+          }
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                disabled={item.disabled}
-                {...commonProps}
-              >
-                {content}
-              </button>
-            );
-          })}
-        </div>,
-        document.body
-      )}
+          lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+          const selIdx = selectableItems.findIndex((s) => s.id === item.id);
+          if (selIdx !== -1) setHighlightedIndex(selIdx);
+        };
 
-      {/* Submenu popout portal rendered into document.body to prevent nesting, transform, or stacking clipping */}
-      {activeSubmenuDef && submenuPosition && createPortal(
-        <div
-          ref={submenuRef}
-          className={`editor-context-submenu ${submenuPosition.side === "left" ? "align-left" : "align-right"}`}
-          style={{
-            position: "fixed",
-            left: `${submenuPosition.x}px`,
-            top: `${submenuPosition.y}px`,
-            zIndex: 10002,
-          }}
-          role="menu"
-          aria-label={`${activeSubmenuDef.label} Submenu`}
-          onContextMenu={(e) => {
+        const commonProps = {
+          "data-menu-item-id": item.id,
+          role: "menuitem",
+          className: `editor-context-menu-item ${isHighlighted ? "is-highlighted" : ""}`,
+          onMouseMove: handleItemPointer,
+          onMouseEnter: handleItemPointer,
+          onMouseOver: handleItemPointer,
+          onClick: () => handleItemClick(item),
+          onMouseDown: (e: React.MouseEvent) => {
             e.preventDefault();
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {activeSubmenuDef.submenuItems?.map((subItem) => {
-            const isSubHighlighted =
-              activeSubmenuDef.submenuItems?.filter((s) => !s.disabled)[submenuHighlightedIndex]?.id ===
-              subItem.id;
+          },
+        };
 
-            const handleSubmenuPointer = (e: React.MouseEvent) => {
-              if (ignorePointerRef.current) {
-                if (!lastMousePosRef.current) {
-                  lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-                  return;
-                }
-                const dx = Math.abs(e.clientX - lastMousePosRef.current.x);
-                const dy = Math.abs(e.clientY - lastMousePosRef.current.y);
-                if (dx <= 2 && dy <= 2) {
-                  return;
-                }
-                ignorePointerRef.current = false;
-              }
+        const content = (
+          <>
+            <div className="editor-context-menu-item-left">
+              {item.icon && <span className="editor-context-menu-icon">{item.icon}</span>}
+              <span className="editor-context-menu-label">{item.label}</span>
+            </div>
 
-              lastMousePosRef.current = { x: e.clientX, y: e.clientY };
-              const sIdx =
-                activeSubmenuDef.submenuItems
-                  ?.filter((s) => !s.disabled)
-                  .findIndex((s) => s.id === subItem.id) ?? -1;
-              setSubmenuHighlightedIndex(sIdx);
-            };
+            <div className="editor-context-menu-item-right">
+              {item.active && (
+                <span className="editor-context-menu-active-check" title="Active">
+                  <Check size={11} strokeWidth={2.8} />
+                </span>
+              )}
+              {item.shortcut && (
+                <span className="editor-context-menu-shortcut">{item.shortcut}</span>
+              )}
+            </div>
+          </>
+        );
 
-            return (
-              <button
-                key={subItem.id}
-                type="button"
-                role="menuitem"
-                disabled={subItem.disabled}
-                className={`editor-context-menu-item ${isSubHighlighted ? "is-highlighted" : ""}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleItemClick(subItem);
-                }}
-                onMouseDown={(e) => e.preventDefault()}
-                onMouseMove={handleSubmenuPointer}
-                onMouseEnter={handleSubmenuPointer}
-              >
-                <div className="editor-context-menu-item-left">
-                  {subItem.icon && (
-                    <span className="editor-context-menu-icon">{subItem.icon}</span>
-                  )}
-                  <span className="editor-context-menu-label">{subItem.label}</span>
-                </div>
-                <div className="editor-context-menu-item-right">
-                  {subItem.shortcut && (
-                    <span className="editor-context-menu-shortcut">{subItem.shortcut}</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
-        </div>,
-        document.body
-      )}
-    </>
+        return (
+          <button
+            key={item.id}
+            type="button"
+            disabled={item.disabled}
+            {...commonProps}
+          >
+            {content}
+          </button>
+        );
+      })}
+    </div>,
+    document.body
   );
 }

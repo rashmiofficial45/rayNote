@@ -278,17 +278,17 @@ export async function executeContextMenuAction(
 
     // ── Selection & History ──────────────────────────────────
     case "selectAll": {
-      editor.chain().focus().selectAll().run();
+      if (editor.commands.selectAllBlocks()) editor.view.focus();
       break;
     }
 
     case "undo": {
-      editor.chain().focus().undo().run();
+      editor.chain().focus(undefined, { scrollIntoView: false }).undo().run();
       break;
     }
 
     case "redo": {
-      editor.chain().focus().redo().run();
+      editor.chain().focus(undefined, { scrollIntoView: false }).redo().run();
       break;
     }
 

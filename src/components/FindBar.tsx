@@ -7,9 +7,10 @@ interface FindBarProps {
   isOpen: boolean;
   onClose: () => void;
   editor: Editor | null;
+  readOnly?: boolean;
 }
 
-export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
+export function FindBar({ isOpen, onClose, editor, readOnly = false }: FindBarProps) {
   const [query, setQuery] = useState("");
   const [replacement, setReplacement] = useState("");
   const [showReplace, setShowReplace] = useState(false);
@@ -165,14 +166,14 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
           >
             <ChevronDown size={14} />
           </button>
-          <button
+          {!readOnly && <button
             type="button"
             className={`find-bar-btn ${showReplace ? "is-active" : ""}`}
             onClick={() => setShowReplace((prev) => !prev)}
             title="Toggle Replace"
           >
             <Replace size={13} />
-          </button>
+          </button>}
           <button
             type="button"
             className="find-bar-btn close"
@@ -185,7 +186,7 @@ export function FindBar({ isOpen, onClose, editor }: FindBarProps) {
       </div>
 
       {/* Replace row */}
-      {showReplace && (
+      {showReplace && !readOnly && (
         <div className="find-bar-row replace-row">
           <ArrowRight size={13} className="find-bar-icon" />
           <input

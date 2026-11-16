@@ -136,6 +136,7 @@ function App() {
     } catch { }
     return null;
   });
+  const [readOnlyNoteId, setReadOnlyNoteId] = useState<string | null>(null);
 
   // Active fetch tracker to guard against out-of-order SQLite responses
   const activeFetchIdRef = useRef(0);
@@ -177,7 +178,7 @@ function App() {
     observer.observe(scroller);
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
-        // WKWebView can apply the native viewport size after the IPC reply.
+        // WKWebView can publish its viewport after the IPC reply.
         restoreScroll();
         scroller.removeAttribute("data-fullscreen-resizing");
       });
@@ -1197,6 +1198,7 @@ function App() {
       listen(event, action).then(stop => { if (disposed) stop(); else stops.push(stop); }).catch(console.error);
     };
     subscribe("new-note", () => nativeActionsRef.current.handleNewNote());
+    subscribe("note-fullscreen-exited-by-resize", () => setIsFullscreen(false));
     const openPending = async () => {
       if (disposed || !nativeActionsRef.current.isBootReady) return;
       const id = await invoke<string | null>("take_pending_note_link");
@@ -2130,6 +2132,7 @@ function App() {
 
       <TitleBar
         isFullscreen={isFullscreen}
+        readOnly={activeNoteId !== null && readOnlyNoteId === activeNoteId}
         onToggleFullscreen={toggleFullscreen}
         title={activeNote ? getNoteTitle(activeNote.title, activeNote.preview) : "rayNote"}
         onNewNote={handleNewNote}
@@ -2215,6 +2218,7 @@ function App() {
           onNewNote={handleNewNote}
           noteTitle={activeNote?.title || ""}
           onSetTitle={handleSetTitle}
+          onReadOnlyNoteChange={setReadOnlyNoteId}
           onUpdate={handleUpdateNote}
           onRecoverOrphan={handleRecoverOrphan}
           onSwitchFailed={handleSwitchFailed}

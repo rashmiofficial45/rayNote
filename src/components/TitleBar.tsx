@@ -1,4 +1,4 @@
-import { Command, Trash2, Copy, AlertTriangle } from "lucide-react";
+import { Command, Trash2, Copy, AlertTriangle, PencilOff } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { useSaveStatus } from "../lib/saveStatusStore";
 
 interface TitleBarProps {
   title: string;
+  readOnly?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onNewNote: () => void;
@@ -24,6 +25,7 @@ interface TitleBarProps {
 
 export function TitleBar({
   title,
+  readOnly = false,
   isFullscreen = false,
   onToggleFullscreen,
   onOpenCommandPalette,
@@ -256,7 +258,14 @@ export function TitleBar({
 
       {/* Center: Note title */}
       <div className="title-text flex items-center justify-center gap-2 min-w-0">
-        <span className="title-text-content">{displayTitle || "Untitled"}</span>
+        <div className="relative flex min-w-0">
+          {readOnly && (
+            <span className="title-read-only-icon" role="img" aria-label="Read-only note" title="Read-only note">
+              <PencilOff size={14} strokeWidth={2.75} className="size-3 text-red-500 min-[480px]:size-3.5" aria-hidden="true" />
+            </span>
+          )}
+          <span className="title-text-content">{displayTitle || "Untitled"}</span>
+        </div>
         {saveStatus.isSaveBlocked && (
           <button
             onClick={(e) => {

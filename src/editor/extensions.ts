@@ -222,6 +222,39 @@ export async function preloadLanguagesForContent(content: unknown): Promise<void
 
 import { Extension } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
+import { isHistoryTransaction } from "@tiptap/pm/history";
+
+const PreserveHistoryViewport = Extension.create({
+  name: "preserveHistoryViewport",
+
+  addStorage() {
+    return { restoringHistory: false };
+  },
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: { handleScrollToSelection: () => this.storage.restoringHistory },
+    })];
+  },
+
+  dispatchTransaction({ transaction, next }) {
+    if (!isHistoryTransaction(transaction)) {
+      next(transaction);
+      return;
+    }
+
+    const scroller = this.editor.view.dom.closest<HTMLElement>("[data-scroll-container]");
+    const top = scroller?.scrollTop ?? 0;
+    const wasRestoringHistory = this.storage.restoringHistory;
+    this.storage.restoringHistory = true;
+    try {
+      next(transaction);
+      scroller?.scrollTo({ top, behavior: "instant" });
+    } finally {
+      this.storage.restoringHistory = wasRestoringHistory;
+    }
+  },
+});
 
 const CustomDocument = Document.extend({
   content: "block+",
@@ -297,6 +330,7 @@ export function getExtensions(
       },
     }),
     HorizontalRuleExtension,
+    PreserveHistoryViewport,
     Underline,
     ShortcutsExtension,
     SearchExtension,

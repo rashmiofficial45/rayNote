@@ -15,6 +15,8 @@ import { clearFormatMemory } from "./formatMemory";
  */
 
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import { Extension } from "@tiptap/core";
+import { Plugin } from "@tiptap/pm/state";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -147,6 +149,7 @@ interface EditorProps {
   noteId: string;
   noteTitle?: string;
   onSetTitle?: (title: string) => void;
+  onReadOnlyNoteChange?: (noteId: string | null) => void;
   onUpdate: (id: string, content: string, titleHint?: string) => Promise<string | void> | string | void;
   onRecoverOrphan?: (content: string, sourceId?: string) => void | Promise<void> | any;
   onSwitchFailed?: (failedId: string, error: unknown) => void;
@@ -218,6 +221,7 @@ export function Editor({
   noteId,
   noteTitle,
   onSetTitle,
+  onReadOnlyNoteChange,
   onUpdate,
   onRecoverOrphan,
   onSwitchFailed,
@@ -254,6 +258,21 @@ export function Editor({
   discardedNoteIdRef.current = discardedNoteId;
 
   const [contextMenuState, setContextMenuState] = useState<ContextMenuState | null>(null);
+  const [readOnly, setReadOnly] = useState(false);
+  const readOnlyRef = useRef(false);
+  const applyingDocumentRef = useRef(false);
+  const onReadOnlyNoteChangeRef = useRef(onReadOnlyNoteChange);
+  onReadOnlyNoteChangeRef.current = onReadOnlyNoteChange;
+
+  const loadReadOnly = useCallback((id: string) => {
+    try {
+      readOnlyRef.current = localStorage.getItem(`raynote:read-only:${id}`) === "true";
+    } catch {
+      readOnlyRef.current = false;
+    }
+    setReadOnly(readOnlyRef.current);
+    onReadOnlyNoteChangeRef.current?.(readOnlyRef.current ? id : null);
+  }, []);
 
   useEffect(() => {
     setContextMenuState(null);
@@ -495,13 +514,23 @@ export function Editor({
 
   const extensions = useMemo(
     () =>
-      getExtensions(SlashCommand, {
+      [...getExtensions(SlashCommand, {
         getCurrentTitle: () => currentTitleRef.current,
         onSetTitle: (newTitle: string) => {
+          if (readOnlyRef.current) return;
           currentTitleRef.current = newTitle;
           onSetTitleRef.current?.(newTitle);
         },
-      }),
+      }), Extension.create({
+        name: "documentReadOnly",
+        addProseMirrorPlugins() {
+          return [new Plugin({
+            filterTransaction(transaction) {
+              return !transaction.docChanged || !readOnlyRef.current || applyingDocumentRef.current;
+            },
+          })];
+        },
+      })],
     []
   );
 
@@ -656,7 +685,8 @@ export function Editor({
     if (!editor || editor.isDestroyed) return;
     const prevId = currentNoteIdRef.current;
     if (prevId === noteId) {
-      editor.setEditable(true, false);
+      loadReadOnly(noteId);
+      editor.setEditable(!readOnlyRef.current, false);
       return;
     }
     noteSwitchGenerationRef.current += 1;
@@ -761,9 +791,15 @@ export function Editor({
         // preventing cross-note history accumulation while keeping the single editor mounted with 0ms flicker.
         const applyDocumentInPlace = (docData: any) => {
           clearFormatMemory(editor);
-          const applied = editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false, errorOnInvalidContent: true });
-          if (!applied) throw new Error("Note content could not be applied");
+          applyingDocumentRef.current = true;
+          try {
+            const applied = editor.commands.setContent(ensureHeadingOneForDoc(docData), { emitUpdate: false, errorOnInvalidContent: true });
+            if (!applied) throw new Error("Note content could not be applied");
+          } finally {
+            applyingDocumentRef.current = false;
+          }
           currentNoteIdRef.current = noteId;
+          loadReadOnly(noteId);
           lastSavedDocRef.current = editor.state.doc;
           isDirtyRef.current = false;
           // Reset ProseMirror undo/redo history stack cleanly without leaking document DOM nodes
@@ -886,7 +922,7 @@ export function Editor({
         if (!cancelled && prevId) onSwitchFailedRef.current?.(prevId, error);
       } finally {
         if (!cancelled && editor && !editor.isDestroyed) {
-          editor.setEditable(Boolean(currentNoteIdRef.current), false);
+          editor.setEditable(Boolean(currentNoteIdRef.current) && !readOnlyRef.current, false);
         }
         if ((import.meta as any).env?.DEV) {
           const switchDuration = performance.now() - switchStart;
@@ -907,7 +943,7 @@ export function Editor({
       }
       isHalfOpenAttemptRef.current = false;
     };
-  }, [noteId, editor, saveNow]);
+  }, [noteId, editor, saveNow, loadReadOnly]);
 
   // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
   useEffect(() => {
@@ -1276,6 +1312,23 @@ export function Editor({
     [editor]
   );
 
+  const toggleReadOnly = () => {
+    if (!editor || editor.isDestroyed || currentNoteIdRef.current !== noteId ||
+        (!editor.isEditable && !readOnlyRef.current)) return;
+    const locked = !readOnlyRef.current;
+    readOnlyRef.current = locked;
+    setReadOnly(locked);
+    onReadOnlyNoteChangeRef.current?.(locked ? noteId : null);
+    editor.setEditable(!locked, false);
+    try {
+      const key = `raynote:read-only:${noteId}`;
+      if (locked) localStorage.setItem(key, "true");
+      else localStorage.removeItem(key);
+    } catch (error) {
+      console.error("Could not save the note's read-only setting", error);
+    }
+  };
+
   if (!editor) return null;
 
   return (
@@ -1284,6 +1337,7 @@ export function Editor({
         isOpen={Boolean(isFindOpen)}
         onClose={() => onCloseFind?.()}
         editor={editor}
+        readOnly={readOnly}
       />
       <div
         ref={scrollContainerRef}
@@ -1303,13 +1357,13 @@ export function Editor({
             isFindOpen={Boolean(isFindOpen)}
           />
           <EditorContent editor={editor} />
-          <FloatingCodeBlockToolbar
+          {!readOnly && <FloatingCodeBlockToolbar
             editor={editor}
             scrollContainerRef={scrollContainerRef}
             zoomLevel={zoomLevel}
-          />
+          />}
         </div>
-        {showBlockControls && !contextMenuState && (
+        {showBlockControls && !readOnly && !contextMenuState && (
           <FullscreenBlockControls key={noteId} editor={editor} zoomLevel={zoomLevel} scrollContainerRef={scrollContainerRef}
             onMenu={(point) => setContextMenuState(resolveContextMenuState(editor, point))} />
         )}
@@ -1331,10 +1385,12 @@ export function Editor({
       <EditorCharCount editor={editor} noteId={noteId} />
       {/* Bottom frosted glass blend scrim for scrolling text */}
       <div className="app-bottom-blend" aria-hidden="true" />
-      <BottomToolbar editor={editor} />
+      {!readOnly && <BottomToolbar editor={editor} />}
       <EditorContextMenu
         editor={editor}
         menuState={contextMenuState}
+        readOnly={readOnly}
+        onToggleReadOnly={toggleReadOnly}
         onClose={() => setContextMenuState(null)}
       />
     </div>

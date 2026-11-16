@@ -7,6 +7,7 @@ import { Editor } from "../../editor/Editor";
 import { updateNote, deleteNote, flushEditorNow, flushSaveQueue } from "../../lib/db";
 import { noteCache } from "../../lib/noteCache";
 import { invoke } from "@tauri-apps/api/core";
+import type { Editor as TiptapEditor } from "@tiptap/core";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -49,6 +50,72 @@ describe("App onUpdate Save Wiring & IPC Invariants", () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  it("locks only the current note from the page menu and blocks document transactions until unlocked", async () => {
+    const lockedId = "read-only-note";
+    const otherId = "editable-note";
+    const notes = new Map();
+    for (const id of [lockedId, otherId]) {
+      const content = JSON.stringify({
+        type: "doc",
+        content: [{
+          type: "heading", attrs: { level: 1 },
+          content: [{ type: "text", text: id }],
+        }],
+      });
+      const now = new Date().toISOString();
+      notes.set(id, { id, title: id, content, updated_at: now });
+      noteCache.set(id, content, now, id, 0, false);
+    }
+    vi.mocked(invoke).mockImplementation(async (command, args) =>
+      command === "get_note" ? notes.get((args as { id: string }).id) : undefined
+    );
+    let live: TiptapEditor;
+    const onUpdate = vi.fn();
+    const onReadOnlyNoteChange = vi.fn();
+    const ready = (editor: typeof live) => { live = editor; };
+    const openNote = async (noteId: string) => {
+      await act(async () => {
+        root.render(<Editor noteId={noteId} onUpdate={onUpdate} onEditorReady={ready}
+          onReadOnlyNoteChange={onReadOnlyNoteChange} />);
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(500); });
+    };
+    const choose = (label: string) => {
+      act(() => {
+        container.querySelector("[data-scroll-container]")!.dispatchEvent(
+          new MouseEvent("contextmenu", { bubbles: true, cancelable: true })
+        );
+      });
+      const item = [...document.querySelectorAll('[role="menuitem"]')]
+        .find(element => element.textContent?.startsWith(label)) as HTMLElement | undefined;
+      expect(item).toBeDefined();
+      act(() => { item!.click(); });
+    };
+
+    await openNote(lockedId);
+    vi.spyOn(live!.view, "posAtCoords").mockReturnValue({ pos: 1, inside: 0 });
+    choose("Make Read-Only");
+    expect(live!.isEditable).toBe(false);
+    expect(onReadOnlyNoteChange).toHaveBeenLastCalledWith(lockedId);
+    const before = live!.getJSON();
+    act(() => { live!.commands.insertContent("blocked"); });
+    expect(live!.getJSON()).toEqual(before);
+
+    await openNote(otherId);
+    expect(live!.isEditable).toBe(true);
+    expect(onReadOnlyNoteChange).toHaveBeenLastCalledWith(null);
+    expect(live!.getText()).toContain(otherId);
+    await openNote(lockedId);
+    expect(live!.isEditable).toBe(false);
+    expect(onReadOnlyNoteChange).toHaveBeenLastCalledWith(lockedId);
+    expect(live!.getJSON()).toEqual(before);
+    choose("Enable Editing");
+    expect(live!.isEditable).toBe(true);
+    expect(onReadOnlyNoteChange).toHaveBeenLastCalledWith(null);
+    act(() => { live!.commands.insertContent("allowed"); });
+    expect(live!.getText()).toContain("allowed");
   });
 
   it("updateNote() returns the real invoke promise through saveQueue, propagating rejection", async () => {

@@ -55,9 +55,19 @@ interface DragState {
   boundary: number | null;
 }
 
-function hoveredBlock(editor: Editor, target: Element): HoveredBlock | null {
+function hoveredBlock(editor: Editor, target: Element, pointerY: number): HoveredBlock | null {
   const { view } = editor;
-  const item = target.closest("li");
+  let item: HTMLElement | null = target.closest("li");
+  if (!item && target.matches("ol, ul")) {
+    const items = Array.from(target.children).filter((child): child is HTMLElement => child instanceof HTMLElement && child.matches("li"));
+    item = items.reduce<HTMLElement | null>((closest, candidate) => {
+      const distance = (element: HTMLElement) => {
+        const rect = element.getBoundingClientRect();
+        return Math.max(rect.top - pointerY, 0, pointerY - rect.bottom);
+      };
+      return !closest || distance(candidate) < distance(closest) ? candidate : closest;
+    }, null);
+  }
   let element: Element | null = item && view.dom.contains(item) ? item : target;
   if (element !== item || !item) {
     while (element && element.parentElement !== view.dom) element = element.parentElement;
@@ -111,7 +121,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
     if (!scroll) return;
     const onPointer = (event: PointerEvent) => {
       if (dragRef.current || !(event.target instanceof Element) || controlsRef.current?.contains(event.target)) return;
-      const block = editor.view.dom.contains(event.target) ? hoveredBlock(editor, event.target) : null;
+      const block = editor.view.dom.contains(event.target) ? hoveredBlock(editor, event.target, event.clientY) : null;
       if (!block) {
         const bounds = controlsRef.current?.getBoundingClientRect();
         if (bounds && event.clientY >= bounds.top - 4 && event.clientY <= bounds.bottom + 4 &&
@@ -167,7 +177,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
   }, [hover, zoomLevel]);
 
   const openMenu = () => {
-    if (!hover || editor.state.doc.nodeAt(hover.pos) !== hover.node) return;
+    if (!hover || isNoteTitle(hover) || editor.state.doc.nodeAt(hover.pos) !== hover.node) return;
     const tr = editor.state.tr.setMeta(blockSelectionPluginKey, {
       anchor: hover.pos, head: hover.pos, selectedPositions: [hover.pos],
     });
@@ -309,6 +319,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
   const height = 30 * scale;
   const isFramedBlock = hover.node.type.name === "codeBlock" || hover.node.type.name === "table";
   const anchorTop = isFramedBlock ? hover.rect.top : (lineCenter ?? hover.rect.top + height / 2) - height / 2;
+  if (bounds && (anchorTop + height < bounds.top + 52 || anchorTop > bounds.bottom - height)) return null;
   const top = Math.max(bounds?.top ?? 0, Math.min(
     anchorTop,
     (bounds?.bottom ?? window.innerHeight) - height,
@@ -327,7 +338,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
           onClick={(event) => insertAdjacentBlock(editor, hover, event.altKey)}>
           <Plus strokeWidth={2.1} aria-hidden="true" />
         </button>
-        <button type="button" className="fullscreen-block-grip" aria-label="Block actions" title="Drag to move · Click or press ⌘/ for block actions"
+        {!isNoteTitle(hover) && <button type="button" className="fullscreen-block-grip" aria-label="Block actions" title="Drag to move · Click or press ⌘/ for block actions"
           onPointerDown={startGrip}
           onPointerMove={(event) => {
             const drag = dragRef.current;
@@ -366,7 +377,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
             suppressGripClick.current = false;
           }}>
           <GripVertical strokeWidth={2.1} aria-hidden="true" />
-        </button>
+        </button>}
       </div>
       <div ref={previewRef} className="fullscreen-block-drag-preview" hidden inert aria-hidden="true" />
       {indicator && (

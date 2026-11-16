@@ -369,13 +369,35 @@ pub fn get_native_window_frame(window: tauri::WebviewWindow) -> Result<NativeWin
 
 #[cfg(target_os = "macos")]
 thread_local! {
-    static WINDOWED_FRAME: std::cell::Cell<Option<tauri_nspanel::objc2_foundation::NSRect>> =
+    static FULLSCREEN_FRAMES: std::cell::Cell<Option<(
+        tauri_nspanel::objc2_foundation::NSRect,
+        tauri_nspanel::objc2_foundation::NSSize,
+    )>> =
         const { std::cell::Cell::new(None) };
 }
 
 #[cfg(target_os = "macos")]
 pub(crate) fn is_panel_fullscreen() -> bool {
-    WINDOWED_FRAME.with(|frame| frame.get().is_some())
+    FULLSCREEN_FRAMES.with(|frames| frames.get().is_some())
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn exit_panel_fullscreen_after_resize(window: &tauri::WebviewWindow) -> bool {
+    use objc2::{msg_send, runtime::AnyObject};
+    use tauri_nspanel::objc2_foundation::NSRect;
+
+    FULLSCREEN_FRAMES.with(|frames| {
+        let Some((_, expanded_size)) = frames.get() else { return false };
+        let Ok(ptr) = window.ns_window() else { return false };
+        let Some(panel) = (unsafe { (ptr as *mut AnyObject).as_ref() }) else { return false };
+        let frame: NSRect = unsafe { msg_send![panel, frame] };
+        // Ignore resize notifications for the frame applied when entering fullscreen.
+        if frame.size == expanded_size {
+            return false;
+        }
+        frames.set(None);
+        true
+    })
 }
 
 #[tauri::command]
@@ -397,11 +419,9 @@ pub async fn toggle_note_fullscreen(window: tauri::WebviewWindow) -> Result<bool
                 let ptr = panel_window.ns_window().map_err(|e| e.to_string())? as *mut AnyObject;
                 let panel = unsafe { ptr.as_ref() }.ok_or("Note window is unavailable")?;
 
-                WINDOWED_FRAME.with(|windowed_frame| unsafe {
-                    if let Some(frame) = windowed_frame.get() {
-                        let _: () = msg_send![panel, setFrame: frame, display: true];
-                        windowed_frame.set(None);
-                        return Ok(false);
+                let (enabled, target_frame) = FULLSCREEN_FRAMES.with(|frames| unsafe {
+                    if let Some((frame, _)) = frames.take() {
+                        return Ok::<_, String>((false, frame));
                     }
 
                     let screen: *mut AnyObject = msg_send![panel, screen];
@@ -414,10 +434,12 @@ pub async fn toggle_note_fullscreen(window: tauri::WebviewWindow) -> Result<bool
                     expanded_frame.size.width -= 2.0 * DISPLAY_MARGIN;
                     expanded_frame.size.height -= 2.0 * DISPLAY_MARGIN;
 
-                    windowed_frame.set(Some(frame));
-                    let _: () = msg_send![panel, setFrame: expanded_frame, display: true];
-                    Ok(true)
-                })
+                    frames.set(Some((frame, expanded_frame.size)));
+                    Ok((true, expanded_frame))
+                })?;
+
+                let _: () = unsafe { msg_send![panel, setFrame: target_frame, display: true] };
+                Ok(enabled)
             })();
             let _ = reply.try_send(outcome);
         }).map_err(|e| e.to_string())?;

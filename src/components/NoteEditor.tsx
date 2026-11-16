@@ -9,6 +9,7 @@ interface NoteEditorProps {
   content?: string | null;
   noteTitle?: string;
   onSetTitle?: (title: string) => void;
+  onReadOnlyNoteChange?: (noteId: string | null) => void;
   onUpdate: (id: string, content: string, titleHint?: string) => Promise<string | void> | string | void;
   onRecoverOrphan?: (content: string) => void;
   onSwitchFailed?: (failedId: string, error: unknown) => void;
@@ -27,6 +28,7 @@ export function NoteEditor({
   content,
   noteTitle,
   onSetTitle,
+  onReadOnlyNoteChange,
   onUpdate,
   onRecoverOrphan,
   onSwitchFailed,
@@ -76,6 +78,7 @@ export function NoteEditor({
         noteId={noteId}
         noteTitle={noteTitle}
         onSetTitle={onSetTitle}
+        onReadOnlyNoteChange={onReadOnlyNoteChange}
         initialContent={content || ""}
         onUpdate={onUpdate}
         onRecoverOrphan={onRecoverOrphan}
