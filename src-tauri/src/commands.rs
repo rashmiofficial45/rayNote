@@ -368,6 +368,9 @@ pub fn get_native_window_frame(window: tauri::WebviewWindow) -> Result<NativeWin
 }
 
 #[cfg(target_os = "macos")]
+static PANEL_FULLSCREEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+#[cfg(target_os = "macos")]
 thread_local! {
     static FULLSCREEN_FRAMES: std::cell::Cell<Option<(
         tauri_nspanel::objc2_foundation::NSRect,
@@ -378,7 +381,7 @@ thread_local! {
 
 #[cfg(target_os = "macos")]
 pub(crate) fn is_panel_fullscreen() -> bool {
-    FULLSCREEN_FRAMES.with(|frames| frames.get().is_some())
+    PANEL_FULLSCREEN.load(std::sync::atomic::Ordering::SeqCst)
 }
 
 #[cfg(target_os = "macos")]
@@ -396,6 +399,7 @@ pub(crate) fn exit_panel_fullscreen_after_resize(window: &tauri::WebviewWindow) 
             return false;
         }
         frames.set(None);
+        PANEL_FULLSCREEN.store(false, std::sync::atomic::Ordering::SeqCst);
         true
     })
 }
@@ -421,12 +425,24 @@ pub async fn toggle_note_fullscreen(window: tauri::WebviewWindow) -> Result<bool
 
                 let (enabled, target_frame) = FULLSCREEN_FRAMES.with(|frames| unsafe {
                     if let Some((frame, _)) = frames.take() {
+                        PANEL_FULLSCREEN.store(false, std::sync::atomic::Ordering::SeqCst);
                         return Ok::<_, String>((false, frame));
                     }
 
                     let screen: *mut AnyObject = msg_send![panel, screen];
                     let screen = screen.as_ref().ok_or("Note window has no active display")?;
                     let frame: NSRect = msg_send![panel, frame];
+                    // Persist the last windowed frame before expanding. The expanded
+                    // frame itself must never replace the windowed restore point.
+                    use tauri::Manager;
+                    if let Ok(app_dir) = panel_window.app_handle().path().app_data_dir() {
+                        let state = serde_json::json!({ "x": frame.origin.x, "y": frame.origin.y,
+                            "width": frame.size.width, "height": frame.size.height });
+                        let _ = std::fs::create_dir_all(&app_dir);
+                        let _ = std::fs::write(app_dir.join("window_state.json"), state.to_string());
+                        let size = serde_json::json!({ "width": frame.size.width, "height": frame.size.height });
+                        let _ = std::fs::write(app_dir.join("window_size.json"), size.to_string());
+                    }
                     let mut expanded_frame: NSRect = msg_send![screen, visibleFrame];
                     const DISPLAY_MARGIN: f64 = 12.0;
                     expanded_frame.origin.x += DISPLAY_MARGIN;
@@ -435,6 +451,7 @@ pub async fn toggle_note_fullscreen(window: tauri::WebviewWindow) -> Result<bool
                     expanded_frame.size.height -= 2.0 * DISPLAY_MARGIN;
 
                     frames.set(Some((frame, expanded_frame.size)));
+                    PANEL_FULLSCREEN.store(true, std::sync::atomic::Ordering::SeqCst);
                     Ok((true, expanded_frame))
                 })?;
 
@@ -556,6 +573,10 @@ pub fn quit_app(app: tauri::AppHandle) {
 #[tauri::command]
 pub fn save_window_size(app: tauri::AppHandle, width: f64, height: f64) -> Result<(), String> {
     use tauri::Manager;
+    #[cfg(target_os = "macos")]
+    if is_panel_fullscreen() { return Ok(()); }
+    #[cfg(not(target_os = "macos"))]
+    if app.get_webview_window("main").and_then(|window| window.is_fullscreen().ok()).unwrap_or(false) { return Ok(()); }
     if width >= 320.0 && height >= 400.0 {
         let app_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
         std::fs::create_dir_all(&app_dir).map_err(|e| e.to_string())?;

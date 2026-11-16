@@ -34,6 +34,7 @@ export function ImageCropModal({
   const [isAspectMenuOpen, setIsAspectMenuOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const imageElementRef = useRef<HTMLImageElement>(null);
 
   // Aspect ratio presets
@@ -58,10 +59,10 @@ export function ImageCropModal({
 
   // Compute display size fit into container
   const updateDisplaySize = useCallback(() => {
-    if (!naturalSize || !containerRef.current) return;
-    const container = containerRef.current;
-    const availableWidth = container.clientWidth - 80;
-    const availableHeight = container.clientHeight - 120;
+    if (!naturalSize || !canvasRef.current) return;
+    const container = canvasRef.current;
+    const availableWidth = Math.max(1, container.clientWidth - 48);
+    const availableHeight = Math.max(1, container.clientHeight - 48);
 
     const scale = Math.min(
       availableWidth / naturalSize.width,
@@ -72,7 +73,7 @@ export function ImageCropModal({
     const width = Math.round(naturalSize.width * scale);
     const height = Math.round(naturalSize.height * scale);
     const left = Math.round((container.clientWidth - width) / 2);
-    const top = Math.round((container.clientHeight - height) / 2 + 20);
+    const top = Math.round((container.clientHeight - height) / 2);
 
     setDisplaySize({ width, height, left, top });
     // Reset crop rect to full image on initial load
@@ -88,8 +89,9 @@ export function ImageCropModal({
   // Handle window resize
   useEffect(() => {
     if (!isOpen) return;
-    window.addEventListener("resize", updateDisplaySize);
-    return () => window.removeEventListener("resize", updateDisplaySize);
+    const observer = new ResizeObserver(updateDisplaySize);
+    if (canvasRef.current) observer.observe(canvasRef.current);
+    return () => observer.disconnect();
   }, [isOpen, updateDisplaySize]);
 
   // Keyboard navigation: Escape to cancel, Enter to save
@@ -309,42 +311,37 @@ export function ImageCropModal({
   if (!isOpen) return null;
 
   return createPortal(
-    <div
-      ref={containerRef}
-      className="fixed inset-0 z-[10000] flex flex-col bg-neutral-950/95 backdrop-blur-2xl select-none animate-in fade-in duration-200"
-      onClick={(e) => {
-        if (e.target === containerRef.current) onClose();
-      }}
-    >
+    <div className="crop-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div ref={containerRef} className="crop-panel" role="dialog" aria-modal="true" aria-label="Crop and edit image">
       {/* Top Header Bar */}
-      <div className="relative z-50 flex h-14 w-full items-center justify-between border-b border-white/10 px-6 bg-neutral-900/70 dark:bg-neutral-950/80 backdrop-blur-2xl">
+      <div className="crop-header">
         {/* Left: Aspect Ratio Dropdown */}
-        <div className="relative">
+        <div className="crop-aspect">
           <button
             type="button"
-            className="flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-1.5 text-xs font-medium text-neutral-200 hover:bg-white/15 hover:text-white transition-all active:scale-95"
+            className="crop-control crop-aspect-trigger"
+            aria-expanded={isAspectMenuOpen}
+            aria-haspopup="listbox"
             onClick={() => setIsAspectMenuOpen((prev) => !prev)}
           >
-            <CropIcon size={14} className="text-blue-400" />
+            <CropIcon size={19} className="text-blue-400" />
             <span>{aspectOptions.find((o) => o.id === aspectRatio)?.label}</span>
-            <ChevronDown size={13} className="text-neutral-400" />
+            <ChevronDown size={16} className="text-neutral-400" />
           </button>
 
           {isAspectMenuOpen && (
-            <div className="absolute left-0 top-full mt-1.5 z-50 w-44 rounded-xl border border-white/15 bg-neutral-900/95 p-1 shadow-2xl backdrop-blur-xl">
+            <div className="crop-aspect-menu" role="listbox" aria-label="Crop aspect ratio">
               {aspectOptions.map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
-                  className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-left transition-colors ${
-                    aspectRatio === opt.id
-                      ? "bg-blue-500/20 text-blue-400 font-semibold"
-                      : "text-neutral-300 hover:bg-white/10 hover:text-white"
-                  }`}
+                  className={`crop-aspect-option${aspectRatio === opt.id ? " is-selected" : ""}`}
+                  role="option"
+                  aria-selected={aspectRatio === opt.id}
                   onClick={() => applyAspectRatio(opt.id)}
                 >
                   <span>{opt.label}</span>
-                  {aspectRatio === opt.id && <Check size={13} />}
+                  {aspectRatio === opt.id && <Check size={17} />}
                 </button>
               ))}
             </div>
@@ -352,34 +349,34 @@ export function ImageCropModal({
         </div>
 
         {/* Center: Title & Reset */}
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-neutral-100 tracking-wide">Crop & Edit Image</span>
+        <div className="crop-heading">
+          <span className="crop-heading-title">Crop & Edit Image</span>
           <button
             type="button"
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="crop-control crop-reset"
             onClick={handleReset}
             title="Reset crop area to full image"
           >
-            <RotateCcw size={12} />
+            <RotateCcw size={17} />
             <span>Reset</span>
           </button>
         </div>
 
         {/* Right: Download, Cancel & Save Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="crop-actions">
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 hover:bg-white/20 px-3.5 py-1.5 text-xs font-medium text-neutral-200 hover:text-white transition-all active:scale-95 shadow-sm"
+            className="crop-control"
             onClick={handleDownload}
             title="Download image"
           >
-            <Download size={14} className="text-blue-400" />
+            <Download size={18} className="text-blue-400" />
             <span>Download</span>
           </button>
 
           <button
             type="button"
-            className="rounded-full px-3.5 py-1.5 text-xs font-medium text-neutral-400 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+            className="crop-control"
             onClick={onClose}
           >
             Cancel
@@ -387,20 +384,20 @@ export function ImageCropModal({
 
           <button
             type="button"
-            className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-500 px-4 py-1.5 text-xs font-semibold text-white shadow-md shadow-blue-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="crop-control crop-save"
             onClick={handleSaveCrop}
           >
-            <Check size={14} />
+            <Check size={18} />
             <span>Save</span>
           </button>
         </div>
       </div>
 
       {/* Main Cropping Canvas */}
-      <div className="relative flex-1 overflow-hidden flex items-center justify-center p-6">
+      <div ref={canvasRef} className="crop-canvas">
         {displaySize && (
           <div
-            className="relative"
+            className="crop-image-stage"
             style={{
               width: displaySize.width,
               height: displaySize.height,
@@ -418,7 +415,7 @@ export function ImageCropModal({
             {/* The Interactive Crop Box */}
             {cropRect && (
               <div
-                className="absolute z-20 cursor-move border border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.65)]"
+                className="absolute z-20 cursor-move border border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.48)]"
                 style={{
                   left: cropRect.x,
                   top: cropRect.y,
@@ -485,6 +482,7 @@ export function ImageCropModal({
           </div>
         )}
       </div>
+    </div>
     </div>,
     document.body
   );

@@ -384,7 +384,9 @@ function App() {
     let timeoutId: ReturnType<typeof setTimeout>;
     const handleResize = () => {
       clearTimeout(timeoutId);
+      if (isFullscreen || fullscreenPending.current) return;
       timeoutId = setTimeout(() => {
+        if (fullscreenPending.current) return;
         const width = window.innerWidth;
         const height = window.innerHeight;
         if (width >= 320 && height >= 400) {
@@ -398,7 +400,7 @@ function App() {
       window.removeEventListener("resize", handleResize);
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [isFullscreen]);
 
   const [toast, setToast] = useState<ToastData | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

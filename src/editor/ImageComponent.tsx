@@ -57,7 +57,7 @@ export function ImageComponent({
 
   // Compute active initial width
   const displayWidth =
-    width && width !== "100%"
+    isFullscreen && width && width !== "100%"
       ? typeof width === "number"
         ? `${width}px`
         : width
@@ -141,7 +141,7 @@ export function ImageComponent({
     >
       <div
         ref={boxRef}
-        className="relative inline-block max-w-full group/box"
+        className="image-node-box relative inline-block max-w-full group/box"
         style={{ width: displayWidth }}
       >
         {/* The Image Element */}
@@ -149,7 +149,7 @@ export function ImageComponent({
           src={src}
           alt={alt || "Image"}
           title={title || ""}
-          className={`block h-auto w-full rounded-xl object-contain cursor-default transition-shadow duration-150 ${
+          className={`image-node-media block h-auto w-full rounded-xl object-contain cursor-default transition-shadow duration-150 ${
             selected || isResizing
               ? "ring-2 ring-blue-500/70 shadow-lg shadow-blue-500/10"
               : "border border-black/10 dark:border-white/10 shadow-sm hover:ring-1 hover:ring-blue-400/40"
@@ -160,7 +160,7 @@ export function ImageComponent({
         />
 
         {showControls && (
-          <div className="image-action-glass" role="group" aria-label="Image actions" contentEditable={false}
+          <div className={`image-action-glass${isFullscreen ? "" : " image-action-compact"}`} role="group" aria-label="Image actions" contentEditable={false}
             onMouseDown={(event) => event.preventDefault()}>
             {isFullscreen && (
               <>
@@ -180,7 +180,7 @@ export function ImageComponent({
                 ))}
               </>
             )}
-            <button type="button" className="image-delete-action" onClick={deleteNode} title="Delete image">
+            <button type="button" className="image-delete-action" onClick={deleteNode} title="Delete image" aria-label="Delete image">
               <Trash2 size={15} aria-hidden="true" />
             </button>
           </div>
