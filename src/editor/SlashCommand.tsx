@@ -32,6 +32,7 @@ import {
   Strikethrough,
   Highlighter,
   Table as TableIcon,
+  Image as ImageIcon,
 } from "lucide-react";
 
 export interface CommandItem {
@@ -137,6 +138,46 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     icon: <Code2 size={13} />,
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
+    },
+  },
+  {
+    id: "image",
+    title: "Image",
+    badge: "img",
+    aliases: ["image", "img", "photo", "picture", "screenshot", "upload"],
+    icon: <ImageIcon size={13} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const dataUrl = ev.target?.result as string;
+            if (dataUrl) {
+              const img = new Image();
+              img.onload = () => {
+                const editorWidth = editor.view.dom.clientWidth || 600;
+                const initialWidth = Math.round(
+                  Math.min(img.naturalWidth || 500, Math.max(300, editorWidth - 32))
+                );
+                editor.chain().focus().setImage({
+                  src: dataUrl,
+                  alt: file.name,
+                  width: `${initialWidth}px`,
+                  alignment: "center",
+                }).run();
+              };
+              img.src = dataUrl;
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+      input.click();
     },
   },
   {

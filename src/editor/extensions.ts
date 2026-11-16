@@ -25,6 +25,7 @@ import { BlockSelection } from "../extensions/BlockSelection";
 import { ClickSelectionExtension } from "./clickSelectionExtension";
 import { PasteTitleExtension, PasteTitleOptions, isDefaultTitle } from "./pasteTitleExtension";
 import { FormatMemoryExtension } from "./formatMemory";
+import { ImageExtension } from "./ImageExtension";
 
 
 function enhancedBash(hljs: any) {
@@ -400,6 +401,7 @@ export function getExtensions(
     BlockSelection,
     ClickSelectionExtension,
     FormatMemoryExtension,
+    ImageExtension,
   ];
 
   if (slashCommandExtension) {

@@ -17,6 +17,7 @@ interface NoteEditorProps {
   discardedNoteId?: string | null;
   zoomLevel: number;
   showBlockControls?: boolean;
+  isFullscreen?: boolean;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
 }
@@ -36,6 +37,7 @@ export function NoteEditor({
   discardedNoteId,
   zoomLevel,
   showBlockControls,
+  isFullscreen,
   isFindOpen,
   onCloseFind,
 }: NoteEditorProps) {
@@ -87,6 +89,7 @@ export function NoteEditor({
         discardedNoteId={discardedNoteId}
         zoomLevel={zoomLevel}
         showBlockControls={showBlockControls}
+        isFullscreen={isFullscreen}
         isFindOpen={isFindOpen}
         onCloseFind={onCloseFind}
       />

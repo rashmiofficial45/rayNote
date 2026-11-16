@@ -737,9 +737,36 @@ function App() {
         file.name.endsWith(".txt") ||
         file.type.includes("markdown") ||
         file.type.includes("text");
+      const isImage =
+        file.type.startsWith("image/") ||
+        /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i.test(file.name);
+
       if (isMd) {
         const text = await file.text();
         setDroppedFilePrompt({ file, text });
+      } else if (isImage) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          if (dataUrl && (window as any).__RAYNOTE_EDITOR__) {
+            const img = new Image();
+            img.onload = () => {
+              const editor = (window as any).__RAYNOTE_EDITOR__;
+              const editorWidth = editor?.view?.dom?.clientWidth || 600;
+              const initialWidth = Math.round(
+                Math.min(img.naturalWidth || 500, Math.max(300, editorWidth - 32))
+              );
+              editor.chain().focus().setImage({
+                src: dataUrl,
+                alt: file.name || "Dropped image",
+                width: `${initialWidth}px`,
+                alignment: "center",
+              }).run();
+            };
+            img.src = dataUrl;
+          }
+        };
+        reader.readAsDataURL(file);
       }
     }
   };
@@ -2225,6 +2252,7 @@ function App() {
           onSwitchConflict={(info) => setSwitchConflict(info)}
           discardedNoteId={discardedNoteId}
           zoomLevel={zoomLevel}
+          isFullscreen={isFullscreen}
           showBlockControls={isFullscreen && !visiblePanel && !hasBlockingDialog && !moveToTrash}
           isFindOpen={visiblePanel === "find"}
           onCloseFind={closeFind}

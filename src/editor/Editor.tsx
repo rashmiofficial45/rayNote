@@ -27,6 +27,7 @@ import { BottomToolbar } from "../components/BottomToolbar";
 import { FindBar } from "../components/FindBar";
 import { SmoothCaret } from "../components/SmoothCaret";
 import { FullscreenBlockControls } from "./FullscreenBlockControls";
+import { ImageFullscreenContext } from "./ImageComponent";
 import { FloatingCodeBlockToolbar } from "./FloatingCodeBlockToolbar";
 import { DocumentTickSlider } from "../components/DocumentTickSlider";
 import { useBlockDrag } from "../extensions/useBlockDrag";
@@ -157,6 +158,7 @@ interface EditorProps {
   discardedNoteId?: string | null;
   zoomLevel?: number;
   showBlockControls?: boolean;
+  isFullscreen?: boolean;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
   onEditorReady?: (editor: any) => void;
@@ -229,6 +231,7 @@ export function Editor({
   discardedNoteId,
   zoomLevel,
   showBlockControls,
+  isFullscreen = false,
   isFindOpen,
   onCloseFind,
   onEditorReady,
@@ -604,7 +607,70 @@ export function Editor({
           const clipboardData = event.clipboardData;
           if (!clipboardData) return false;
 
-          // 1. Check if a Markdown or text file was pasted directly
+          // 1. Check if an image or screenshot was pasted directly
+          let imageFile: File | Blob | null = null;
+          if (clipboardData.files && clipboardData.files.length > 0) {
+            for (let i = 0; i < clipboardData.files.length; i++) {
+              const f = clipboardData.files[i];
+              if (f.type.startsWith("image/")) {
+                imageFile = f;
+                break;
+              }
+            }
+          }
+          if (!imageFile && clipboardData.items && clipboardData.items.length > 0) {
+            for (let i = 0; i < clipboardData.items.length; i++) {
+              const item = clipboardData.items[i];
+              if (item.type.startsWith("image/")) {
+                const f = item.getAsFile();
+                if (f) {
+                  imageFile = f;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (imageFile) {
+            event.preventDefault();
+            const pasteNoteId = currentNoteIdRef.current;
+            const pasteGeneration = noteSwitchGenerationRef.current;
+            const pasteEditor = editorRef.current;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const dataUrl = e.target?.result as string;
+              if (!dataUrl) return;
+
+              const img = new Image();
+              img.onload = () => {
+                if (
+                  pasteEditor &&
+                  !pasteEditor.isDestroyed &&
+                  editorRef.current === pasteEditor &&
+                  currentNoteIdRef.current === pasteNoteId &&
+                  noteSwitchGenerationRef.current === pasteGeneration
+                ) {
+                  const editorWidth = pasteEditor.view.dom.clientWidth || 600;
+                  const initialWidth = Math.round(
+                    Math.min(img.naturalWidth || 500, Math.max(300, editorWidth - 32))
+                  );
+
+                  pasteEditor.chain().focus().setImage({
+                    src: dataUrl,
+                    alt: (imageFile as File).name || "Pasted image",
+                    width: `${initialWidth}px`,
+                    alignment: "center",
+                  }).run();
+                }
+              };
+              img.src = dataUrl;
+            };
+            reader.readAsDataURL(imageFile);
+            return true;
+          }
+
+          // 2. Check if a Markdown or text file was pasted directly
           const files = clipboardData.files;
           if (files && files.length > 0) {
             const file = files[0];
@@ -657,6 +723,73 @@ export function Editor({
           }
 
           return false;
+        },
+        handleDrop: (view, event, _slice, moved) => {
+          if (moved) return false;
+          const files = event.dataTransfer?.files;
+          if (!files || files.length === 0) return false;
+
+          let imageFile: File | null = null;
+          for (let i = 0; i < files.length; i++) {
+            if (files[i].type.startsWith("image/")) {
+              imageFile = files[i];
+              break;
+            }
+          }
+
+          if (!imageFile) return false;
+
+          event.preventDefault();
+          const pasteNoteId = currentNoteIdRef.current;
+          const pasteGeneration = noteSwitchGenerationRef.current;
+          const pasteEditor = editorRef.current;
+
+          const coordinates = view.posAtCoords({ left: event.clientX, top: event.clientY });
+          const dropPos = coordinates ? coordinates.pos : undefined;
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            if (!dataUrl) return;
+
+            const img = new Image();
+            img.onload = () => {
+              if (
+                pasteEditor &&
+                !pasteEditor.isDestroyed &&
+                editorRef.current === pasteEditor &&
+                currentNoteIdRef.current === pasteNoteId &&
+                noteSwitchGenerationRef.current === pasteGeneration
+              ) {
+                const editorWidth = pasteEditor.view.dom.clientWidth || 600;
+                const initialWidth = Math.round(
+                  Math.min(img.naturalWidth || 500, Math.max(300, editorWidth - 32))
+                );
+
+                if (dropPos !== undefined) {
+                  pasteEditor.chain().focus().insertContentAt(dropPos, {
+                    type: "image",
+                    attrs: {
+                      src: dataUrl,
+                      alt: imageFile.name || "Dropped image",
+                      width: `${initialWidth}px`,
+                      alignment: "center",
+                    },
+                  }).run();
+                } else {
+                  pasteEditor.chain().focus().setImage({
+                    src: dataUrl,
+                    alt: imageFile.name || "Dropped image",
+                    width: `${initialWidth}px`,
+                    alignment: "center",
+                  }).run();
+                }
+              }
+            };
+            img.src = dataUrl;
+          };
+          reader.readAsDataURL(imageFile);
+          return true;
         },
       },
       autofocus: "end",
@@ -1356,7 +1489,9 @@ export function Editor({
             scrollContainerRef={scrollContainerRef}
             isFindOpen={Boolean(isFindOpen)}
           />
-          <EditorContent editor={editor} />
+          <ImageFullscreenContext.Provider value={isFullscreen}>
+            <EditorContent editor={editor} />
+          </ImageFullscreenContext.Provider>
           {!readOnly && <FloatingCodeBlockToolbar
             editor={editor}
             scrollContainerRef={scrollContainerRef}
