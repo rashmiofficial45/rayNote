@@ -79,7 +79,7 @@ import { registerClearAllNotesHandler } from "./lib/noteDeletion";
 import { noteCache } from "./lib/noteCache";
 import { titleStore } from "./lib/titleStore";
 import { blockSelectionPluginKey } from "./extensions/BlockSelection";
-import { broadcastSync, listenToSettingsSync, matchesEvent, nativeShortcut } from "./lib/settingsSync";
+import { broadcastSync, listenToSettingsSync, matchesEvent, nativeShortcut, isHyperActive } from "./lib/settingsSync";
 import { getStoredCommandsConfig, OPEN_TRASH_HOTKEY, CommandRow } from "./lib/commandsConfig";
 import {
   Check,
@@ -1848,6 +1848,23 @@ function App() {
         return;
       }
 
+      // Toggle Fullscreen (Green Button shortcut)
+      // Supports user-configured hotkey (default: ⌃F / Control+F), or ✦F (Hyper+F), or native ⌃⌘F
+      if (
+        isTriggered("toggle_fullscreen", "⌃F") ||
+        (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "f" || e.code === "KeyF")) ||
+        (isHyperActive(e) && (e.key.toLowerCase() === "f" || e.code === "KeyF")) ||
+        (e.ctrlKey && e.metaKey && (e.key.toLowerCase() === "f" || e.code === "KeyF"))
+      ) {
+        const cmd = getCmd("toggle_fullscreen", "⌃F");
+        if (cmd.enabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleFullscreen();
+          return;
+        }
+      }
+
       // Quit the whole app completely
       if (isTriggered("quit", "⌘Q")) {
         e.preventDefault();
@@ -2110,6 +2127,7 @@ function App() {
     handleResetZoom,
     visiblePanel,
     isFullscreen,
+    toggleFullscreen,
     hasBlockingDialog,
     paletteInitialView,
     handleOpenCommandPalette,
@@ -2289,6 +2307,8 @@ function App() {
           onZoomOut={handleZoomOut}
           onResetZoom={handleResetZoom}
           onShowShortcuts={() => setActivePanel("shortcuts")}
+          onToggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
           onTriggerImportFile={handleTriggerImportFile}
           onTriggerViewFile={handleTriggerViewFile}
           zoomLevel={zoomLevel}

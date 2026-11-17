@@ -64,6 +64,7 @@ export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
       { keys: getKeys("history_forward", "⌘]"), description: "Go Forward in History", category: "Navigation & App" },
       { keys: getKeys("settings", "⌘,"), description: "Open Settings / Preferences", category: "Navigation & App" },
       { keys: getKeys("hide", "⌘W"), description: "Hide Window (Run in Background)", category: "Navigation & App" },
+      { keys: getKeys("toggle_fullscreen", "⌃F"), description: "Toggle Fullscreen (Green Button)", category: "Navigation & App" },
       { keys: getKeys("quit", "⌘Q"), description: "Quit rayNote Completely", category: "Navigation & App" },
       { keys: getKeys("open-trash", OPEN_TRASH_HOTKEY), description: "Open Trash", category: "Navigation & App" },
       { keys: getKeys("delete", "⇧⌘⌫"), description: "Move Current Note to Trash", category: "Navigation & App" },

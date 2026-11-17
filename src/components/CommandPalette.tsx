@@ -36,6 +36,7 @@ import {
   Eye,
   Sliders,
   AlertTriangle,
+  Maximize,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
@@ -88,6 +89,8 @@ export interface CommandPaletteProps {
   onResetZoom?: () => void;
   onSetZoom?: (zoom: number) => void;
   onShowShortcuts?: () => void;
+  onToggleFullscreen?: () => void;
+  isFullscreen?: boolean;
   onTriggerImportFile?: () => void;
   onTriggerViewFile?: () => void;
   onPromptClearAllNotes?: () => void;
@@ -138,6 +141,8 @@ export function CommandPalette({
   onResetZoom,
   onSetZoom,
   onShowShortcuts,
+  onToggleFullscreen,
+  isFullscreen,
   onTriggerImportFile,
   onTriggerViewFile,
   onPromptClearAllNotes,
@@ -667,6 +672,18 @@ export function CommandPalette({
       action: () => {
         onClose();
         onShowShortcuts?.();
+      },
+    },
+    {
+      id: "toggle-fullscreen",
+      category: "App Controls",
+      label: isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen",
+      icon: <Maximize size={14} />,
+      shortcut: getShortcut("toggle_fullscreen", "⌃F"),
+      keywords: ["fullscreen", "maximize", "green button", "window", "expand", "screen"],
+      action: () => {
+        onClose();
+        onToggleFullscreen?.();
       },
     },
     {

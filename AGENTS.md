@@ -73,8 +73,9 @@ This document serves as the persistent memory and authoritative architectural re
 | | Switch Conflict Guard | `src/components/SwitchConflictModal.tsx` | Prevents data loss when navigating notes while background saves are pending. |
 | | Markdown File Viewer | `src/components/MarkdownViewerModal.tsx` | Zero-write preview modal for external markdown files dropped onto the app. |
 | | Keyboard Shortcuts Cheat Sheet | `src/components/ShortcutsModal.tsx` | Overlay showing all active app hotkeys. |
+| | Fullscreen & Window Mode | `src/components/TitleBar.tsx`, `src/App.tsx`, `src-tauri/src/commands.rs` | Toggle fullscreen shortcut (`⌃F` / `Control+F` or `✦F`), green window button tooltip, native Cocoa panel zoom. |
 | | Settings Window | `src/SettingsApp.tsx` | Multi-tab settings panel (Appearance, Shortcuts, Database, About). |
-| **Styling & System Integration** | Liquid Glass Theme System | `src/lib/theme.ts`, `src/index.css`, `LIQUID_GLASS_DESIGN_SYSTEM.md` | Apple Liquid Glass translucent materials, dark/light modes, accent colors. |
-| | Settings Sync Bus | `src/lib/settingsSync.ts` | Cross-window broadcast channel and Tauri events syncing settings in real-time. |
+| **Styling & System Integration** | Liquid Glass Theme System | `src/lib/theme.ts`, `src/index.css`, `.agents/skills/liquid-glass-design/SKILL.md` | Apple Liquid Glass translucent materials, dark/light modes, accent colors. |
+| | Settings Sync Bus & Hyper Key | `src/lib/settingsSync.ts`, `src/lib/commandsConfig.ts` | Cross-window broadcast channel, hotkey parsing, Hyper key engine (`✦`, Caps Lock modifier tracking, Karabiner 4-mod support). |
 | | Zoom & Typography | `src/lib/zoom.ts` | Document and UI zoom scaling with memory persistence. |
 | | Native macOS Window Controls | `src-tauri/src/window_geometry.rs` | Frameless window geometry caching, screen snapping, and borderless dragging. |

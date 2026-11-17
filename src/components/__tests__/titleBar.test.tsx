@@ -254,4 +254,49 @@ describe("TitleBar UI Component", () => {
     expect(titleContent).not.toBeNull();
     expect(titleContent?.textContent).toBe("Test Note with Long Title That Should Not Wrap");
   });
+
+  it("renders green fullscreen button with dynamic hotkey tooltip and calls onToggleFullscreen", () => {
+    const onToggleFullscreen = vi.fn();
+    act(() => {
+      root.render(
+        <TitleBar
+          title="Fullscreen Test Note"
+          onToggleFullscreen={onToggleFullscreen}
+          isFullscreen={false}
+          onNewNote={vi.fn()}
+          onOpenCommandPalette={vi.fn()}
+          onDuplicateNote={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onCopyMarkdown={vi.fn()}
+        />
+      );
+    });
+
+    const fullscreenBtn = container.querySelector(".fullscreen-btn") as HTMLButtonElement;
+    expect(fullscreenBtn).not.toBeNull();
+    expect(fullscreenBtn.getAttribute("title")).toBe("Enter fullscreen (⌃F)");
+
+    act(() => {
+      fullscreenBtn.click();
+    });
+    expect(onToggleFullscreen).toHaveBeenCalledTimes(1);
+
+    // When already in fullscreen, title reflects exit
+    act(() => {
+      root.render(
+        <TitleBar
+          title="Fullscreen Test Note"
+          onToggleFullscreen={onToggleFullscreen}
+          isFullscreen={true}
+          onNewNote={vi.fn()}
+          onOpenCommandPalette={vi.fn()}
+          onDuplicateNote={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onCopyMarkdown={vi.fn()}
+        />
+      );
+    });
+
+    expect(fullscreenBtn.getAttribute("title")).toBe("Exit fullscreen (⌃F)");
+  });
 });

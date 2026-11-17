@@ -232,17 +232,96 @@ export interface ParsedHotkey {
   alt: boolean;
   shift: boolean;
   meta: boolean;
+  hyper?: boolean;
   key: string;
+}
+
+let isCapsLockHeld = false;
+
+if (typeof window !== "undefined") {
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.code === "CapsLock" || e.key === "CapsLock") {
+        isCapsLockHeld = true;
+      }
+    },
+    true
+  );
+
+  window.addEventListener(
+    "keyup",
+    (e) => {
+      if (e.code === "CapsLock" || e.key === "CapsLock") {
+        isCapsLockHeld = false;
+      }
+    },
+    true
+  );
+
+  window.addEventListener("blur", () => {
+    isCapsLockHeld = false;
+  });
+}
+
+/**
+ * Manually toggle or set Caps Lock held state (useful for tests and synthetic events).
+ */
+export function setCapsLockHeld(held: boolean) {
+  isCapsLockHeld = held;
+}
+
+/**
+ * Returns whether Hyper key is currently active:
+ * 1. Physical Caps Lock key held down, OR
+ * 2. Karabiner / Hardware Hyper key sending all 4 modifiers (Cmd+Opt+Ctrl+Shift) or 3 modifiers (Cmd+Opt+Ctrl), OR
+ * 3. Synthetic getModifierState("Hyper")
+ */
+export function isHyperActive(e?: KeyboardEvent): boolean {
+  if (isCapsLockHeld) return true;
+  if (!e) return false;
+  if (e.code === "CapsLock" || e.key === "CapsLock") return true;
+
+  // Karabiner/hardware Hyper key sends 4 modifiers (Cmd+Opt+Ctrl+Shift) or 3 modifiers (Cmd+Opt+Ctrl)
+  const is4Mod = e.metaKey && e.altKey && e.ctrlKey && e.shiftKey;
+  const is3Mod = e.metaKey && e.altKey && e.ctrlKey;
+  const isStateHyper = typeof e.getModifierState === "function" && e.getModifierState("Hyper");
+  return Boolean(is4Mod || is3Mod || isStateHyper);
 }
 
 export function parseHotkey(hotkeyStr: string): ParsedHotkey | null {
   if (!hotkeyStr) return null;
-  const ctrl = hotkeyStr.includes("⌃");
-  const alt = hotkeyStr.includes("⌥");
-  const shift = hotkeyStr.includes("⇧");
-  const meta = hotkeyStr.includes("⌘");
 
-  let rawKey = hotkeyStr.replace(/[⌃⌥⇧⌘]/g, "").trim().toLowerCase();
+  const hyper =
+    hotkeyStr.includes("✦") ||
+    hotkeyStr.includes("✧") ||
+    hotkeyStr.includes("⇪") ||
+    /\b(hyper|caps|capslock)\b/i.test(hotkeyStr);
+
+  const ctrl =
+    hotkeyStr.includes("⌃") ||
+    hotkeyStr.includes("^") ||
+    /\b(ctrl|control)\b/i.test(hotkeyStr);
+
+  const alt =
+    hotkeyStr.includes("⌥") ||
+    /\b(alt|opt|option)\b/i.test(hotkeyStr);
+
+  const shift =
+    hotkeyStr.includes("⇧") ||
+    /\bshift\b/i.test(hotkeyStr);
+
+  const meta =
+    hotkeyStr.includes("⌘") ||
+    /\b(cmd|command|meta)\b/i.test(hotkeyStr);
+
+  let rawKey = hotkeyStr
+    .replace(/[⌃⌥⇧⌘✦✧⇪^]/g, "")
+    .replace(/\b(hyper|capslock|caps|control|ctrl|command|cmd|shift|option|opt|alt)\b/gi, "")
+    .replace(/[+-]/g, "")
+    .trim()
+    .toLowerCase();
+
   if (rawKey === "⌫" || rawKey === "backspace") rawKey = "backspace";
   else if (rawKey === "space" || rawKey === "spacebar") rawKey = " ";
   else if (rawKey === "esc" || rawKey === "escape") rawKey = "escape";
@@ -253,7 +332,11 @@ export function parseHotkey(hotkeyStr: string): ParsedHotkey | null {
   else if (rawKey === "←") rawKey = "arrowleft";
   else if (rawKey === "→") rawKey = "arrowright";
 
-  return { ctrl, alt, shift, meta, key: rawKey };
+  const result: ParsedHotkey = { ctrl, alt, shift, meta, key: rawKey };
+  if (hyper) {
+    result.hyper = true;
+  }
+  return result;
 }
 
 export function matchesEvent(e: KeyboardEvent, hotkeyStr: string): boolean {
@@ -261,32 +344,59 @@ export function matchesEvent(e: KeyboardEvent, hotkeyStr: string): boolean {
   const parsed = parseHotkey(hotkeyStr);
   if (!parsed) return false;
 
-  const isMeta = e.metaKey || (e.ctrlKey && !e.metaKey && !parsed.ctrl);
+  const eventKey = e.key.toLowerCase();
+  const codeKey =
+    e.code && e.code.startsWith("Key")
+      ? e.code.replace("Key", "").toLowerCase()
+      : e.code && e.code.startsWith("Digit")
+      ? e.code.replace("Digit", "").toLowerCase()
+      : "";
+
+  const keyMatches =
+    parsed.key === eventKey ||
+    (Boolean(codeKey) && codeKey === parsed.key) ||
+    ((parsed.key === "=" || parsed.key === "+") && (eventKey === "=" || eventKey === "+")) ||
+    ((parsed.key === "/" || parsed.key === "?") && (eventKey === "/" || eventKey === "?"));
+
+  if (!keyMatches) return false;
+
+  // Hyper key matching: if hotkey is defined with Hyper (✦ / Hyper / Caps Lock)
+  if (parsed.hyper) {
+    return isHyperActive(e);
+  }
+
+  // If Hyper (Caps Lock or 4-mod Hyper) is active but this shortcut did NOT ask for Hyper,
+  // do not accidentally trigger standard non-hyper shortcuts unless it explicitly requested all modifiers
+  const hyperNow = isHyperActive(e);
+  if (hyperNow && !parsed.hyper && !(parsed.meta && parsed.alt && parsed.ctrl && parsed.shift)) {
+    return false;
+  }
+
+  // On macOS, Control (⌃) and Command (⌘) are distinct modifier keys
+  const isMac =
+    (typeof process !== "undefined" && process.platform === "darwin") ||
+    (typeof navigator !== "undefined" &&
+      (/Macintosh|Mac OS X|iPhone|iPad/i.test(navigator.userAgent) ||
+        (typeof navigator.platform === "string" && navigator.platform.startsWith("Mac"))));
+
+  const isMeta = isMac
+    ? e.metaKey
+    : e.metaKey || (e.ctrlKey && !e.metaKey && !parsed.ctrl);
+
+  const isCtrl = isMac ? e.ctrlKey : parsed.ctrl ? e.ctrlKey : false;
+
   if (parsed.meta !== isMeta) return false;
   if (parsed.shift !== e.shiftKey) return false;
   if (parsed.alt !== e.altKey) return false;
-  if (parsed.ctrl && !e.ctrlKey) return false;
+  if (parsed.ctrl !== isCtrl) return false;
 
-  const eventKey = e.key.toLowerCase();
-  if (parsed.key === "=" || parsed.key === "+") {
-    return eventKey === "=" || eventKey === "+";
-  }
-  if (parsed.key === "/" || parsed.key === "?") {
-    return eventKey === "/" || eventKey === "?";
-  }
-
-  // Handle macOS Alt/Option key character mutations (e.g. Option+P -> 'π')
-  if (e.code && e.code.startsWith("Key")) {
-    const codeKey = e.code.replace("Key", "").toLowerCase();
-    if (codeKey === parsed.key) {
-      return true;
-    }
-  }
-
-  return eventKey === parsed.key;
+  return true;
 }
 
 export function getKeystrokeModifierString(e: KeyboardEvent): string {
+  if (isHyperActive(e)) {
+    return "✦";
+  }
   let mods = "";
   if (e.ctrlKey) mods += "⌃";
   if (e.altKey) mods += "⌥";
@@ -296,13 +406,19 @@ export function getKeystrokeModifierString(e: KeyboardEvent): string {
 }
 
 export function formatKeystrokeFromEvent(e: KeyboardEvent): { isModifierOnly: boolean; result: string } {
-  const isModifierKey = ["Meta", "Control", "Alt", "Shift"].includes(e.key);
-  const mods = getKeystrokeModifierString(e);
+  const isCaps = e.code === "CapsLock" || e.key === "CapsLock";
+  const isModifierKey = ["Meta", "Control", "Alt", "Shift"].includes(e.key) || isCaps;
+  const hyperNow = isHyperActive(e) || isCaps;
 
   if (isModifierKey) {
+    if (hyperNow) {
+      return { isModifierOnly: true, result: "✦" };
+    }
+    const mods = getKeystrokeModifierString(e);
     return { isModifierOnly: true, result: mods };
   }
 
+  const mods = getKeystrokeModifierString(e);
   let keySymbol = "";
   switch (e.key) {
     case "ArrowUp":

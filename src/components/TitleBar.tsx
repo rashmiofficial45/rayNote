@@ -61,6 +61,7 @@ export function TitleBar({
   const deleteHotkey = getCommandHotkey(commandsConfig, "delete", "⇧⌘⌫").hotkey;
   const commandPaletteHotkey = getCommandHotkey(commandsConfig, "search", "⌘K").hotkey;
   const hideHotkey = getCommandHotkey(commandsConfig, "hide", "⌘W").hotkey;
+  const fullscreenHotkey = getCommandHotkey(commandsConfig, "toggle_fullscreen", "⌃F").hotkey;
 
   // Native drag on mousedown (skip if clicking buttons or the command menu)
   useEffect(() => {
@@ -239,7 +240,7 @@ export function TitleBar({
             type="button"
             className="fullscreen-btn"
             onClick={onToggleFullscreen}
-            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            title={`${isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}${fullscreenHotkey ? ` (${fullscreenHotkey})` : ""}`}
             aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
           >
             {isFullscreen ? (

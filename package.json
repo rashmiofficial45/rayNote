@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "tauri": "node scripts/tauri-wrapper.cjs",
     "test": "vitest run",
-    "test:perf": "npx tsx scripts/run_comprehensive_benchmark_suite.ts",
     "test:regression": "vitest run && pnpm build",
     "dmg:assets": "swift scripts/generate-dmg-assets.swift",
     "build:dmg": "./scripts/package-dmg.sh"

@@ -58,6 +58,7 @@ export const DEFAULT_COMMANDS: CommandRow[] = [
   { id: "shortcuts_help", title: "Shortcuts Cheatsheet", hotkey: "⌘/", enabled: true, category: "commands" },
   { id: "settings", title: "Open Settings", hotkey: "⌘,", enabled: true, category: "commands" },
   { id: "hide", title: "Hide Window", hotkey: "⌘W", enabled: true, category: "commands" },
+  { id: "toggle_fullscreen", title: "Toggle Fullscreen", hotkey: "⌃F", enabled: true, category: "commands" },
   { id: "quit", title: "Quit rayNote", hotkey: "⌘Q", enabled: true, category: "commands" },
   { id: "toggle", title: "rayNote (Toggle Notes)", hotkey: "⌘⇧Space", enabled: true, category: "commands" },
 
@@ -204,11 +205,11 @@ export function splitHotkeyToKeys(hotkey: string): string[] {
   const parts: string[] = [];
   let remaining = hotkey;
 
-  // Extract modifiers in canonical order
-  const modifiers = ["⌃", "⌥", "⇧", "⌘"];
+  // Extract modifiers in canonical order: Hyper first, then standard modifiers
+  const modifiers = ["✦", "✧", "⌃", "⌥", "⇧", "⌘"];
   for (const mod of modifiers) {
     if (remaining.includes(mod)) {
-      parts.push(mod);
+      parts.push(mod === "✧" ? "✦" : mod);
       remaining = remaining.replace(mod, "");
     }
   }

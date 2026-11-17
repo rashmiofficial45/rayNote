@@ -272,7 +272,7 @@ To open the data folder from within the app: **Settings (`⌘,`) → Storage →
 | **Hide window** | `⌘W` |
 | **Quit** | `⌘Q` |
 
-> Full shortcut reference: **In-app `⌘/`** or see [`NOTEFAST_APP_DOCUMENTATION.md`](./NOTEFAST_APP_DOCUMENTATION.md).
+> Full shortcut reference: **In-app `⌘/`** or press `⌘K` for the Command Palette.
 
 ---
 
@@ -326,6 +326,3 @@ This is expected. Rust is compiling all dependencies (including SQLite, objc2, a
 
 MIT — see [`LICENSE`](./LICENSE).
 
----
-
-> **Full architecture documentation, feature inventory, and keyboard shortcut cheatsheet:** [`NOTEFAST_APP_DOCUMENTATION.md`](./NOTEFAST_APP_DOCUMENTATION.md)

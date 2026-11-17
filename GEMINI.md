@@ -11,4 +11,4 @@ See [AGENTS.md](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/AGENTS.md)
    - In-memory note caching ([src/lib/noteCache.ts](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/src/lib/noteCache.ts)) ensures 0ms note switching.
    - Saves are debounced and coordinated via [src/lib/editorFlush.ts](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/src/lib/editorFlush.ts) and [src/lib/saveStatusStore.ts](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/src/lib/saveStatusStore.ts).
 3. **UI / Design**:
-   - Adheres to Apple Liquid Glass design language ([LIQUID_GLASS_DESIGN_SYSTEM.md](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/LIQUID_GLASS_DESIGN_SYSTEM.md)).
+   - Adheres to Apple Liquid Glass design language ([SKILL.md](file:///Users/rashmipersonal/Desktop/MAC Apps/rayNote/.agents/skills/liquid-glass-design/SKILL.md)).

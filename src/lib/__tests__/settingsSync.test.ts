@@ -6,6 +6,8 @@ import {
   formatKeystrokeFromEvent,
   broadcastSync,
   listenToSettingsSync,
+  setCapsLockHeld,
+  isHyperActive,
 } from "../settingsSync";
 
 vi.mock("@tauri-apps/api/event", () => ({
@@ -29,6 +31,20 @@ describe("Settings Synchronization & Keystroke Utilities (settingsSync.ts)", () 
       expect(parseHotkey("⌥D")).toEqual({ ctrl: false, alt: true, shift: false, meta: false, key: "d" });
       expect(parseHotkey("⇧⌘P")).toEqual({ ctrl: false, alt: false, shift: true, meta: true, key: "p" });
       expect(parseHotkey("⌃⌥Space")).toEqual({ ctrl: true, alt: true, shift: false, meta: false, key: " " });
+    });
+
+    it("parses Control key variants: ⌃F, ^F, Control+F", () => {
+      expect(parseHotkey("⌃F")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "f" });
+      expect(parseHotkey("^F")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "f" });
+      expect(parseHotkey("Control+F")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "f" });
+      expect(parseHotkey("Ctrl+F")).toEqual({ ctrl: true, alt: false, shift: false, meta: false, key: "f" });
+    });
+
+    it("parses Hyper key variants: ✦F, Hyper+F, Caps+F, ⇪F", () => {
+      expect(parseHotkey("✦F")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, hyper: true, key: "f" });
+      expect(parseHotkey("Hyper+F")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, hyper: true, key: "f" });
+      expect(parseHotkey("Caps+F")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, hyper: true, key: "f" });
+      expect(parseHotkey("⇪F")).toEqual({ ctrl: false, alt: false, shift: false, meta: false, hyper: true, key: "f" });
     });
 
     it("normalizes special key symbols (backspace, enter, esc, arrows)", () => {
@@ -64,15 +80,80 @@ describe("Settings Synchronization & Keystroke Utilities (settingsSync.ts)", () 
       const event = new KeyboardEvent("keydown", { key: "j", metaKey: true });
       expect(matchesEvent(event, "⌘K")).toBe(false);
     });
+
+    it("matches Control key combinations (⌃F, ^F, Control+F)", () => {
+      const eventCtrlF = new KeyboardEvent("keydown", { key: "f", ctrlKey: true });
+      expect(matchesEvent(eventCtrlF, "⌃F")).toBe(true);
+      expect(matchesEvent(eventCtrlF, "^F")).toBe(true);
+      expect(matchesEvent(eventCtrlF, "Control+F")).toBe(true);
+      expect(matchesEvent(eventCtrlF, "⌘F")).toBe(false);
+    });
+
+    it("matches Hyper key when Caps Lock is held down", () => {
+      expect(isHyperActive()).toBe(false);
+      setCapsLockHeld(true);
+      expect(isHyperActive()).toBe(true);
+      const eventF = new KeyboardEvent("keydown", { key: "f" });
+      expect(matchesEvent(eventF, "✦F")).toBe(true);
+      expect(matchesEvent(eventF, "Hyper+F")).toBe(true);
+      expect(matchesEvent(eventF, "Caps+F")).toBe(true);
+
+      setCapsLockHeld(false);
+      expect(matchesEvent(eventF, "✦F")).toBe(false);
+      expect(isHyperActive()).toBe(false);
+    });
+
+    it("matches Hyper key for hardware/Karabiner 4-modifier combo", () => {
+      const eventHyper = new KeyboardEvent("keydown", {
+        key: "f",
+        metaKey: true,
+        altKey: true,
+        ctrlKey: true,
+        shiftKey: true,
+      });
+      expect(matchesEvent(eventHyper, "✦F")).toBe(true);
+      expect(matchesEvent(eventHyper, "Hyper+F")).toBe(true);
+    });
+
+    it("matches Hyper key for 3-modifier combo (Cmd+Alt+Ctrl)", () => {
+      const eventHyper3 = new KeyboardEvent("keydown", {
+        key: "f",
+        metaKey: true,
+        altKey: true,
+        ctrlKey: true,
+      });
+      expect(matchesEvent(eventHyper3, "✦F")).toBe(true);
+    });
   });
 
   describe("Keystroke Formatting (formatKeystrokeFromEvent)", () => {
-    it("identifies modifier-only key events", () => {
+    it("identifies modifier-only key events including CapsLock (Hyper)", () => {
       const metaEvt = new KeyboardEvent("keydown", { key: "Meta", metaKey: true });
       expect(formatKeystrokeFromEvent(metaEvt)).toEqual({ isModifierOnly: true, result: "⌘" });
 
       const altEvt = new KeyboardEvent("keydown", { key: "Alt", altKey: true });
       expect(formatKeystrokeFromEvent(altEvt)).toEqual({ isModifierOnly: true, result: "⌥" });
+
+      const capsEvt = new KeyboardEvent("keydown", { key: "CapsLock", code: "CapsLock" });
+      expect(formatKeystrokeFromEvent(capsEvt)).toEqual({ isModifierOnly: true, result: "✦" });
+    });
+
+    it("formats Hyper combinations with CapsLock held", () => {
+      setCapsLockHeld(true);
+      const evt = new KeyboardEvent("keydown", { key: "f" });
+      expect(formatKeystrokeFromEvent(evt)).toEqual({ isModifierOnly: false, result: "✦F" });
+      setCapsLockHeld(false);
+    });
+
+    it("formats Hyper combinations with 4 hardware modifiers", () => {
+      const evt = new KeyboardEvent("keydown", {
+        key: "k",
+        metaKey: true,
+        altKey: true,
+        ctrlKey: true,
+        shiftKey: true,
+      });
+      expect(formatKeystrokeFromEvent(evt)).toEqual({ isModifierOnly: false, result: "✦K" });
     });
 
     it("formats combinations with standard and special keys", () => {
