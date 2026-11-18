@@ -129,27 +129,23 @@ export const ShortcutsExtension = Extension.create({
       "Mod-Shift--": () => this.editor.commands.setHorizontalRule(),
       "Mod-_": () => this.editor.commands.setHorizontalRule(),
 
-      // Links: ⌘L or ⇧⌘K
+      // Insert or edit a link with ⌘L. ⌘K belongs to the command palette.
       "Mod-l": () => {
-        const previousUrl = this.editor.getAttributes("link").href;
-        const url = window.prompt("Enter URL:", previousUrl || "");
-        if (url === null) return true;
-        if (url.trim() === "") {
-          this.editor.chain().focus().unsetLink().run();
-        } else {
-          this.editor.chain().focus().setLink({ href: url.trim() }).run();
-        }
+        if (!this.editor.isEditable) return true;
+        window.dispatchEvent(
+          new CustomEvent("raynote:open-link-popover", {
+            detail: { mode: "edit" },
+          })
+        );
         return true;
       },
       "Mod-Shift-k": () => {
-        const previousUrl = this.editor.getAttributes("link").href;
-        const url = window.prompt("Enter URL:", previousUrl || "");
-        if (url === null) return true;
-        if (url.trim() === "") {
-          this.editor.chain().focus().unsetLink().run();
-        } else {
-          this.editor.chain().focus().setLink({ href: url.trim() }).run();
-        }
+        if (!this.editor.isEditable) return true;
+        window.dispatchEvent(
+          new CustomEvent("raynote:open-link-popover", {
+            detail: { mode: "edit" },
+          })
+        );
         return true;
       },
 

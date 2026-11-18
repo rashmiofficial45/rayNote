@@ -144,7 +144,7 @@ export function EditorContextMenu({
         {
           id: "editLink",
           label: "Edit Link",
-          shortcut: "⌘K",
+          shortcut: "⌘L",
           icon: <Link2 size={13} />,
           action: "link",
           disabled: !isEditable,
@@ -287,7 +287,7 @@ export function EditorContextMenu({
 
     // ── Context: Text Selected (Menu A) ──────────────────────
     if (menuState.type === "text-selected") {
-      return [
+      const items: (MenuItemDef | "separator")[] = [
         {
           id: "cut",
           label: "Cut",
@@ -311,6 +311,28 @@ export function EditorContextMenu({
           action: "paste",
           disabled: !isEditable,
         },
+        "separator",
+        {
+          id: "link",
+          label: menuState.hasLinkInSelection ? "Edit Link" : "Add Link",
+          shortcut: "⌘L",
+          icon: <Link2 size={13} />,
+          action: "link",
+          disabled: !isEditable,
+        },
+      ];
+
+      if (menuState.hasLinkInSelection) {
+        items.push({
+          id: "removeLink",
+          label: "Remove Link",
+          icon: <Trash2 size={13} />,
+          action: "removeLink",
+          disabled: !isEditable,
+        });
+      }
+
+      items.push(
         "separator",
         {
           id: "bold",
@@ -354,8 +376,10 @@ export function EditorContextMenu({
           active: menuState.isTaskList,
           action: "taskList",
           disabled: !isEditable,
-        },
-      ];
+        }
+      );
+
+      return items;
     }
 
     // ── Context: No Selection (Menu B - Compact) ─────────────

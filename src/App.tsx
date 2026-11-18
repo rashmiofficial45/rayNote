@@ -1875,6 +1875,12 @@ function App() {
 
       // Command Palette (Cmd+K)
       if (isTriggered("search", "⌘K")) {
+        const active = document.activeElement;
+        const isEditingInEditor = Boolean(active?.closest(".tiptap"));
+        if (isEditingInEditor) {
+          // Handled by editor link insertion/edit popover
+          return;
+        }
         e.preventDefault();
         if (hasBlockingDialog) {
           e.stopPropagation();
@@ -2138,6 +2144,17 @@ function App() {
     closeFind,
   ]);
 
+  useEffect(() => {
+    const handleNavigateNoteEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ noteId?: string }>).detail;
+      if (detail?.noteId) {
+        handleSelectNote(detail.noteId);
+      }
+    };
+    window.addEventListener("raynote:navigate-note", handleNavigateNoteEvent);
+    return () => window.removeEventListener("raynote:navigate-note", handleNavigateNoteEvent);
+  }, [handleSelectNote]);
+
   if (isLoading) {
     return (
       <div className="app-shell flex items-center justify-center">
@@ -2276,6 +2293,7 @@ function App() {
           showBlockControls={isFullscreen && !visiblePanel && !hasBlockingDialog && !moveToTrash}
           isFindOpen={visiblePanel === "find"}
           onCloseFind={closeFind}
+          onNavigateToNote={handleSelectNote}
         />
       </div>
 

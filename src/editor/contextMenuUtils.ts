@@ -4,7 +4,7 @@ import { blockSelectionPluginKey, deleteSelectedBlocks } from "../extensions/Blo
 import { smartToggleBlockFormat, smartToggleMark } from "./formatMemory";
 import { copyToClipboard, readFromClipboard } from "../lib/clipboard";
 import { sliceToMarkdown } from "./markdownUtils";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { safeOpenUrl } from "../lib/linkUtils";
 
 export type ContextMenuType =
   | "text-selected"
@@ -20,6 +20,7 @@ export interface ContextMenuState {
   y: number;
   savedSelection: { from: number; to: number };
   linkHref?: string;
+  hasLinkInSelection?: boolean;
   codeBlockText?: string;
   codeBlockRange?: { from: number; to: number };
   taskItemPos?: number;
@@ -103,11 +104,28 @@ export function resolveContextMenuState(
   if (hasTextSelection) {
     if (targetPos >= currentSelection.from && targetPos <= currentSelection.to) {
       // Right click inside existing selection: preserve selection!
+      const hasLinkInSelection = Boolean(
+        state.schema.marks.link &&
+        doc.rangeHasMark(currentSelection.from, currentSelection.to, state.schema.marks.link)
+      );
+      let linkHref: string | undefined = undefined;
+      if (hasLinkInSelection) {
+        doc.nodesBetween(currentSelection.from, currentSelection.to, (node) => {
+          const mark = node.marks?.find((m) => m.type.name === "link");
+          if (mark) {
+            linkHref = mark.attrs.href;
+            return false;
+          }
+        });
+      }
+
       return {
         type: "text-selected",
         x: coords.x,
         y: coords.y,
         savedSelection: { from: currentSelection.from, to: currentSelection.to },
+        hasLinkInSelection,
+        linkHref,
         canUndo: editor.can().undo(),
         canRedo: editor.can().redo(),
         isBold: editor.isActive("bold"),
@@ -319,21 +337,18 @@ export async function executeContextMenuAction(
     }
 
     case "link": {
-      const prevUrl = state.linkHref || (editor.getAttributes("link").href as string) || "";
-      const url = window.prompt("Enter URL:", prevUrl);
-      if (url === null) return;
-      if (url.trim() === "") {
-        editor.chain().focus().unsetLink().run();
-      } else {
-        editor.chain().focus().setLink({ href: url.trim() }).run();
-      }
+      window.dispatchEvent(
+        new CustomEvent("raynote:open-link-popover", {
+          detail: { mode: "edit" },
+        })
+      );
       break;
     }
 
     case "openLink": {
       const href = state.linkHref || (editor.getAttributes("link").href as string);
       if (href) {
-        openUrl(href).catch(() => window.open(href, "_blank"));
+        safeOpenUrl(href);
       }
       break;
     }

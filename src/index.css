@@ -840,6 +840,16 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
 }
 
 /* ── Command Popover ─────────────────────────────────── */
+.raynote-link-popover {
+  animation: overlayIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top center;
+  pointer-events: auto;
+}
+
+.raynote-link-popover input:focus {
+  box-shadow: 0 0 0 2px var(--color-accent-subtle, rgba(108, 92, 231, 0.25));
+}
+
 .command-popover {
   position: absolute;
   top: calc(100% + 6px);
@@ -6976,3 +6986,72 @@ body:has(.command-overlay) .editor-char-count {
 .image-action-glass.image-action-compact { inset: 6px 6px auto auto; padding: 2px; border-radius: 999px; }
 .image-action-glass.image-action-compact .image-delete-action { width: 28px; min-width: 28px; height: 28px; }
 .image-action-glass.image-action-compact .image-delete-action svg { width: 14px; height: 14px; }
+
+/* Link controls float above the note as a single translucent surface. */
+.raynote-link-popover {
+  position: fixed;
+  z-index: 10005;
+  --link-glass: rgba(14, 17, 25, .52);
+  --link-sheen: rgba(220, 234, 255, .16);
+  --link-edge: rgba(255, 255, 255, .26);
+  --link-field: rgba(255, 255, 255, .07);
+  --link-text: #f7f8fb;
+  --link-muted: #d8e0ec;
+  color: var(--link-text);
+}
+[data-theme="light"] .raynote-link-popover {
+  --link-glass: rgba(250, 252, 255, .56);
+  --link-sheen: rgba(255, 255, 255, .28);
+  --link-edge: rgba(65, 82, 105, .24);
+  --link-field: rgba(58, 75, 99, .05);
+  --link-text: #172233;
+  --link-muted: #35455a;
+}
+.link-preview-glass, .link-editor-glass {
+  box-sizing: border-box;
+  color: var(--link-text);
+  background: linear-gradient(155deg, var(--link-sheen), transparent 65%), var(--link-glass);
+  border: 1px solid var(--link-edge);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .32);
+  -webkit-backdrop-filter: blur(5px) saturate(155%);
+  backdrop-filter: blur(5px) saturate(155%);
+}
+.link-preview-glass { display: flex; align-items: center; gap: 8px; width: min(380px, calc(100vw - 24px)); padding: 6px; border-radius: 22px; }
+.link-preview-label { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; padding-left: 8px; font-size: 12px; }
+.link-preview-label span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--link-text); }
+.link-preview-actions, .link-editor-footer-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.raynote-link-popover button { display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; border: 0; cursor: pointer; color: var(--link-text); }
+.link-preview-actions button, .link-editor-header button { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: transparent; }
+.raynote-link-popover button:hover { background: var(--link-field); }
+.raynote-link-popover button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.link-editor-glass {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 3.5vh, 14px);
+  width: min(clamp(300px, 55vw, 400px), calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  padding: clamp(12px, 3.5vw, 16px);
+  border-radius: 22px;
+  font-size: 12px;
+}
+.link-editor-header { display: flex; align-items: center; justify-content: space-between; }
+.link-editor-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 650; }
+.link-editor-title svg { color: var(--color-accent); }
+.link-editor-fields { display: flex; flex-direction: column; gap: 12px; }
+.link-editor-field { display: flex; flex-direction: column; gap: 6px; }
+.link-editor-field label { color: var(--link-muted); font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.link-editor-field input { box-sizing: border-box; width: 100%; min-width: 0; height: 36px; padding: 0 10px; border: 1px solid var(--link-edge); border-radius: 10px; background: var(--link-field); color: var(--link-text); font-size: 12px; }
+.link-editor-field input::placeholder { color: var(--link-muted); }
+.link-editor-field input:focus { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.link-editor-footer { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--link-edge); color: var(--link-muted); }
+.link-editor-footer button { min-height: 32px; padding: 0 12px; border-radius: 10px; background: transparent; font-size: 12px; font-weight: 600; }
+.link-editor-footer button[data-action="unlink"] { color: #ef5057; }
+.link-editor-footer button[data-action="apply"] { background: var(--color-accent); color: white; }
+.link-editor-footer button[data-action="apply"]:hover { filter: brightness(1.1); }
+@media (prefers-reduced-transparency: reduce) {
+  .link-preview-glass, .link-editor-glass { background: var(--surface-glass-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .link-preview-glass, .link-editor-glass { background: var(--surface-glass-elevated); }
+}

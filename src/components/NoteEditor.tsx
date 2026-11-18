@@ -20,6 +20,7 @@ interface NoteEditorProps {
   isFullscreen?: boolean;
   isFindOpen?: boolean;
   onCloseFind?: () => void;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
 export function NoteEditor({
@@ -40,6 +41,7 @@ export function NoteEditor({
   isFullscreen,
   isFindOpen,
   onCloseFind,
+  onNavigateToNote,
 }: NoteEditorProps) {
   if (!noteId) {
     const emptyLibrary = hasNotes === false;
@@ -92,6 +94,7 @@ export function NoteEditor({
         isFullscreen={isFullscreen}
         isFindOpen={isFindOpen}
         onCloseFind={onCloseFind}
+        onNavigateToNote={onNavigateToNote}
       />
     </div>
   );

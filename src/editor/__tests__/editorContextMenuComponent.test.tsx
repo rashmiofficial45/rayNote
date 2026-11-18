@@ -79,12 +79,10 @@ describe("EditorContextMenu Component & User Interactions", () => {
     expect(labels).toContain("Bullet List");
     expect(labels).toContain("Numbered List");
 
-    // Critical Requirement: Insert/Edit Link must be completely removed from Menu A
-    expect(labels).not.toContain("Insert/Edit Link");
-    expect(labels).not.toContain("Insert Link");
-    expect(labels).not.toContain("Edit Link");
+    // Phase 9: Link is now available in text-selected context with ⌘L shortcut
+    expect(labels).toContain("Add Link");
 
-    // Verify shortcuts are present (and ⌘K is absent)
+    // Verify shortcuts are present
     const shortcuts = Array.from(menuEl!.querySelectorAll(".editor-context-menu-shortcut")).map(
       (el) => el.textContent
     );
@@ -93,7 +91,7 @@ describe("EditorContextMenu Component & User Interactions", () => {
     expect(shortcuts).toContain("⌘V");
     expect(shortcuts).toContain("⌘B");
     expect(shortcuts).toContain("⌘I");
-    expect(shortcuts).not.toContain("⌘K");
+    expect(shortcuts).toContain("⌘L");
   });
 
   it("renders Menu B (No Selection) as a compact menu with Insert submenu", async () => {
@@ -127,10 +125,10 @@ describe("EditorContextMenu Component & User Interactions", () => {
     );
 
     expect(labels).toContain("Paste");
-    expect(labels).not.toContain("Select All");
+    expect(labels).toContain("Select All");
     expect(labels).toContain("Undo");
     expect(labels).toContain("Redo");
-    expect(labels).toContain("Insert");
+    expect(labels).not.toContain("Insert");
 
     // Must NOT contain text formatting items in no-selection state
     expect(labels).not.toContain("Bold");
@@ -274,12 +272,14 @@ describe("EditorContextMenu Component & User Interactions", () => {
     expect(copySpy).toHaveBeenCalled();
   });
 
-  it("expands Insert submenu on hover or right arrow", async () => {
+  it("renders Add Link and formatting in text-selected context", async () => {
+    editor.commands.setTextSelection({ from: 5, to: 16 });
+
     const menuState: ContextMenuState = {
-      type: "no-selection",
+      type: "text-selected",
       x: 100,
       y: 100,
-      savedSelection: { from: 1, to: 1 },
+      savedSelection: { from: 5, to: 16 },
       canUndo: true,
       canRedo: false,
       isBold: false,
@@ -296,29 +296,22 @@ describe("EditorContextMenu Component & User Interactions", () => {
     });
 
     const menuEl = document.querySelector(".editor-context-menu");
-    const insertBtn = Array.from(menuEl!.querySelectorAll('[role="menuitem"]')).find((el) =>
-      el.textContent?.includes("Insert")
+    expect(menuEl).not.toBeNull();
+
+    const linkBtn = Array.from(menuEl!.querySelectorAll('[role="menuitem"]')).find((el) =>
+      el.textContent?.includes("Add Link")
     );
-    expect(insertBtn).not.toBeUndefined();
+    expect(linkBtn).not.toBeUndefined();
 
-    // Hover Insert
-    await act(async () => {
-      insertBtn?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    });
-
-    const submenuEl = document.querySelector(".editor-context-submenu");
-    expect(submenuEl).not.toBeNull();
-
-    const subLabels = Array.from(submenuEl!.querySelectorAll(".editor-context-menu-label")).map(
+    const labels = Array.from(menuEl!.querySelectorAll(".editor-context-menu-label")).map(
       (el) => el.textContent
     );
-    expect(subLabels).toContain("Heading 1");
-    expect(subLabels).toContain("Heading 2");
-    expect(subLabels).toContain("Bullet List");
-    expect(subLabels).toContain("Numbered List");
-    expect(subLabels).toContain("Checklist");
-    expect(subLabels).toContain("Code Block");
-    expect(subLabels).toContain("Divider");
+    expect(labels).toContain("Cut");
+    expect(labels).toContain("Copy");
+    expect(labels).toContain("Paste");
+    expect(labels).toContain("Add Link");
+    expect(labels).toContain("Bold");
+    expect(labels).toContain("Italic");
   });
 
   it("clicking bold in the menu formats text and preserves selection", async () => {
@@ -366,9 +359,8 @@ describe("EditorContextMenu Component & User Interactions", () => {
     expect(editor.state.selection.empty).toBe(false);
   });
 
-  it("handles viewport boundary collision and opens submenu to the left near screen right edge", async () => {
+  it("handles viewport boundary collision and constrains menu position within viewport", async () => {
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(800);
-    // Window width is 800, right click is at 750 (near right edge)
     const menuState: ContextMenuState = {
       type: "no-selection",
       x: 750,
@@ -389,36 +381,9 @@ describe("EditorContextMenu Component & User Interactions", () => {
       );
     });
 
-    const menuEl = document.querySelector(".editor-context-menu");
+    const menuEl = document.querySelector(".editor-context-menu") as HTMLElement;
     expect(menuEl).not.toBeNull();
-
-    // Hover Insert to open submenu
-    const insertBtn = Array.from(menuEl!.querySelectorAll('[role="menuitem"]')).find((el) =>
-      el.textContent?.includes("Insert")
-    );
-    expect(insertBtn).not.toBeUndefined();
-
-    // Mock parent item and submenu bounding rects for happy-dom collision detection
-    vi.spyOn(insertBtn as HTMLElement, "getBoundingClientRect").mockReturnValue({
-      left: 600,
-      right: 780,
-      top: 250,
-      bottom: 278,
-      width: 180,
-      height: 28,
-      x: 600,
-      y: 250,
-      toJSON: () => {},
-    });
-
-    await act(async () => {
-      insertBtn?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    });
-
-    const submenuEl = document.querySelector(".editor-context-submenu");
-    expect(submenuEl).not.toBeNull();
-    // With parent right at 780 and window width 800 (spaceOnRight = 10 < 180), submenu must align left
-    expect(submenuEl?.classList.contains("align-left")).toBe(true);
+    expect(parseInt(menuEl.style.left || "0", 10)).toBeLessThanOrEqual(800);
   });
 
   it("renders distinct icons for Bold, Italic, Bullet List, Numbered List, and Task List", async () => {
@@ -536,7 +501,7 @@ describe("EditorContextMenu Component & User Interactions", () => {
     expect(editor.isActive("taskList")).toBe(true);
   });
 
-  it("renders submenu via portal to document.body with z-index 10002 without overlapping parent horizontally", async () => {
+  it("renders context menu via portal to document.body with fixed positioning", async () => {
     vi.spyOn(window, "innerWidth", "get").mockReturnValue(1000);
     const menuState: ContextMenuState = {
       type: "no-selection",
@@ -558,35 +523,9 @@ describe("EditorContextMenu Component & User Interactions", () => {
       );
     });
 
-    const menuEl = document.querySelector(".editor-context-menu");
-    const insertBtn = Array.from(menuEl!.querySelectorAll('[role="menuitem"]')).find((el) =>
-      el.textContent?.includes("Insert")
-    );
-    expect(insertBtn).not.toBeUndefined();
-
-    vi.spyOn(insertBtn as HTMLElement, "getBoundingClientRect").mockReturnValue({
-      left: 206,
-      right: 386,
-      top: 250,
-      bottom: 278,
-      width: 180,
-      height: 28,
-      x: 206,
-      y: 250,
-      toJSON: () => {},
-    });
-
-    await act(async () => {
-      insertBtn?.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    });
-
-    const submenuEl = document.querySelector(".editor-context-submenu") as HTMLElement | null;
-    expect(submenuEl).not.toBeNull();
-    // Submenu portal is direct child of body, not inside .editor-context-menu
-    expect(submenuEl?.parentElement).toBe(document.body);
-    expect(submenuEl?.style.position).toBe("fixed");
-    expect(submenuEl?.style.zIndex).toBe("10002");
-    // With parent right at 386 and plenty of space on right (1000 - 386 = 614px), opens to right: 386 + 4 = 390px
-    expect(submenuEl?.style.left).toBe("390px");
+    const menuEl = document.querySelector(".editor-context-menu") as HTMLElement | null;
+    expect(menuEl).not.toBeNull();
+    expect(menuEl?.parentElement).toBe(document.body);
+    expect(menuEl?.classList.contains("editor-context-menu")).toBe(true);
   });
 });

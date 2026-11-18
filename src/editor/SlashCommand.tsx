@@ -33,6 +33,7 @@ import {
   Highlighter,
   Table as TableIcon,
   Image as ImageIcon,
+  Link2,
 } from "lucide-react";
 
 export interface CommandItem {
@@ -271,6 +272,21 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
         .deleteRange(range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run();
+    },
+  },
+  {
+    id: "link",
+    title: "Link",
+    badge: "link",
+    aliases: ["link", "url", "href", "hyperlink"],
+    icon: <Link2 size={13} />,
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      window.dispatchEvent(
+        new CustomEvent("raynote:open-link-popover", {
+          detail: { mode: "edit" },
+        })
+      );
     },
   },
 ];

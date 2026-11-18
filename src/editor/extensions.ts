@@ -26,6 +26,8 @@ import { ClickSelectionExtension } from "./clickSelectionExtension";
 import { PasteTitleExtension, PasteTitleOptions, isDefaultTitle } from "./pasteTitleExtension";
 import { FormatMemoryExtension } from "./formatMemory";
 import { ImageExtension } from "./ImageExtension";
+import { isSafeUrl } from "../lib/linkUtils";
+import { InternalNoteLink } from "./InternalNoteLink";
 
 
 function enhancedBash(hljs: any) {
@@ -377,11 +379,15 @@ export function getExtensions(
       autolink: true,
       linkOnPaste: true,
       defaultProtocol: 'https',
+      protocols: ['http', 'https', 'mailto', 'tel', 'raynote', 'notefast'],
+      isAllowedUri: (url) => isSafeUrl(url),
+      shouldAutoLink: (url) => isSafeUrl(url),
       HTMLAttributes: {
         class: 'editor-link',
-        title: 'Click to open link in browser',
+        rel: 'noopener noreferrer',
       },
     }),
+    InternalNoteLink,
     Markdown.configure({
       indentation: {
         style: 'space',

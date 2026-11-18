@@ -19,7 +19,6 @@ import { Extension } from "@tiptap/core";
 import { Plugin } from "@tiptap/pm/state";
 import { useEditor, EditorContent } from "@tiptap/react";
 import { useEffect, useRef, useCallback, useState, useMemo, memo } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getExtensions } from "./extensions";
 import { SlashCommand } from "./SlashCommand";
@@ -45,6 +44,8 @@ import { clearActiveNoteSnapshot } from "../lib/storage";
 import { preloadLanguagesForContent, scanCodeBlockLanguages, ensureLanguageLoaded } from "./extensions";
 import { EditorContextMenu } from "./EditorContextMenu";
 import { resolveContextMenuState, ContextMenuState } from "./contextMenuUtils";
+import { LinkPopover, LinkPopoverData } from "./LinkPopover";
+import { safeOpenUrl } from "../lib/linkUtils";
 
 export interface EditorCharCountProps {
   editor: any;
@@ -162,6 +163,7 @@ interface EditorProps {
   isFindOpen?: boolean;
   onCloseFind?: () => void;
   onEditorReady?: (editor: any) => void;
+  onNavigateToNote?: (noteId: string) => void;
 }
 
 /**
@@ -235,6 +237,7 @@ export function Editor({
   isFindOpen,
   onCloseFind,
   onEditorReady,
+  onNavigateToNote,
 }: EditorProps) {
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstPendingChangeTimeRef = useRef<number | null>(null);
@@ -259,8 +262,19 @@ export function Editor({
   onSwitchConflictRef.current = onSwitchConflict;
   const discardedNoteIdRef = useRef(discardedNoteId);
   discardedNoteIdRef.current = discardedNoteId;
+  const onNavigateToNoteRef = useRef(onNavigateToNote);
+  onNavigateToNoteRef.current = onNavigateToNote;
 
   const [contextMenuState, setContextMenuState] = useState<ContextMenuState | null>(null);
+  const [linkPopover, setLinkPopover] = useState<{
+    isOpen: boolean;
+    mode: "preview" | "edit";
+    data: LinkPopoverData | null;
+  }>({
+    isOpen: false,
+    mode: "preview",
+    data: null,
+  });
   const [readOnly, setReadOnly] = useState(false);
   const readOnlyRef = useRef(false);
   const applyingDocumentRef = useRef(false);
@@ -279,12 +293,98 @@ export function Editor({
 
   useEffect(() => {
     setContextMenuState(null);
+    setLinkPopover({ isOpen: false, mode: "preview", data: null });
   }, [noteId]);
 
   const currentTitleRef = useRef<string>(noteTitle || "");
   useEffect(() => {
     currentTitleRef.current = noteTitle || "";
   }, [noteTitle]);
+
+  const openLinkPopover = useCallback((mode: "preview" | "edit" = "edit") => {
+    const editor = editorRef.current;
+    if (!editor || editor.isDestroyed) return;
+    if (readOnlyRef.current || !editor.isEditable) return;
+
+    const { state } = editor;
+    const { selection, doc } = state;
+    const { from, to, empty } = selection;
+
+    // Check if caret or selection is inside a link mark
+    const $from = doc.resolve(from);
+    const linkMark = $from.marks().find((m: any) => m.type.name === "link");
+
+    if (linkMark) {
+      let start = from;
+      let end = to;
+      $from.parent.forEach((child: any, offset: number) => {
+        if (child.marks.some((m: any) => m.type.name === "link" && m.attrs.href === linkMark.attrs.href)) {
+          const nodeStart = $from.start() + offset;
+          const nodeEnd = nodeStart + child.nodeSize;
+          if (nodeStart <= from && nodeEnd >= from) {
+            start = nodeStart;
+            end = nodeEnd;
+          }
+        }
+      });
+
+      const linkText = doc.textBetween(start, end, " ");
+      setLinkPopover({
+        isOpen: true,
+        mode,
+        data: {
+          text: linkText,
+          href: (linkMark.attrs.href as string) || "",
+          from: start,
+          to: end,
+          isNew: false,
+        },
+      });
+      return;
+    }
+
+    if (!empty) {
+      const selectedText = doc.textBetween(from, to, " ");
+      setLinkPopover({
+        isOpen: true,
+        mode: "edit",
+        data: {
+          text: selectedText,
+          href: "",
+          from,
+          to,
+          isNew: false,
+        },
+      });
+      return;
+    }
+
+    // No selection, no link: insert at caret
+    setLinkPopover({
+      isOpen: true,
+      mode: "edit",
+      data: {
+        text: "",
+        href: "",
+        from,
+        to,
+        isNew: true,
+      },
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleOpenLinkPopoverEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ mode?: "preview" | "edit" }>).detail;
+      const mode = detail?.mode || "edit";
+      openLinkPopover(mode);
+    };
+
+    window.addEventListener("raynote:open-link-popover", handleOpenLinkPopoverEvent);
+    return () => {
+      window.removeEventListener("raynote:open-link-popover", handleOpenLinkPopoverEvent);
+    };
+  }, [openLinkPopover]);
 
   // Track the active note ID internally to identify transitions (starts null so initial note mounts cleanly)
   const currentNoteIdRef = useRef<string | null>(null);
@@ -1252,12 +1352,58 @@ export function Editor({
       if (!link) return;
 
       const href = link.getAttribute("href");
-      if (href && href !== "#") {
-        e.preventDefault();
-        e.stopPropagation();
-        openUrl(href).catch((err) => {
-          console.warn("Could not open URL via tauri opener, fallback to window.open", err);
-          window.open(href, "_blank");
+      if (!href || href === "#") return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isMetaOrCtrl = e.metaKey || e.ctrlKey;
+      const isReadOnly = readOnlyRef.current || !editorRef.current?.isEditable;
+
+      // In read-only mode OR on Cmd/Ctrl+Click in edit mode: open destination directly
+      if (isReadOnly || isMetaOrCtrl) {
+        safeOpenUrl(href, { onNavigateNote: onNavigateToNoteRef.current });
+        return;
+      }
+
+      // In edit mode without Cmd key: preview the link in the popover
+      if (editorRef.current && !editorRef.current.isDestroyed) {
+        const view = editorRef.current.view;
+        let linkFrom = 0;
+        let linkTo = 0;
+        try {
+          const pos = view.posAtDOM(link, 0);
+          const $pos = view.state.doc.resolve(pos);
+          let start = pos;
+          let end = pos;
+          $pos.parent.forEach((child: any, offset: number) => {
+            if (child.marks.some((m: any) => m.type.name === "link" && m.attrs.href === href)) {
+              const nodeStart = $pos.start() + offset;
+              const nodeEnd = nodeStart + child.nodeSize;
+              if (nodeStart <= pos && nodeEnd >= pos) {
+                start = nodeStart;
+                end = nodeEnd;
+              }
+            }
+          });
+          linkFrom = start;
+          linkTo = end;
+        } catch {
+          linkFrom = view.state.selection.from;
+          linkTo = view.state.selection.to;
+        }
+
+        setLinkPopover({
+          isOpen: true,
+          mode: "preview",
+          data: {
+            text: link.textContent || "",
+            href,
+            from: linkFrom,
+            to: linkTo,
+            anchorEl: link,
+            isNew: false,
+          },
         });
       }
     };
@@ -1527,6 +1673,15 @@ export function Editor({
         readOnly={readOnly}
         onToggleReadOnly={toggleReadOnly}
         onClose={() => setContextMenuState(null)}
+      />
+      <LinkPopover
+        editor={editor}
+        isOpen={linkPopover.isOpen}
+        mode={linkPopover.mode}
+        linkData={linkPopover.data}
+        onClose={() => setLinkPopover((prev) => ({ ...prev, isOpen: false }))}
+        onNavigateNote={onNavigateToNoteRef.current}
+        onSwitchToEdit={() => setLinkPopover((prev) => ({ ...prev, mode: "edit" }))}
       />
     </div>
   );
