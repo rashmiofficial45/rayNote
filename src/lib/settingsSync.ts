@@ -318,9 +318,14 @@ export function parseHotkey(hotkeyStr: string): ParsedHotkey | null {
   let rawKey = hotkeyStr
     .replace(/[⌃⌥⇧⌘✦✧⇪^]/g, "")
     .replace(/\b(hyper|capslock|caps|control|ctrl|command|cmd|shift|option|opt|alt)\b/gi, "")
-    .replace(/[+-]/g, "")
     .trim()
     .toLowerCase();
+
+  // Separators may precede the key, but a trailing + or - can itself be the key.
+  if (rawKey.length > 1) {
+    const last = rawKey[rawKey.length - 1];
+    rawKey = last === "+" || last === "-" ? last : rawKey.replace(/[+-]/g, "").trim();
+  }
 
   if (rawKey === "⌫" || rawKey === "backspace") rawKey = "backspace";
   else if (rawKey === "space" || rawKey === "spacebar") rawKey = " ";

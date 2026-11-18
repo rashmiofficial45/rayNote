@@ -1,5 +1,20 @@
 import { Node, InputRule } from "@tiptap/react";
-import { TextSelection, EditorState, Transaction } from "@tiptap/pm/state";
+import { TextSelection, NodeSelection, Plugin, EditorState, Transaction } from "@tiptap/pm/state";
+
+/** Move into a paragraph directly after a divider, creating one if needed. */
+export function selectParagraphAfterDivider(tr: Transaction, dividerPos: number): boolean {
+  const divider = tr.doc.nodeAt(dividerPos);
+  if (divider?.type.name !== "horizontalRule") return false;
+  const after = dividerPos + divider.nodeSize;
+  const $after = tr.doc.resolve(after);
+  if ($after.nodeAfter?.type.name !== "paragraph") {
+    const paragraph = tr.doc.type.schema.nodes.paragraph;
+    if (!paragraph || !$after.parent.canReplaceWith($after.index(), $after.index(), paragraph)) return false;
+    tr.insert(after, paragraph.create());
+  }
+  tr.setSelection(TextSelection.create(tr.doc, after + 1));
+  return true;
+}
 
 /**
  * Smart Horizontal Rule insertion:
@@ -163,6 +178,33 @@ export const HorizontalRuleExtension = Node.create({
     };
   },
 
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        handleTextInput(view, _from, _to, text) {
+          const { selection } = view.state;
+          if (!(selection instanceof NodeSelection) || selection.node.type.name !== "horizontalRule") return false;
+          const tr = view.state.tr;
+          if (!selectParagraphAfterDivider(tr, selection.from)) return false;
+          view.dispatch(tr.insertText(text).scrollIntoView());
+          return true;
+        },
+        handleDOMEvents: {
+          beforeinput(view, event) {
+            const { selection } = view.state;
+            if (!event.inputType.startsWith("insert") ||
+                !(selection instanceof NodeSelection) ||
+                selection.node.type.name !== "horizontalRule") return false;
+            const tr = view.state.tr;
+            if (!selectParagraphAfterDivider(tr, selection.from)) return false;
+            view.dispatch(tr.scrollIntoView());
+            return false;
+          },
+        },
+      },
+    })];
+  },
+
   addKeyboardShortcuts() {
     return {
       "Mod-Alt--": () => this.editor.commands.setHorizontalRule(),
@@ -176,8 +218,6 @@ export const HorizontalRuleExtension = Node.create({
         if (
           text === "---" ||
           text === "—-" ||
-          text === "——" ||
-          text === "—" ||
           text === "***" ||
           text === "___" ||
           text === "- - -" ||
@@ -193,9 +233,9 @@ export const HorizontalRuleExtension = Node.create({
   addInputRules() {
     return [
       new InputRule({
-        find: /^(?:---|—-|——|—|___|\*\*\*|- - -|\* \* \*)\s?$/,
+        find: /^(?:---|—-|___|\*\*\*|- - -|\* \* \*)\s?$/,
         handler: ({ state, range }) => {
-          insertHorizontalRuleSmart(state, this.editor.view.dispatch, range);
+          insertHorizontalRuleSmart(state, undefined, range);
         },
       }),
     ];

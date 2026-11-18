@@ -7,6 +7,7 @@ import { DOMSerializer, Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
 import { cva } from "../lib/utils";
 import { sliceToMarkdown } from "../editor/markdownUtils";
+import { selectParagraphAfterDivider } from "../editor/horizontalRuleExtension";
 
 export interface BlockSelectionState {
   anchor: number | null;
@@ -884,6 +885,16 @@ export const BlockSelection = Extension.create({
                     head: null,
                     selectedPositions: [],
                   });
+                  if (pluginState.selectedPositions.length === 1 &&
+                      selectParagraphAfterDivider(tr, firstPos)) {
+                    if (event.data && !event.isComposing) {
+                      view.dispatch(tr.insertText(event.data).scrollIntoView());
+                      event.preventDefault();
+                      return true;
+                    }
+                    view.dispatch(tr.scrollIntoView());
+                    return false;
+                  }
                   try {
                     const $pos = tr.doc.resolve(Math.min(firstPos + 1, tr.doc.content.size));
                     tr = tr.setSelection(Selection.near($pos));
@@ -1125,6 +1136,7 @@ export const BlockSelection = Extension.create({
               !event.metaKey &&
               !event.ctrlKey &&
               !event.altKey &&
+              !event.isComposing &&
               event.key.length === 1
             ) {
               event.preventDefault();
@@ -1136,6 +1148,13 @@ export const BlockSelection = Extension.create({
                 head: null,
                 selectedPositions: [],
               });
+
+              if (pluginState.selectedPositions.length === 1 &&
+                  selectParagraphAfterDivider(tr, firstPos)) {
+                dispatch(tr.insertText(event.key).scrollIntoView());
+                view.focus();
+                return true;
+              }
 
               try {
                 const $pos = tr.doc.resolve(Math.min(firstPos + 1, tr.doc.content.size));

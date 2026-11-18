@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { SmoothCaret, getSelectionCaretCoords } from "../SmoothCaret";
+import { TextSelection } from "@tiptap/pm/state";
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -155,8 +156,9 @@ describe("Phase 5: SmoothCaret & GPU Loop Cancellation Tests", () => {
     expect(requestRafSpy).toHaveBeenCalled();
   });
 
-  it("stops blinking animation after 4.5 seconds of idle inactivity", () => {
+  it("continues blinking after 4.5 seconds of idle inactivity", () => {
     vi.useFakeTimers();
+    Object.setPrototypeOf(mockEditor.state.selection, TextSelection.prototype);
 
     act(() => {
       root.render(
@@ -184,8 +186,8 @@ describe("Phase 5: SmoothCaret & GPU Loop Cancellation Tests", () => {
       vi.advanceTimersByTime(4000);
     });
 
-    // Asserts is-blinking class is removed to conserve GPU/WebKit power
-    expect(caret.classList.contains("is-blinking")).toBe(false);
+    // The focused caret continues blinking while idle.
+    expect(caret.classList.contains("is-blinking")).toBe(true);
 
     vi.useRealTimers();
   });

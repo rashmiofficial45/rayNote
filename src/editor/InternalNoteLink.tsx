@@ -17,8 +17,10 @@ import {
 } from "react";
 import { FileText, Pin } from "lucide-react";
 import { safeLocalStorageGetItem } from "../lib/storage";
-import { getRecentNotes } from "../lib/db";
+import { getAllNotes } from "../lib/db";
+import { computeSlashMenuPlacementAndHeight } from "./SlashCommand";
 import { createInternalNoteUrl } from "../lib/linkUtils";
+import { normalizeQuery, scoreDocumentCandidate } from "../lib/searchRanking";
 
 export interface InternalNoteItem {
   id: string;
@@ -62,37 +64,32 @@ export function getCachedNotes(): InternalNoteItem[] {
   return [];
 }
 
-// Background refresh of note cache for suggestions
-if (typeof window !== "undefined") {
-  getRecentNotes(100)
-    .then((notes) => {
-      if (Array.isArray(notes)) {
-        cachedNotesMemory = notes.map((n) => ({
-          id: n.id,
-          title: n.title || "Untitled Note",
-          preview: n.preview || "",
-          is_pinned: Boolean(n.is_pinned),
-        }));
-      }
-    })
-    .catch(() => {});
-}
-
 export const InternalNoteList = forwardRef<InternalNoteListRef, InternalNoteListProps>(
   ({ items, command }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const selectionFromPointer = useRef(false);
+    const mousePosition = useRef<{ x: number; y: number } | null>(null);
+    const itemIds = items.map((item) => item.id).join("\0");
 
     useLayoutEffect(() => {
       setSelectedIndex(0);
-    }, [items]);
+    }, [itemIds]);
 
     useLayoutEffect(() => {
+      if (selectionFromPointer.current) {
+        selectionFromPointer.current = false;
+        return;
+      }
       if (containerRef.current) {
-        const itemEl = containerRef.current.children[selectedIndex + 1] as HTMLElement | undefined;
+        if (selectedIndex === 0) {
+          containerRef.current.scrollTop = 0;
+          return;
+        }
+        const itemEl = containerRef.current.children[selectedIndex] as HTMLElement | undefined;
         revealMenuItem(containerRef.current, itemEl);
       }
-    }, [selectedIndex]);
+    }, [selectedIndex, itemIds]);
 
     const selectItem = useCallback(
       (index: number) => {
@@ -131,60 +128,38 @@ export const InternalNoteList = forwardRef<InternalNoteListRef, InternalNoteList
       },
     }));
 
-    if (items.length === 0) {
-      return (
-        <div
-          ref={containerRef}
-          role="menu"
-          className="p-2.5 rounded-xl bg-[var(--surface-glass-elevated)] backdrop-blur-xl border border-[var(--border-subtle)] shadow-[var(--shadow-glass)] text-[var(--text-muted)] text-[12px] min-w-[200px]"
-        >
-          No matching notes found
-        </div>
-      );
-    }
-
     return (
-      <div
-        ref={containerRef}
-        role="menu"
-        aria-label="Link to note"
-        className="flex flex-col gap-0.5 p-1 rounded-xl bg-[var(--surface-glass-elevated)] backdrop-blur-xl border border-[var(--border-subtle)] shadow-[var(--shadow-glass)] text-[var(--text-primary)] text-[12px] min-w-[240px] max-w-[320px] max-h-[220px] overflow-y-auto"
-      >
-        <div className="px-2 py-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-          Link to note
-        </div>
-        {items.map((item, index) => {
-          const isSelected = index === selectedIndex;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              role="menuitem"
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                isSelected
-                  ? "bg-[var(--btn-liquid-bg-hover)] text-[var(--text-primary)]"
-                  : "text-[var(--text-primary)] hover:bg-[var(--btn-liquid-bg-hover)]"
-              }`}
-              onClick={() => selectItem(index)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              <FileText size={14} className="text-[var(--color-accent)] shrink-0" />
-              <div className="flex-1 min-w-0 flex flex-col">
-                <span className="truncate font-medium text-[12px] leading-tight">
-                  {item.title || "Untitled Note"}
-                </span>
-                {item.preview && (
-                  <span className="truncate text-[10px] text-[var(--text-muted)] leading-tight mt-0.5">
-                    {item.preview}
-                  </span>
-                )}
-              </div>
-              {item.is_pinned && (
-                <Pin size={11} className="text-[var(--color-accent)] shrink-0 ml-1" />
-              )}
-            </button>
-          );
-        })}
+      <div className="internal-note-picker">
+        <div className="internal-note-picker-heading">Link to note</div>
+        {items.length ? (
+          <div ref={containerRef} className="internal-note-picker-list" role="menu" aria-label="Link to note">
+            {items.map((item, index) => (
+              <button
+                key={item.id}
+                type="button"
+                role="menuitem"
+                className="internal-note-picker-row"
+                data-active={index === selectedIndex}
+                aria-label={item.title || "Untitled Note"}
+                onClick={() => selectItem(index)}
+                onMouseMove={(event) => {
+                  const previous = mousePosition.current;
+                  mousePosition.current = { x: event.clientX, y: event.clientY };
+                  if (previous && (Math.abs(previous.x - event.clientX) > 3 || Math.abs(previous.y - event.clientY) > 3)) {
+                    selectionFromPointer.current = true;
+                    setSelectedIndex(index);
+                  }
+                }}
+              >
+                <FileText size={15} aria-hidden="true" />
+                <span title={item.title || "Untitled Note"}>{item.title || "Untitled Note"}</span>
+                {item.is_pinned && <Pin size={12} aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="internal-note-picker-empty" role="status">No matching notes found</div>
+        )}
       </div>
     );
   }
@@ -198,6 +173,7 @@ export const InternalNoteLink = Extension.create({
     return {
       suggestion: {
         char: "[[",
+        allowSpaces: true,
         command: ({
           editor,
           range,
@@ -227,24 +203,52 @@ export const InternalNoteLink = Extension.create({
             ])
             .run();
         },
-        items: ({ query }: { query: string }) => {
-          const notes = getCachedNotes();
-          const q = (query || "").toLowerCase().trim();
-          if (!q) {
-            return notes.slice(0, 8);
+        items: async ({ query }: { query: string }) => {
+          let notes = getCachedNotes();
+          try {
+            notes = await getAllNotes();
+            cachedNotesMemory = notes;
+          } catch {
+            // Keep the last available snapshot when the database is unavailable.
           }
+          if (!normalizeQuery(query || "")) return notes;
           return notes
-            .filter((n) =>
-              n.title.toLowerCase().includes(q) || n.preview.toLowerCase().includes(q)
-            )
-            .slice(0, 8);
+            .map((note, index) => ({
+              note,
+              index,
+              ...scoreDocumentCandidate(query, {
+                id: note.id,
+                title: note.title || "Untitled Note",
+                preview: note.preview || "",
+                search_text: note.preview || "",
+                updated_at: "1970-01-01T00:00:00Z",
+                is_pinned: Boolean(note.is_pinned),
+              }),
+            }))
+            .filter((result) => result.match_type !== "unmatched")
+            .sort((a, b) => b.score - a.score || a.index - b.index)
+            .map((result) => result.note);
         },
         render: () => {
           let component: ReactRenderer | null = null;
           let popup: TippyInstance[] | null = null;
+          let latestProps: SuggestionProps | null = null;
+
+          const updatePosition = (event?: Event) => {
+            if (event?.target instanceof Node && component?.element.contains(event.target)) return;
+            if (!latestProps?.clientRect || !popup?.[0]) return;
+            const rect = latestProps.clientRect();
+            const { placement, maxHeight } = computeSlashMenuPlacementAndHeight(
+              rect, latestProps.items.length
+            );
+            const menu = component?.element.querySelector(".internal-note-picker") as HTMLElement | null;
+            if (menu) menu.style.maxHeight = `${maxHeight}px`;
+            popup[0].setProps({ placement, getReferenceClientRect: latestProps.clientRect as () => DOMRect });
+          };
 
           return {
             onStart: (props: SuggestionProps) => {
+              latestProps = props;
               component = new ReactRenderer(InternalNoteList, {
                 props,
                 editor: props.editor,
@@ -260,17 +264,23 @@ export const InternalNoteLink = Extension.create({
                 interactive: true,
                 trigger: "manual",
                 placement: "bottom-start",
+                arrow: false,
                 zIndex: 10006,
                 animation: false,
+                offset: [0, 6],
+                popperOptions: {
+                  strategy: "fixed",
+                  modifiers: [{ name: "preventOverflow", options: { boundary: "viewport", padding: 8, altAxis: true } }],
+                },
               });
+              updatePosition();
+              window.addEventListener("resize", updatePosition);
+              window.addEventListener("scroll", updatePosition, true);
             },
             onUpdate: (props: SuggestionProps) => {
+              latestProps = props;
               component?.updateProps(props);
-              if (props.clientRect && popup?.[0]) {
-                popup[0].setProps({
-                  getReferenceClientRect: props.clientRect as () => DOMRect,
-                });
-              }
+              updatePosition();
             },
             onKeyDown: (props: SuggestionKeyDownProps) => {
               if (props.event.key === "Escape") {
@@ -280,6 +290,8 @@ export const InternalNoteLink = Extension.create({
               return (component?.ref as any)?.onKeyDown(props) ?? false;
             },
             onExit: () => {
+              window.removeEventListener("resize", updatePosition);
+              window.removeEventListener("scroll", updatePosition, true);
               popup?.[0]?.destroy();
               component?.destroy();
             },

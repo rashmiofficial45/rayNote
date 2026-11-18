@@ -123,6 +123,31 @@ describe("HorizontalRuleExtension Smart Insertion & Input Rules", () => {
   });
 
   describe("Shortcuts and Markdown Input Rules", () => {
+    it("types after a selected divider without replacing it", () => {
+      editor.commands.setContent("<p>Before</p><hr><p>After</p>");
+      const dividerPos = editor.state.doc.child(0).nodeSize;
+      editor.commands.setNodeSelection(dividerPos);
+      const { from, to } = editor.state.selection;
+      const handled = editor.view.someProp("handleTextInput", (handler) =>
+        handler(editor.view, from, to, "X", () => editor.state.tr.insertText("X", from, to))
+      );
+      expect(handled).toBe(true);
+      expect(editor.getHTML()).toContain("<hr");
+      expect(editor.state.doc.child(2).textContent).toBe("XAfter");
+    });
+
+    it("creates a paragraph after a block-selected divider at the end", () => {
+      editor.commands.setContent("<p>Before</p><hr>");
+      const dividerPos = editor.state.doc.child(0).nodeSize;
+      editor.commands.selectBlock(dividerPos);
+      const handled = editor.view.someProp("handleKeyDown", (handler) =>
+        handler(editor.view, new KeyboardEvent("keydown", { key: "X" }))
+      );
+      expect(handled).toBe(true);
+      expect(editor.state.doc.child(1).type.name).toBe("horizontalRule");
+      expect(editor.state.doc.child(2).textContent).toBe("X");
+    });
+
     it("converts '---' and Enter into a horizontal rule", () => {
       editor.commands.setContent("<p>---</p>");
       editor.commands.setTextSelection(4);
@@ -140,7 +165,7 @@ describe("HorizontalRuleExtension Smart Insertion & Input Rules", () => {
       expect(hasHr).toBe(true);
     });
 
-    it("converts em-dash '—' and Enter into a horizontal rule", () => {
+    it("keeps a single em dash as text when Enter is pressed", () => {
       editor.commands.setContent("<p>—</p>");
       editor.commands.setTextSelection(2);
 
@@ -149,10 +174,30 @@ describe("HorizontalRuleExtension Smart Insertion & Input Rules", () => {
       );
       const enterHandler = (shortcuts as any)?.config?.addKeyboardShortcuts?.call({ editor })?.Enter;
       const handled = enterHandler({ editor });
-      expect(handled).toBe(true);
+      expect(handled).toBe(false);
 
       const hasHr = editor.state.doc.content.toJSON().some((n: any) => n.type === "horizontalRule");
-      expect(hasHr).toBe(true);
+      expect(hasHr).toBe(false);
+    });
+
+    it("creates a divider only after three consecutive minus keystrokes", () => {
+      editor.commands.setContent("<p></p>");
+      editor.commands.setTextSelection(1);
+
+      for (let count = 1; count <= 3; count++) {
+        const keyEvent = new KeyboardEvent("keydown", { key: "-", code: "Minus" });
+        const intercepted = editor.view.someProp("handleKeyDown", (handler) =>
+          handler(editor.view, keyEvent)
+        );
+        expect(intercepted).not.toBe(true);
+        const { from, to } = editor.state.selection;
+        const handled = editor.view.someProp("handleTextInput", (handler) =>
+          handler(editor.view, from, to, "-", () => editor.state.tr.insertText("-", from, to))
+        );
+        if (!handled) editor.view.dispatch(editor.state.tr.insertText("-", from, to));
+        const rules = editor.state.doc.content.toJSON().filter((node: any) => node.type === "horizontalRule");
+        expect(rules).toHaveLength(count === 3 ? 1 : 0);
+      }
     });
   });
 });

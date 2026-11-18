@@ -104,7 +104,6 @@ export function SmoothCaret({
   const caretRef = useRef<HTMLDivElement>(null);
   const lastPosRef = useRef<{ x: number; y: number; height: number } | null>(null);
   const blinkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blinkStopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMouseDownRef = useRef(false);
   const retryControllerRef = useRef(new SmoothCaretRetryController());
   const rafIdRef = useRef<number | null>(null);
@@ -232,23 +231,12 @@ export function SmoothCaret({
       if (blinkTimeoutRef.current) {
         clearTimeout(blinkTimeoutRef.current);
       }
-      if (blinkStopTimeoutRef.current) {
-        clearTimeout(blinkStopTimeoutRef.current);
-      }
       blinkTimeoutRef.current = setTimeout(() => {
         if (view.hasFocus() && editor.state.selection.empty && !document.hidden) {
           caret.classList.add("is-blinking");
         }
       }, 500);
 
-      // Cap infinite blinking animation after 4.5s of inactivity (Apple Notes / Bear standard)
-      // Prevents WebKit compositor thread from consuming CPU while idle
-      blinkStopTimeoutRef.current = setTimeout(() => {
-        caret.classList.remove("is-blinking");
-        if (view.hasFocus() && editor.state.selection.empty) {
-          caret.style.opacity = "1";
-        }
-      }, 4500);
     } catch {
       // Coords might be unavailable during rapid unmounts
     }
@@ -343,10 +331,6 @@ export function SmoothCaret({
         clearTimeout(blinkTimeoutRef.current);
         blinkTimeoutRef.current = null;
       }
-      if (blinkStopTimeoutRef.current) {
-        clearTimeout(blinkStopTimeoutRef.current);
-        blinkStopTimeoutRef.current = null;
-      }
       if (caretRef.current) {
         caretRef.current.style.opacity = "0";
         caretRef.current.classList.remove("is-blinking");
@@ -412,9 +396,6 @@ export function SmoothCaret({
       }
       if (blinkTimeoutRef.current) {
         clearTimeout(blinkTimeoutRef.current);
-      }
-      if (blinkStopTimeoutRef.current) {
-        clearTimeout(blinkStopTimeoutRef.current);
       }
     };
   }, [editor, scheduleCaretUpdate, isEnabled, _scrollContainerRef]);

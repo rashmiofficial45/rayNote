@@ -51,7 +51,7 @@ export const ShortcutsExtension = Extension.create({
             // 1. Check if event matches ANY active dynamic command
             for (const [actionId, actionFn] of Object.entries(DYNAMIC_EDITOR_ACTIONS)) {
               const cmd = config.find((c) => c.id === actionId);
-              if (cmd && cmd.enabled !== false && cmd.hotkey) {
+              if (cmd && cmd.enabled !== false && cmd.hotkey && !(actionId === "divider" && cmd.hotkey === "---")) {
                 if (matchesEvent(event, cmd.hotkey)) {
                   actionFn(editor);
                   return true;
@@ -62,7 +62,7 @@ export const ShortcutsExtension = Extension.create({
             // 2. Check if event matches a DEFAULT shortcut of an action that has been remapped or disabled
             for (const [actionId] of Object.entries(DYNAMIC_EDITOR_ACTIONS)) {
               const defaultCmd = DEFAULT_COMMANDS.find((c) => c.id === actionId);
-              if (!defaultCmd?.hotkey) continue;
+              if (!defaultCmd?.hotkey || (actionId === "divider" && defaultCmd.hotkey === "---")) continue;
 
               const activeCmd = config.find((c) => c.id === actionId);
               const isRemappedOrDisabled =

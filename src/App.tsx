@@ -1875,12 +1875,6 @@ function App() {
 
       // Command Palette (Cmd+K)
       if (isTriggered("search", "⌘K")) {
-        const active = document.activeElement;
-        const isEditingInEditor = Boolean(active?.closest(".tiptap"));
-        if (isEditingInEditor) {
-          // Handled by editor link insertion/edit popover
-          return;
-        }
         e.preventDefault();
         if (hasBlockingDialog) {
           e.stopPropagation();

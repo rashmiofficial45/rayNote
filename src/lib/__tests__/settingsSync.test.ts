@@ -65,6 +65,12 @@ describe("Settings Synchronization & Keystroke Utilities (settingsSync.ts)", () 
       expect(matchesEvent(event, "⌥K")).toBe(false);
     });
 
+    it("matches a minus or plus key as the shortcut key", () => {
+      expect(matchesEvent(new KeyboardEvent("keydown", { key: "-", metaKey: true }), "⌘-")).toBe(true);
+      expect(matchesEvent(new KeyboardEvent("keydown", { key: "+", metaKey: true }), "⌘+")).toBe(true);
+      expect(parseHotkey("Cmd+-")?.key).toBe("-");
+    });
+
     it("matches Option keystroke (e.g. dictation ⌥D)", () => {
       const event = new KeyboardEvent("keydown", { key: "d", altKey: true });
       expect(matchesEvent(event, "⌥D")).toBe(true);
