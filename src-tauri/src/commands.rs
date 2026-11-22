@@ -549,14 +549,18 @@ pub fn hide_window(window: tauri::WebviewWindow) -> Result<(), String> {
 
     #[cfg(target_os = "macos")]
     {
-        use tauri_nspanel::WebviewWindowExt;
-        // Get the panel and hide it — app stays alive as Accessory process
-        if let Ok(panel) = window.to_panel::<crate::RayNotePanel>() {
-            panel.hide();
-        } else {
-            // Fallback: just hide the window
-            window.hide().map_err(|e| e.to_string())?;
-        }
+        use tauri::Manager;
+        use tauri_nspanel::ManagerExt;
+        let app = window.app_handle().clone();
+        app.run_on_main_thread(move || {
+            if window.label() == "main" {
+                if let Ok(panel) = window.app_handle().get_webview_panel("main") {
+                    crate::hide_main_panel(&panel);
+                    return;
+                }
+            }
+            let _ = window.hide();
+        }).map_err(|e| e.to_string())?;
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -1323,7 +1327,7 @@ pub fn set_menu_bar_visible(app: tauri::AppHandle, visible: bool) -> Result<(), 
                                     if panel.is_visible() {
                                         use tauri::Emitter;
                                         let _ = app_handle.emit("panel-will-hide", ());
-                                        panel.hide();
+                                        crate::hide_main_panel(&panel);
                                     } else {
                                         crate::show_and_focus_main_panel(&app_handle);
                                     }

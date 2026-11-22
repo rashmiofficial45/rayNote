@@ -1,6 +1,8 @@
 import { Node, mergeAttributes, nodeInputRule } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { ImageComponent } from "./ImageComponent";
+import { NodeSelection, Plugin } from "@tiptap/pm/state";
+import { selectParagraphAfterDivider } from "./horizontalRuleExtension";
 
 export interface SetImageOptions {
   src: string;
@@ -154,6 +156,31 @@ export const ImageExtension = Node.create<ImageOptions>({
         },
       }),
     ];
+  },
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        handleTextInput(view, _from, _to, text) {
+          const { selection } = view.state;
+          if (!(selection instanceof NodeSelection) || selection.node.type.name !== "image") return false;
+          const tr = view.state.tr;
+          if (!selectParagraphAfterDivider(tr, selection.from)) return false;
+          view.dispatch(tr.insertText(text).scrollIntoView());
+          return true;
+        },
+        handleDOMEvents: {
+          beforeinput(view, event) {
+            const { selection } = view.state;
+            if (!event.inputType.startsWith("insert") || !(selection instanceof NodeSelection) || selection.node.type.name !== "image") return false;
+            const tr = view.state.tr;
+            if (!selectParagraphAfterDivider(tr, selection.from)) return false;
+            view.dispatch(tr.scrollIntoView());
+            return false;
+          },
+        },
+      },
+    })];
   },
 
   addNodeView() {

@@ -4,7 +4,7 @@ import { TextSelection, NodeSelection, Plugin, EditorState, Transaction } from "
 /** Move into a paragraph directly after a divider, creating one if needed. */
 export function selectParagraphAfterDivider(tr: Transaction, dividerPos: number): boolean {
   const divider = tr.doc.nodeAt(dividerPos);
-  if (divider?.type.name !== "horizontalRule") return false;
+  if (divider?.type.name !== "horizontalRule" && divider?.type.name !== "image") return false;
   const after = dividerPos + divider.nodeSize;
   const $after = tr.doc.resolve(after);
   if ($after.nodeAfter?.type.name !== "paragraph") {

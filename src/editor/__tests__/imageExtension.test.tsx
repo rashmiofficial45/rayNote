@@ -52,6 +52,19 @@ describe("ImageExtension and Resizable Image Support", () => {
     expect(imageNode?.attrs?.alignment).toBe("center");
   });
 
+  it("types after a selected image without replacing it", () => {
+    const editor = new Editor({ extensions: [StarterKit, ImageExtension], content: '<img src="https://example.com/a.png"><p>After</p>' });
+    editor.commands.setNodeSelection(0);
+    const { from, to } = editor.state.selection;
+    const handled = editor.view.someProp("handleTextInput", (handler) =>
+      handler(editor.view, from, to, "X", () => editor.state.tr.insertText("X", from, to))
+    );
+    expect(handled).toBe(true);
+    expect(editor.state.doc.child(0).type.name).toBe("image");
+    expect(editor.state.doc.child(1).textContent).toBe("XAfter");
+    editor.destroy();
+  });
+
   it("updates image width and alignment attributes for resizing", () => {
     const editor = new Editor({
       extensions: [

@@ -94,6 +94,7 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
         let mut key_now: bool = msg_send![ns_win, isKeyWindow];
         if !key_now {
             // Last resort: activate the app, then try again
+            remember_frontmost_app();
             let shared_app: *mut AnyObject = msg_send![objc2::class!(NSApplication), sharedApplication];
             let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
             let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
@@ -129,7 +130,83 @@ fn start_hover_focus_watcher(app: tauri::AppHandle) {
 }
 
 #[cfg(target_os = "macos")]
+static PREVIOUS_APP_PID: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+// Call on the main thread before activating rayNote. Keep the previous value
+// when rayNote is already frontmost, such as when reopening an existing panel.
+#[cfg(target_os = "macos")]
+fn remember_frontmost_app() {
+    use objc2::{class, msg_send};
+    use objc2::runtime::AnyObject;
+    use std::sync::atomic::Ordering;
+    unsafe {
+        let workspace: *mut AnyObject = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let app: *mut AnyObject = msg_send![workspace, frontmostApplication];
+        if !app.is_null() {
+            let pid: i32 = msg_send![app, processIdentifier];
+            if pid > 0 && pid != std::process::id() as i32 {
+                PREVIOUS_APP_PID.store(pid, Ordering::SeqCst);
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn restore_previous_app() {
+    use objc2::{class, msg_send};
+    use objc2::runtime::AnyObject;
+    use std::sync::atomic::Ordering;
+    let pid = PREVIOUS_APP_PID.swap(0, Ordering::SeqCst);
+    unsafe {
+        let workspace: *mut AnyObject = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let frontmost: *mut AnyObject = msg_send![workspace, frontmostApplication];
+        let frontmost_pid: i32 = msg_send![frontmost, processIdentifier];
+        if frontmost_pid != std::process::id() as i32 {
+            // Leave the current foreground app in place after resigning key status.
+            return;
+        }
+
+        let shared_app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
+        let previous: *mut AnyObject = if pid > 0 {
+            msg_send![class!(NSRunningApplication), runningApplicationWithProcessIdentifier: pid]
+        } else {
+            std::ptr::null_mut()
+        };
+        if !previous.is_null() {
+            let can_yield: bool =
+                msg_send![shared_app, respondsToSelector: objc2::sel!(yieldActivationToApplication:)];
+            let activated: bool = if can_yield {
+                let current: *mut AnyObject = msg_send![class!(NSRunningApplication), currentApplication];
+                let _: () = msg_send![shared_app, yieldActivationToApplication: previous];
+                msg_send![previous, activateFromApplication: current, options: 0usize]
+            } else {
+                msg_send![previous, activateWithOptions: 1usize << 1]
+            };
+            if activated {
+                return;
+            }
+        }
+        let _: () = msg_send![shared_app, deactivate];
+    }
+}
+
+// Use the panel created at startup. AppKit gives a nonactivating panel
+// keyboard focus independently of which application is frontmost.
+#[cfg(target_os = "macos")]
+pub(crate) fn hide_main_panel<R: tauri::Runtime>(panel: &tauri_nspanel::PanelHandle<R>) {
+    use objc2::msg_send;
+
+    let is_key: bool = unsafe { msg_send![panel.as_panel(), isKeyWindow] };
+    if is_key {
+        panel.resign_key_window();
+    }
+    panel.hide();
+    restore_previous_app();
+}
+
+#[cfg(target_os = "macos")]
 fn setup_macos_panel(app: &tauri::App) {
+    remember_frontmost_app();
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
     use objc2_app_kit::NSWindowCollectionBehavior;
@@ -368,9 +445,7 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
 
-        let app_class = objc2::class!(NSApplication);
-        let shared_app: *mut AnyObject = unsafe { msg_send![app_class, sharedApplication] };
-        let _: () = unsafe { msg_send![shared_app, activateIgnoringOtherApps: true] };
+        remember_frontmost_app();
 
         if let Ok(panel) = manager.get_webview_panel("main") {
             panel.show_and_make_key();
@@ -405,7 +480,11 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
                     }
                 }
             }
-            let _ = win.set_focus();
+            // A key nonactivating panel can receive typing while the other app
+            // stays active. Only force app activation if taking key focus failed.
+            if !win.is_focused().unwrap_or(false) {
+                let _ = win.set_focus();
+            }
             use tauri::Emitter;
             let _ = win.emit("app-focused", ());
         }
@@ -460,7 +539,7 @@ pub fn run() {
                                 if let Ok(panel) = app_handle.get_webview_panel("main") {
                                     if panel.is_visible() {
                                         let _ = app_handle.emit("panel-will-hide", ());
-                                        panel.hide();
+                                        hide_main_panel(&panel);
                                     } else {
                                         show_and_focus_main_panel_inner(&app_handle);
                                     }
