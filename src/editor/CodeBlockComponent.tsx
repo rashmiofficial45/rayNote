@@ -26,6 +26,7 @@ export const POPULAR_LANGUAGES = [
   { label: "Ruby", value: "ruby", ext: "rb" },
   { label: "YAML", value: "yaml", ext: "yml" },
   { label: "Markdown", value: "markdown", ext: "md" },
+  { label: "Mermaid", value: "mermaid", ext: "mmd" },
   { label: "Diff", value: "diff", ext: "diff" },
   { label: "Plain Text", value: "plaintext", ext: "txt" },
 ];

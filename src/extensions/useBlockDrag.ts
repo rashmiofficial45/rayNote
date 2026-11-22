@@ -54,7 +54,7 @@ export function getBlockContentRects(
   const targetEl = isNonText
     ? dom.tagName === "PRE"
       ? dom
-      : dom.querySelector("pre, table") || dom
+      : dom.querySelector("pre:not([hidden]), table") || dom
     : dom;
 
   // Block-level elements take the full block bounds so touching anywhere selects the block
@@ -563,7 +563,7 @@ export function useBlockDrag({
       if (
         target.closest("[data-resize-handle]") ||
         target.closest("[data-tauri-drag-region]") ||
-        target.closest(".floating-code-block-toolbar") ||
+        target.closest(".floating-code-block-toolbar, .mermaid-controls") ||
         target.closest(".document-tick-slider")
       ) {
         return;

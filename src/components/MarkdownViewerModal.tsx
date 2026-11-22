@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import DOMPurify from "dompurify";
 import {
@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Settings,
 } from "lucide-react";
+import { isMermaidLanguage, mountMermaidPreview } from "../editor/mermaidPreview";
 import { markdownToTipTapHtml } from "../editor/markdownUtils";
 import { extractTitleFromMarkdown } from "../lib/utils";
 import { openSettingsWindow } from "../lib/db";
@@ -42,6 +43,7 @@ export function MarkdownViewerModal({
   const [copied, setCopied] = useState(false);
   const importingRef = useRef(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const renderedRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!fileData) return;
@@ -73,6 +75,26 @@ export function MarkdownViewerModal({
       USE_PROFILES: { html: true },
     });
   }, [fileData?.content]);
+
+  useLayoutEffect(() => {
+    const blocks = renderedRef.current?.querySelectorAll("pre > code[class]");
+    const cleanups: (() => void)[] = [];
+    blocks?.forEach((code) => {
+      if (!Array.from(code.classList).some(name =>
+        name.startsWith("language-") && isMermaidLanguage(name.slice("language-".length))
+      )) return;
+
+      const pre = code.parentElement!;
+      const preview = document.createElement("div");
+      pre.replaceWith(preview);
+      const unmount = mountMermaidPreview(preview, code.textContent ?? "");
+      cleanups.push(() => {
+        unmount();
+        preview.replaceWith(pre);
+      });
+    });
+    return () => cleanups.forEach(cleanup => cleanup());
+  }, [renderedHtml, viewMode]);
 
   const docTitle = useMemo(() => {
     if (!fileData) return "Untitled";
@@ -230,6 +252,7 @@ export function MarkdownViewerModal({
         }}>
           {viewMode === "rendered" ? (
             <div
+              ref={renderedRef}
               className="tiptap md-viewer-rendered"
               dangerouslySetInnerHTML={{ __html: renderedHtml }}
             />

@@ -48,7 +48,7 @@ export function FloatingCodeBlockToolbar({
   const computePosition = useCallback(
     (preEl: HTMLElement): { top: number; right: number } | null => {
       const container = scrollContainerRef.current;
-      if (!container || !preEl || !document.body.contains(preEl)) return null;
+      if (!container || !preEl || preEl.hidden || !document.body.contains(preEl)) return null;
 
       // The toolbar sits inside the zoomed content wrapper (offsetParent)
       const parentEl =

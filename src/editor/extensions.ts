@@ -7,7 +7,7 @@ import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
 import Typography from "@tiptap/extension-typography";
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { MermaidCodeBlock } from "./MermaidCodeBlock";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import { createLowlight } from "lowlight";
@@ -363,7 +363,7 @@ export function getExtensions(
       multicolor: false,
     }),
     Typography,
-    CodeBlockLowlight.configure({
+    MermaidCodeBlock.configure({
       lowlight,
       defaultLanguage: "bash",
       exitOnTripleEnter: true,

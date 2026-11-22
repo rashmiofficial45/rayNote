@@ -770,62 +770,64 @@ export const BlockSelection = Extension.create({
 
               const pluginState = blockSelectionPluginKey.getState(view.state);
               const isBlockMode = pluginState && pluginState.selectedPositions.length > 0;
+              const getClickedBlock = () => {
+                const diagram = target.closest(".mermaid-preview")?.closest(".mermaid-block");
+                // The diagram has no caret coordinates because its source is hidden.
+                const pos = diagram
+                  ? view.posAtDOM(diagram, 0)
+                  : view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos;
+                return pos === undefined ? null : findBlockAtPos(view.state.doc, pos);
+              };
 
               // Shift+Click: extend block selection
               if (event.shiftKey) {
-                const clickPos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                if (clickPos) {
-                  const block = findBlockAtPos(view.state.doc, clickPos.pos);
-                  if (block) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const allBlocks = getCachedAllBlocks(view.state.doc);
-                    const targetIdx = allBlocks.findIndex((b) => b.pos === block.pos);
-                    const anchorPos = pluginState?.anchor ?? block.pos;
-                    const anchorIdx = Math.max(
-                      0,
-                      allBlocks.findIndex((b) => b.pos === anchorPos)
-                    );
+                const block = getClickedBlock();
+                if (block) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const allBlocks = getCachedAllBlocks(view.state.doc);
+                  const targetIdx = allBlocks.findIndex((b) => b.pos === block.pos);
+                  const anchorPos = pluginState?.anchor ?? block.pos;
+                  const anchorIdx = Math.max(
+                    0,
+                    allBlocks.findIndex((b) => b.pos === anchorPos)
+                  );
 
-                    const minIdx = Math.min(anchorIdx, targetIdx);
-                    const maxIdx = Math.max(anchorIdx, targetIdx);
-                    const rangePositions = allBlocks
-                      .slice(minIdx, maxIdx + 1)
-                      .map((b) => b.pos);
+                  const minIdx = Math.min(anchorIdx, targetIdx);
+                  const maxIdx = Math.max(anchorIdx, targetIdx);
+                  const rangePositions = allBlocks
+                    .slice(minIdx, maxIdx + 1)
+                    .map((b) => b.pos);
 
-                    const tr = view.state.tr.setMeta(blockSelectionPluginKey, {
-                      anchor: anchorPos,
-                      head: block.pos,
-                      selectedPositions: rangePositions,
-                    });
-                    view.dispatch(tr);
-                    return true;
-                  }
+                  const tr = view.state.tr.setMeta(blockSelectionPluginKey, {
+                    anchor: anchorPos,
+                    head: block.pos,
+                    selectedPositions: rangePositions,
+                  });
+                  view.dispatch(tr);
+                  return true;
                 }
               }
 
               // ⌘+Click (or Ctrl+Click): toggle single block selection
               if (event.metaKey || event.ctrlKey) {
-                const clickPos = view.posAtCoords({ left: event.clientX, top: event.clientY });
-                if (clickPos) {
-                  const block = findBlockAtPos(view.state.doc, clickPos.pos);
-                  if (block) {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const currentPositions = pluginState?.selectedPositions ?? [];
-                    const exists = currentPositions.includes(block.pos);
-                    const newPositions = exists
-                      ? currentPositions.filter((p) => p !== block.pos)
-                      : [...currentPositions, block.pos].sort((a, b) => a - b);
+                const block = getClickedBlock();
+                if (block) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const currentPositions = pluginState?.selectedPositions ?? [];
+                  const exists = currentPositions.includes(block.pos);
+                  const newPositions = exists
+                    ? currentPositions.filter((p) => p !== block.pos)
+                    : [...currentPositions, block.pos].sort((a, b) => a - b);
 
-                    const tr = view.state.tr.setMeta(blockSelectionPluginKey, {
-                      anchor: newPositions[0] ?? null,
-                      head: block.pos,
-                      selectedPositions: newPositions,
-                    });
-                    view.dispatch(tr);
-                    return true;
-                  }
+                  const tr = view.state.tr.setMeta(blockSelectionPluginKey, {
+                    anchor: newPositions[0] ?? null,
+                    head: block.pos,
+                    selectedPositions: newPositions,
+                  });
+                  view.dispatch(tr);
+                  return true;
                 }
               }
 
