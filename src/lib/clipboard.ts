@@ -39,7 +39,7 @@ export async function copyToClipboard(text: string): Promise<boolean> {
       textArea.style.left = "-9999px";
       textArea.setAttribute("aria-hidden", "true");
       document.body.appendChild(textArea);
-      textArea.focus();
+      textArea.focus({ preventScroll: true });
       textArea.select();
       const successful = document.execCommand("copy");
       if (successful) return true;

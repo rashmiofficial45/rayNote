@@ -7148,7 +7148,12 @@ body:has(.command-overlay) .editor-char-count {
   display: none !important;
 }
 
-.mermaid-block.ProseMirror-selectednode {
+/* WebKit can paint the native selection at the editor boundary above the node. */
+.tiptap.ProseMirror-hideselection:has(.mermaid-block.ProseMirror-selectednode)::selection {
+  background: transparent;
+}
+
+.mermaid-block.ProseMirror-selectednode > .mermaid-preview {
   border-radius: 12px;
   box-shadow: 0 0 0 2px var(--color-accent);
 }
@@ -7157,37 +7162,66 @@ body:has(.command-overlay) .editor-char-count {
   cursor: grab;
 }
 
-.mermaid-controls {
-  display: flex;
-  justify-content: flex-end;
+.tiptap[contenteditable="false"] .mermaid-controls {
+  display: none;
+}
+
+.mermaid-block .mermaid-controls {
+  inset: 6px 6px auto auto;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mermaid-block:is(:hover, :focus-within, .ProseMirror-selectednode, .mermaid-editing) > .mermaid-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .mermaid-block .mermaid-controls {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .mermaid-controls button {
-  padding: 4px 8px;
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
+  min-width: 30px;
+  height: 30px;
 }
 
-.mermaid-controls button:hover,
-.mermaid-controls button:focus-visible {
-  color: var(--color-accent);
+@media (pointer: coarse) {
+  .mermaid-controls button {
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+.mermaid-controls button[data-copy-result="copied"] {
+  background: var(--color-accent-muted);
+}
+
+.mermaid-controls button[data-copy-result="failed"] {
+  color: #ffaaaa;
+}
+
+.mermaid-editing > pre.notefast-code-block {
+  padding-top: 56px !important;
 }
 
 .mermaid-preview {
   margin-block: 0.75em;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.tiptap .mermaid-preview > img {
-  display: block;
+.mermaid-diagram {
   max-width: 100%;
-  height: auto;
-  margin: 0 auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  max-height: min(70vh, 560px);
+  margin-inline: auto;
+  background: center / contain no-repeat;
 }
 
 .mermaid-preview-status {

@@ -4,12 +4,16 @@ import { createRoot } from "react-dom/client";
 import { Editor } from "@tiptap/core";
 import { NodeSelection } from "@tiptap/pm/state";
 import { blockSelectionPluginKey } from "../../extensions/BlockSelection";
+import { copyToClipboard } from "../../lib/clipboard";
 import { getBlockContentRects } from "../../extensions/useBlockDrag";
 import { describe, expect, it, vi } from "vitest";
+import mermaid from "mermaid";
+import { mountMermaidPreview } from "../mermaidPreview";
 import { MarkdownViewerModal } from "../../components/MarkdownViewerModal";
 import { getExtensions } from "../extensions";
 import { isMarkdownContent, markdownToTipTapHtml } from "../markdownUtils";
 
+vi.mock("../../lib/clipboard", () => ({ copyToClipboard: vi.fn(async () => true) }));
 vi.mock("mermaid", () => ({
   default: {
     initialize: vi.fn(),
@@ -71,6 +75,74 @@ describe("Mermaid fences", () => {
     }
   });
 
+  it("allows editing, copying and removing a diagram loaded during a read-only note switch", async () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = new Editor({ element: host, extensions: getExtensions(), editable: false, content: markdownToTipTapHtml(markdown), editorProps: { handleScrollToSelection: () => true } });
+    try {
+      editor.setEditable(true, false);
+      const block = host.querySelector(".mermaid-block")!;
+      const edit = block.querySelector<HTMLButtonElement>('[aria-label="Edit Mermaid code"]')!;
+      expect(edit.parentElement!.hidden).toBe(false);
+      edit.click();
+      expect(block.querySelector("pre")!.hidden).toBe(false);
+      expect(edit.getAttribute("aria-label")).toBe("Show diagram");
+      block.querySelector<HTMLButtonElement>('[aria-label="Copy Mermaid code"]')!.click();
+      await vi.waitFor(() => expect(block.textContent).toContain("Mermaid code copied"));
+      expect(copyToClipboard).toHaveBeenCalledWith(block.querySelector("pre")!.textContent);
+      edit.click();
+      expect(block.querySelector("pre")!.hidden).toBe(true);
+      block.querySelector<HTMLButtonElement>('[aria-label="Delete Mermaid diagram"]')!.click();
+      expect(editor.getMarkdown()).not.toContain(source);
+      expect(editor.getMarkdown()).toContain("let n = 1;");
+      expect(editor.commands.undo()).toBe(true);
+      expect(editor.getMarkdown()).toContain(source);
+    } finally {
+      editor.destroy();
+      host.remove();
+    }
+  });
+
+  it("does not bubble a delete click after the toolbar is removed from the editor", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    const editor = new Editor({
+      element: host,
+      extensions: getExtensions(),
+      content: markdownToTipTapHtml(markdown),
+      editorProps: { attributes: { class: "tiptap" } },
+    });
+    const outsideClick = vi.fn();
+    host.addEventListener("click", (event) => {
+      if (event.target instanceof Element && !event.target.closest(".tiptap")) outsideClick();
+    });
+    try {
+      host.querySelector<HTMLButtonElement>('[aria-label="Delete Mermaid diagram"]')!.click();
+      expect(host.querySelector(".mermaid-block")).toBeNull();
+      expect(outsideClick).not.toHaveBeenCalled();
+    } finally {
+      editor.destroy();
+      host.remove();
+    }
+  });
+
+  it("shares layout work between duplicate diagrams and reuses the completed result on reopen", async () => {
+    const first = document.createElement("div");
+    const second = document.createElement("div");
+    const code = "flowchart LR\nCache --> Reopen";
+    const dispose = [mountMermaidPreview(first, code), mountMermaidPreview(second, code)];
+    try {
+      await vi.waitFor(() => expect(second.querySelector('[role="img"]')).not.toBeNull());
+      expect(first.querySelector('[role="img"]')).not.toBeNull();
+      const reopened = document.createElement("div");
+      dispose.push(mountMermaidPreview(reopened, code));
+      expect(reopened.querySelector('[role="img"]')).not.toBeNull();
+      expect(vi.mocked(mermaid.render).mock.calls.filter(([, source]) => source === code)).toHaveLength(1);
+    } finally {
+      dispose.forEach(close => close());
+    }
+  });
+
   it("shows only the diagram for a Mermaid fence in the Markdown file preview", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const host = document.createElement("div");
@@ -80,7 +152,7 @@ describe("Mermaid fences", () => {
         <MarkdownViewerModal fileData={{ name: "diagram.md", content: markdown }} onClose={() => {}} onImportToNotes={() => {}} />
       ));
       const rendered = host.querySelector(".md-viewer-rendered")!;
-      await vi.waitFor(() => expect(rendered.querySelector("img")?.alt).toBe("Deployment"));
+      await vi.waitFor(() => expect(rendered.querySelector('[role="img"]')?.getAttribute("aria-label")).toBe("Deployment"));
       expect(rendered.textContent).not.toContain(source);
       expect(rendered.querySelector("code")?.textContent?.trim()).toBe("let n = 1;");
       await act(async () => [...host.querySelectorAll("button")].find(button => button.textContent === "Raw")!.click());

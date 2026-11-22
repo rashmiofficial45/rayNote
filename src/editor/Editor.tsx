@@ -1046,7 +1046,7 @@ export function Editor({
           } catch { }
         };
 
-        const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number, expectedDoc?: ProseMirrorNode) => {
+        const loadAndApplyDoc = async (rawContent: string, targetId: string, targetScroll: number | undefined, expectedDoc?: ProseMirrorNode) => {
           // Pre-scan and await all code block languages before setContent so lowlight decorates on first render
           await preloadLanguagesForContent(rawContent);
           if (cancelled || editor.isDestroyed ||
@@ -1061,14 +1061,24 @@ export function Editor({
             docData = markdownToTipTapHtml(rawContent, { ensureFirstLineH1: true });
           }
 
+          const container = scrollContainerRef.current;
+          const scrollBeforeApply = container?.scrollTop ?? 0;
           applyDocumentInPlace(docData);
 
-          requestAnimationFrame(() => {
-            if (scrollContainerRef.current && currentNoteIdRef.current === targetId) {
-              scrollContainerRef.current.scrollTop = targetScroll;
-              scrollContainerRef.current.scrollLeft = 0;
-            }
-          });
+          // A background refresh keeps the live position. Initial restoration
+          // only runs if the user hasn't scrolled while the note was loading.
+          if (container && targetScroll === undefined) {
+            container.scrollTop = scrollBeforeApply;
+          } else if (container) {
+            const scrollAfterApply = container.scrollTop;
+            requestAnimationFrame(() => {
+              if (!cancelled && currentNoteIdRef.current === targetId &&
+                  scrollContainerRef.current === container && container.scrollTop === scrollAfterApply) {
+                container.scrollTop = targetScroll ?? scrollBeforeApply;
+                container.scrollLeft = 0;
+              }
+            });
+          }
           return true;
         };
 
@@ -1121,9 +1131,11 @@ export function Editor({
                   isDirtyRef.current = true;
                   saveNow();
                 } else if (reconciliation.action === "apply_db" && fullNote) {
-                  const applied = await loadAndApplyDoc(fullNote.content, noteId, cached.scrollTop, revalidationDoc);
+                  const applied = fullNote.content === cached.content ||
+                    await loadAndApplyDoc(fullNote.content, noteId, undefined, revalidationDoc);
                   if (applied) {
-                    noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, cached.scrollTop, false);
+                    const scroll = scrollContainerRef.current?.scrollTop ?? cached.scrollTop;
+                    noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, scroll, false);
                     noteCache.persistActiveToLocalStorage(noteId, fullNote.content, fullNote.updated_at, false);
                   }
                 } else if (reconciliation.action === "evict_orphan") {

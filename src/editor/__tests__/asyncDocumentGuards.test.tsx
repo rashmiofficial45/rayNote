@@ -42,6 +42,25 @@ describe('Asynchronous editor document guards', () => {
     expect(editor.getText()).toContain('local edit');
   });
 
+  it('keeps the live scroll and rendered document when a database refresh only changes metadata', async () => {
+    let resolve!: (note: unknown) => void;
+    vi.mocked(invoke).mockImplementation(command => command === 'get_note' ? new Promise(r => { resolve = r; }) : Promise.resolve(undefined));
+    const content = doc('Cached title');
+    noteCache.set('note-a', content, '2026-01-01', 'Cached title', 10);
+    await render('note-a');
+    await act(async () => { await vi.advanceTimersByTimeAsync(25); });
+    const scroll = host.querySelector<HTMLElement>('[data-scroll-container]')!;
+    scroll.scrollTop = 230;
+    const shownDoc = editor.state.doc;
+    await act(async () => {
+      resolve({ id: 'note-a', content, updated_at: '2026-01-02' });
+      await vi.advanceTimersByTimeAsync(25);
+    });
+    expect(editor.state.doc).toBe(shownDoc);
+    expect(scroll.scrollTop).toBe(230);
+    expect(noteCache.get('note-a')).toMatchObject({ baseUpdatedAt: '2026-01-02', scrollTop: 230 });
+  });
+
   it('retains edits made while a revalidation response is loading code languages', async () => {
     let resolveNote!: (note: unknown) => void;
     vi.mocked(invoke).mockImplementation(command => command === 'get_note' ? new Promise(r => { resolveNote = r; }) : Promise.resolve(undefined));
