@@ -143,6 +143,34 @@ describe("Mermaid fences", () => {
     }
   });
 
+  it("skips abandoned jobs and keeps shared work alive for a remaining preview", async () => {
+    const pending = "flowchart LR\nShared --> Active";
+    const first = document.createElement("div");
+    const next = document.createElement("div");
+    const closeFirst = mountMermaidPreview(first, pending);
+    const closeNext = mountMermaidPreview(next, pending);
+    closeFirst();
+    const abandoned = "flowchart LR\nAbandoned --> Skip";
+    const cancelled = document.createElement("div");
+    mountMermaidPreview(cancelled, abandoned)();
+    try {
+      await vi.waitFor(() => expect(next.querySelector('[role="img"]')).not.toBeNull());
+      // A later job proves the abandoned queue position was passed.
+      const newer = document.createElement("div");
+      const closeNewer = mountMermaidPreview(newer, "flowchart LR\nNew --> Note");
+      try {
+        await vi.waitFor(() => expect(newer.querySelector('[role="img"]')).not.toBeNull());
+        const sources = vi.mocked(mermaid.render).mock.calls.map(([, source]) => source);
+        expect(sources.filter(source => source === pending)).toHaveLength(1);
+        expect(sources).not.toContain(abandoned);
+      } finally {
+        closeNewer();
+      }
+    } finally {
+      closeNext();
+    }
+  });
+
   it("shows only the diagram for a Mermaid fence in the Markdown file preview", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
     const host = document.createElement("div");

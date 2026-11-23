@@ -209,58 +209,33 @@ fn setup_macos_panel(app: &tauri::App) {
     remember_frontmost_app();
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
-    use objc2_app_kit::NSWindowCollectionBehavior;
-
     let window = app.get_webview_window("main").unwrap();
-    let panel = window.to_panel::<RayNotePanel>().expect("failed to convert window to panel");
+    window.to_panel::<RayNotePanel>().expect("failed to convert window to panel");
 
     // Configure low-level Cocoa properties on the NSPanel
     let ns_window_ptr = window.ns_window().unwrap() as *mut AnyObject;
 
     unsafe {
         if let Some(ns_panel) = ns_window_ptr.as_ref() {
-            // Restore native frame position and size if saved
+            // Resolve saved geometry before making a single native resize.
+            let original_frame: tauri_nspanel::objc2_foundation::NSRect = msg_send![ns_panel, frame];
+            let mut frame = original_frame;
+            // Restore the persisted frame, or size only for legacy records.
             if let Ok(app_dir) = app.path().app_data_dir() {
-                let state_file = app_dir.join("window_state.json");
-                let mut restored = false;
-                if let Ok(content) = std::fs::read_to_string(&state_file) {
-                    if let Ok(saved) = serde_json::from_str::<serde_json::Value>(&content) {
-                        if let (Some(x), Some(y), Some(w), Some(h)) = (
-                            saved["x"].as_f64(),
-                            saved["y"].as_f64(),
-                            saved["width"].as_f64(),
-                            saved["height"].as_f64(),
-                        ) {
-                            if w >= 320.0 && h >= 400.0 {
-                                use tauri_nspanel::objc2_foundation::{NSPoint, NSSize, NSRect};
-                                let frame = NSRect {
-                                    origin: NSPoint { x, y },
-                                    size: NSSize { width: w, height: h },
-                                };
-                                let _: () = msg_send![ns_panel, setFrame: frame, display: true];
-                                restored = true;
-                            }
-                        }
+                for filename in ["window_state.json", "window_size.json"] {
+                    let Ok(content) = std::fs::read_to_string(app_dir.join(filename)) else { continue };
+                    let Ok(saved) = serde_json::from_str::<serde_json::Value>(&content) else { continue };
+                    let (Some(w), Some(h)) = (saved["width"].as_f64(), saved["height"].as_f64()) else { continue };
+                    if w < 320.0 || h < 400.0 { continue; }
+                    if let (Some(x), Some(y)) = (saved["x"].as_f64(), saved["y"].as_f64()) {
+                        frame.origin.x = x;
+                        frame.origin.y = y;
+                    } else {
+                        frame.origin.y += frame.size.height - h;
                     }
-                }
-
-                if !restored {
-                    let size_file = app_dir.join("window_size.json");
-                    if let Ok(content) = std::fs::read_to_string(&size_file) {
-                        if let Ok(saved) = serde_json::from_str::<serde_json::Value>(&content) {
-                            if let (Some(w), Some(h)) = (saved["width"].as_f64(), saved["height"].as_f64()) {
-                                if w >= 320.0 && h >= 400.0 {
-                                    use tauri_nspanel::objc2_foundation::NSRect;
-                                    let mut frame: NSRect = msg_send![ns_panel, frame];
-                                    let diff_h = h - frame.size.height;
-                                    frame.origin.y -= diff_h;
-                                    frame.size.width = w;
-                                    frame.size.height = h;
-                                    let _: () = msg_send![ns_panel, setFrame: frame, display: true];
-                                }
-                            }
-                        }
-                    }
+                    frame.size.width = w;
+                    frame.size.height = h;
+                    break;
                 }
             }
 
@@ -274,11 +249,12 @@ fn setup_macos_panel(app: &tauri::App) {
                 let rect: tauri_nspanel::objc2_foundation::NSRect = msg_send![screen, visibleFrame];
                 visible_frames.push((rect.origin.x, rect.origin.y, rect.size.width, rect.size.height));
             }
-            let mut frame: tauri_nspanel::objc2_foundation::NSRect = msg_send![ns_panel, frame];
             let (x, y, w, h) = window_geometry::reachable_frame(
                 (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height), &visible_frames);
             frame.origin.x = x; frame.origin.y = y; frame.size.width = w; frame.size.height = h;
-            let _: () = msg_send![ns_panel, setFrame: frame, display: true];
+            if frame != original_frame {
+                let _: () = msg_send![ns_panel, setFrame: frame, display: false];
+            }
 
             // Level 1000 = kCGScreenSaverWindowLevel / NSScreenSaverWindowLevel
             // Guarantees NoteFast stays strictly ABOVE native fullscreen apps, auxiliary overlays, and spaces
@@ -315,19 +291,8 @@ fn setup_macos_panel(app: &tauri::App) {
 
             // Allow transparent backing so the rounded corners clip smoothly
             let _: () = msg_send![ns_panel, setOpaque: false];
-
-            // Order window to the very front regardless of the active space
-            let _: () = msg_send![ns_panel, orderFrontRegardless];
         }
     }
-
-    let behavior = NSWindowCollectionBehavior::CanJoinAllSpaces
-        | NSWindowCollectionBehavior::FullScreenAuxiliary
-        | NSWindowCollectionBehavior::IgnoresCycle;
-
-    panel.set_collection_behavior(behavior);
-    panel.set_level(1000);
-    panel.show_and_make_key();
 
     #[cfg(target_os = "macos")]
     unsafe {
@@ -441,15 +406,10 @@ unsafe fn setup_macos_edit_menu() {
 fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>) {
     #[cfg(target_os = "macos")]
     {
-        use tauri_nspanel::ManagerExt;
         use objc2::msg_send;
         use objc2::runtime::AnyObject;
 
         remember_frontmost_app();
-
-        if let Ok(panel) = manager.get_webview_panel("main") {
-            panel.show_and_make_key();
-        }
 
         if let Some(win) = manager.get_webview_window("main") {
             if let Ok(ptr) = win.ns_window() {
@@ -570,21 +530,24 @@ pub fn run() {
             let db = std::sync::Arc::new(Database::new(app_dir.clone()).expect("Failed to initialize database"));
             app.manage(db);
 
-            // Restore window size if previously saved
-            let state_file = app_dir.join("window_state.json");
-            let size_file = app_dir.join("window_size.json");
-            let content_opt = std::fs::read_to_string(&state_file)
-                .or_else(|_| std::fs::read_to_string(&size_file));
+            #[cfg(not(target_os = "macos"))]
+            {
+                // Restore window size if previously saved
+                let state_file = app_dir.join("window_state.json");
+                let size_file = app_dir.join("window_size.json");
+                let content_opt = std::fs::read_to_string(&state_file)
+                    .or_else(|_| std::fs::read_to_string(&size_file));
 
-            if let Ok(content) = content_opt {
-                if let Ok(saved) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let (Some(w), Some(h)) = (saved["width"].as_f64(), saved["height"].as_f64()) {
-                        if w >= 320.0 && h >= 400.0 {
-                            if let Some(win) = app.get_webview_window("main") {
-                                let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize {
-                                    width: w,
-                                    height: h,
-                                }));
+                if let Ok(content) = content_opt {
+                    if let Ok(saved) = serde_json::from_str::<serde_json::Value>(&content) {
+                        if let (Some(w), Some(h)) = (saved["width"].as_f64(), saved["height"].as_f64()) {
+                            if w >= 320.0 && h >= 400.0 {
+                                if let Some(win) = app.get_webview_window("main") {
+                                    let _ = win.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                                        width: w,
+                                        height: h,
+                                    }));
+                                }
                             }
                         }
                     }

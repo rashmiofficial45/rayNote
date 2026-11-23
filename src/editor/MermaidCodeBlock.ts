@@ -1,4 +1,6 @@
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import { CodeBlock, type CodeBlockOptions } from "@tiptap/extension-code-block";
+import type { createLowlight } from "lowlight";
+import { incrementalCodeHighlight } from "./incrementalCodeHighlight";
 import { DOMSerializer } from "@tiptap/pm/model";
 import { copyToClipboard } from "../lib/clipboard";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
@@ -36,7 +38,14 @@ function actionButton(label: string, icon: keyof typeof icons) {
   return button;
 }
 
-export const MermaidCodeBlock = CodeBlockLowlight.extend({
+export const MermaidCodeBlock = CodeBlock.extend<CodeBlockOptions & { lowlight: ReturnType<typeof createLowlight> }>({
+  addProseMirrorPlugins() {
+    return [
+      ...(this.parent?.() ?? []),
+      incrementalCodeHighlight(this.name, this.options.lowlight, this.options.defaultLanguage),
+    ];
+  },
+
   addNodeView() {
     return ({ node, editor, getPos }) => {
       // Keep the existing markup and update behavior for regular code blocks.

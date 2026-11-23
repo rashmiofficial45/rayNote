@@ -638,20 +638,6 @@ export function Editor({
   );
 
   /**
-   * Hydrates initial document payload on mount from LRU cache or initialContent.
-   */
-  const seedContent = useMemo(() => {
-    const cached = noteCache.get(noteId);
-    const raw = cached?.content ?? (initialContent || content || "");
-    if (!raw) return ensureHeadingOneForDoc(null);
-    try {
-      return ensureHeadingOneForDoc(JSON.parse(raw));
-    } catch {
-      return ensureHeadingOneForDoc(markdownToTipTapHtml(raw, { ensureFirstLineH1: true }));
-    }
-  }, []); // Only runs once on mount
-
-  /**
    * Single Persistent TipTap Editor Instance:
    * Notice: Dependency array is empty `[]`! The editor is created ONCE and stays mounted.
    * Switching notes happens in place via `editor.commands.setContent()`, eliminating remount flicker.
@@ -660,7 +646,9 @@ export function Editor({
     {
       shouldRerenderOnTransaction: false,
       extensions,
-      content: seedContent,
+      // The note loader validates and installs the initial document as well as later switches.
+      editable: false,
+      content: ensureHeadingOneForDoc(null),
       onUpdate: ({ editor }) => {
         handleEditorUpdate(editor);
       },
@@ -892,7 +880,6 @@ export function Editor({
           return true;
         },
       },
-      autofocus: "end",
     },
     [] // Permanent editor lifetime
   );

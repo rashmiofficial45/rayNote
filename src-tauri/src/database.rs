@@ -12,6 +12,7 @@
 use rusqlite::{Connection, Result, params, OpenFlags, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, RwLock, Arc};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::path::PathBuf;
 use crate::search::{
     calculate_recency_bonus, normalize_query, score_title_fuzzy, score_title_match, tokenize,
@@ -70,6 +71,7 @@ pub struct Database {
     pub writer: Mutex<Connection>,
     pub reader: Mutex<Connection>,
     meta_cache: RwLock<Option<Arc<Vec<NoteSummary>>>>,
+    search_index_checked: AtomicBool,
     pub cache_gen: std::sync::atomic::AtomicU64,
 }
 
@@ -415,22 +417,6 @@ impl Database {
             [],
         )?;
 
-        // Startup self-heal: if notes count != notes_fts count, repopulate FTS index
-        let notes_count: i64 = writer
-            .query_row("SELECT COUNT(*) FROM notes", [], |r| r.get(0))
-            .unwrap_or(0);
-        let fts_count: i64 = writer
-            .query_row("SELECT COUNT(*) FROM notes_fts", [], |r| r.get(0))
-            .unwrap_or(0);
-        if notes_count != fts_count {
-            let _ = writer.execute("DELETE FROM notes_fts", []);
-            let _ = writer.execute(
-                "INSERT INTO notes_fts(rowid, id, title, search_text)
-                 SELECT rowid, id, title, search_text FROM notes",
-                [],
-            );
-        }
-
         // Open independent read-only connection
         let reader = Connection::open_with_flags(
             &db_path,
@@ -443,8 +429,35 @@ impl Database {
             writer: Mutex::new(writer),
             reader: Mutex::new(reader),
             meta_cache: RwLock::new(None),
+            search_index_checked: AtomicBool::new(false),
             cache_gen: std::sync::atomic::AtomicU64::new(0),
         })
+    }
+
+    // Ordinary note reads don't need FTS. Check it before the first body
+    // search instead of counting two entire tables on every launch.
+    fn ensure_search_index(&self) -> Result<()> {
+        if self.search_index_checked.load(Ordering::Acquire) {
+            return Ok(());
+        }
+        let mut conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        if self.search_index_checked.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+        let notes_count: i64 = conn.query_row("SELECT COUNT(*) FROM notes", [], |row| row.get(0))?;
+        let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM notes_fts", [], |row| row.get(0))?;
+        if notes_count != fts_count {
+            let tx = conn.transaction()?;
+            tx.execute("DELETE FROM notes_fts", [])?;
+            tx.execute(
+                "INSERT INTO notes_fts(rowid, id, title, search_text)
+                 SELECT rowid, id, title, search_text FROM notes",
+                [],
+            )?;
+            tx.commit()?;
+        }
+        self.search_index_checked.store(true, Ordering::Release);
+        Ok(())
     }
 
     /// Completely rebuilds the SQLite FTS5 index from the `notes` table.
@@ -762,6 +775,7 @@ impl Database {
             let clean_fts = sanitize_fts5_query(trimmed_query);
 
             if !clean_fts.is_empty() {
+                self.ensure_search_index()?;
                 let conn = self.reader.lock().unwrap_or_else(|e| e.into_inner());
                 let stmt = conn.prepare(
                     "SELECT f.id, snippet(notes_fts, 2, '', '', '…', 15), rank
@@ -968,6 +982,7 @@ impl Database {
         let t_fts = std::time::Instant::now();
         let clean_fts = sanitize_fts5_query(trimmed_query);
         if !clean_fts.is_empty() {
+            self.ensure_search_index()?;
             let conn = self.reader.lock().unwrap_or_else(|e| e.into_inner());
             let stmt = conn.prepare(
                 "SELECT f.id, snippet(notes_fts, 2, '', '', '…', 15), rank
@@ -1321,6 +1336,29 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_note_open_defers_fts_repair_until_body_search() {
+        let dir = std::env::temp_dir().join(format!("raynote_deferred_fts_{}", uuid::Uuid::new_v4()));
+        let db = Database::new(dir.clone()).unwrap();
+        db.writer.lock().unwrap().execute_batch(
+            "INSERT INTO notes (id, title, content, search_text, created_at, updated_at) VALUES
+             ('note', 'Title', 'quartz beacon', 'quartz beacon', '2026-01-01', '2026-01-01');
+             DELETE FROM notes_fts;"
+        ).unwrap();
+        drop(db);
+
+        let db = Database::new(dir.clone()).unwrap();
+        assert_eq!(db.get_note("note").unwrap().unwrap().content, "quartz beacon");
+        assert_eq!(db.get_recent_summaries(1).unwrap().len(), 1);
+        assert!(!db.search_index_checked.load(Ordering::Relaxed));
+
+        let results = db.search_documents("quartz beacon", 5).unwrap();
+        assert!(results.iter().any(|result| result.id == "note" && result.match_type == "content"));
+        assert!(db.search_index_checked.load(Ordering::Relaxed));
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn test_recent_summaries_are_bounded_on_cold_start() {

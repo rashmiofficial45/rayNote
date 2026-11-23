@@ -4,7 +4,12 @@ export function isMermaidLanguage(language: unknown): boolean {
 
 let nextDiagramId = 0;
 const renderedDiagrams = new Map<string, { svg: string }>();
-const pendingDiagrams = new Map<string, Promise<{ svg: string }>>();
+interface PendingDiagram {
+  consumers: number;
+  controller: AbortController;
+  result: Promise<{ svg: string }>;
+}
+const pendingDiagrams = new Map<string, PendingDiagram>();
 const maxCachedDiagrams = 32;
 const maxCachedSvgLength = 256_000;
 
@@ -14,24 +19,41 @@ function getDiagram(source: string, dark: boolean) {
   if (cached) {
     renderedDiagrams.delete(key);
     renderedDiagrams.set(key, cached);
-    return cached;
+    return { result: cached };
   }
 
-  const pending = pendingDiagrams.get(key);
-  if (pending) return pending;
-  const render = renderMermaid(source, dark).then(({ svg }) => {
-    const diagram = { svg };
-    if (svg.length <= maxCachedSvgLength) {
-      if (renderedDiagrams.size >= maxCachedDiagrams) {
-        const oldest = renderedDiagrams.keys().next().value;
-        if (oldest !== undefined) renderedDiagrams.delete(oldest);
+  let pending = pendingDiagrams.get(key);
+  if (!pending) {
+    const controller = new AbortController();
+    const result = renderMermaid(source, dark, controller.signal).then(({ svg }) => {
+      const diagram = { svg };
+      if (svg.length <= maxCachedSvgLength) {
+        if (renderedDiagrams.size >= maxCachedDiagrams) {
+          const oldest = renderedDiagrams.keys().next().value;
+          if (oldest !== undefined) renderedDiagrams.delete(oldest);
+        }
+        renderedDiagrams.set(key, diagram);
       }
-      renderedDiagrams.set(key, diagram);
-    }
-    return diagram;
-  }).finally(() => pendingDiagrams.delete(key));
-  pendingDiagrams.set(key, render);
-  return render;
+      return diagram;
+    }).finally(() => {
+      // A new preview may have replaced this canceled entry.
+      if (pendingDiagrams.get(key)?.controller === controller) pendingDiagrams.delete(key);
+    });
+    pending = { consumers: 0, controller, result };
+    pendingDiagrams.set(key, pending);
+  }
+
+  const job = pending;
+  job.consumers++;
+  return {
+    result: job.result,
+    release: () => {
+      if (--job.consumers === 0 && pendingDiagrams.get(key) === job) {
+        pendingDiagrams.delete(key);
+        job.controller.abort();
+      }
+    },
+  };
 }
 
 export function mountMermaidPreview(container: HTMLElement, source: string): () => void {
@@ -42,8 +64,11 @@ export function mountMermaidPreview(container: HTMLElement, source: string): () 
   if (!container.firstElementChild) container.replaceChildren(status);
 
   let revision = 0;
+  let releaseRender: (() => void) | undefined;
   const render = async () => {
     const current = ++revision;
+    releaseRender?.();
+    releaseRender = undefined;
     if (!source.trim()) {
       status.textContent = "Empty Mermaid diagram.";
       container.replaceChildren(status);
@@ -53,8 +78,9 @@ export function mountMermaidPreview(container: HTMLElement, source: string): () 
     status.textContent = "Rendering diagram…";
     // Keep the existing diagram sized while a theme or source refresh is pending.
     try {
-      const rendered = getDiagram(source, document.documentElement.dataset.resolvedTheme === "dark");
-      const { svg } = rendered instanceof Promise ? await rendered : rendered;
+      const { result, release } = getDiagram(source, document.documentElement.dataset.resolvedTheme === "dark");
+      releaseRender = release;
+      const { svg } = result instanceof Promise ? await result : result;
       if (current !== revision) return;
 
       const diagram = document.createElement("div");
@@ -77,11 +103,19 @@ export function mountMermaidPreview(container: HTMLElement, source: string): () 
     }
   };
 
-  const theme = new MutationObserver(() => void render());
+  let dark = document.documentElement.dataset.resolvedTheme === "dark";
+  const theme = new MutationObserver(() => {
+    const nextDark = document.documentElement.dataset.resolvedTheme === "dark";
+    if (nextDark === dark) return;
+    dark = nextDark;
+    void render();
+  });
   theme.observe(document.documentElement, { attributeFilter: ["data-resolved-theme"] });
   void render();
   return () => {
     revision++;
+    releaseRender?.();
+    releaseRender = undefined;
     theme.disconnect();
   };
 }
@@ -89,11 +123,14 @@ export function mountMermaidPreview(container: HTMLElement, source: string): () 
 // Mermaid configuration is shared across render calls. Apply each theme and
 // finish its render before switching configuration for another diagram.
 let renderQueue: Promise<unknown> = Promise.resolve();
-function renderMermaid(source: string, dark: boolean) {
+function renderMermaid(source: string, dark: boolean, signal: AbortSignal) {
   const render = renderQueue.then(async () => {
+    if (signal.aborted) throw new DOMException("Diagram preview closed", "AbortError");
     // Yield between uncached diagrams so a long note doesn't monopolize the UI.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
+    if (signal.aborted) throw new DOMException("Diagram preview closed", "AbortError");
     const { default: mermaid } = await import("mermaid");
+    if (signal.aborted) throw new DOMException("Diagram preview closed", "AbortError");
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",

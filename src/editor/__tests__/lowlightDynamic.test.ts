@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   lowlight,
   ensureLanguageLoaded,
@@ -115,11 +115,8 @@ def foo():
     });
 
     // Check decorations created on first render
-    const plugins = editor.state.plugins;
-    const lowlightPlugin = plugins.find((p: any) =>
-      p.key?.includes("lowlight") ||
-      p.spec?.key?.key?.includes("lowlight") ||
-      p.spec?.key === "lowlight"
+    const lowlightPlugin = editor.state.plugins.find(plugin =>
+      String((plugin.spec.key as { key?: string } | undefined)?.key).startsWith("raynoteCodeHighlight")
     );
     expect(lowlightPlugin).toBeDefined();
 
@@ -138,4 +135,61 @@ def foo():
 
     editor.destroy();
   });
+
+  it("refreshes syntax when the same document is loaded after its grammar becomes available", () => {
+    const language = "raynote-test-delayed-grammar";
+    const content = '<h1>Test</h1><pre><code class="language-' + language + '">queuedkeyword</code></pre>';
+    const editor = new Editor({ extensions: getExtensions(), content });
+    try {
+      expect(editor.view.dom.querySelector(".hljs-keyword")).toBeNull();
+      lowlight.register(language, () => ({ keywords: "queuedkeyword", contains: [] }));
+      editor.commands.setContent(editor.getJSON());
+      expect(editor.view.dom.querySelector(".hljs-keyword")?.textContent).toBe("queuedkeyword");
+    } finally {
+      editor.destroy();
+    }
+  });
+
+  it("rehighlights only the edited block and keeps decorations correct through undo, conversion, and paste", async () => {
+    await ensureLanguageLoaded("javascript");
+    await ensureLanguageLoaded("json");
+    const content = '<h1>Test</h1><pre><code class="language-javascript">const first = 1;</code></pre><p>Between</p>' +
+      '<blockquote><pre><code class="language-javascript">const second = 2;</code></pre></blockquote>';
+    const editor = new Editor({ extensions: getExtensions(), content });
+    const spy = vi.spyOn(lowlight, "highlight");
+    const compareWithFreshEditor = () => {
+      const fresh = new Editor({ extensions: getExtensions(), content: editor.getJSON() });
+      try {
+        const spans = (instance: Editor) => [...instance.view.dom.querySelectorAll('pre span')]
+          .map(span => [span.textContent, span.className]);
+        expect(spans(editor)).toEqual(spans(fresh));
+      } finally {
+        fresh.destroy();
+      }
+    };
+    try {
+      const first = editor.state.doc.firstChild!.nodeSize;
+      editor.commands.insertContentAt(first + 1, "// comment\n");
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith("javascript", expect.stringContaining("const first"));
+      compareWithFreshEditor();
+
+      expect(editor.commands.undo()).toBe(true);
+      compareWithFreshEditor();
+      expect(editor.commands.redo()).toBe(true);
+      compareWithFreshEditor();
+      editor.view.dispatch(editor.state.tr.setNodeMarkup(first, undefined, { language: "json" }));
+      compareWithFreshEditor();
+      editor.view.dispatch(editor.state.tr.setNodeMarkup(first, editor.schema.nodes.paragraph));
+      compareWithFreshEditor();
+      editor.commands.insertContentAt(first, {
+        type: "codeBlock", attrs: { language: "javascript" }, content: [{ type: "text", text: "return true;" }],
+      });
+      compareWithFreshEditor();
+    } finally {
+      spy.mockRestore();
+      editor.destroy();
+    }
+  });
+
 });
