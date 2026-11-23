@@ -18,6 +18,7 @@ import { ShortcutsExtension } from "./shortcutsExtension";
 import { HorizontalRuleExtension } from "./horizontalRuleExtension";
 import { Markdown } from "@tiptap/markdown";
 import { Table } from "@tiptap/extension-table";
+import { columnResizing, tableEditing } from "@tiptap/pm/tables";
 import { TableRow } from "@tiptap/extension-table-row";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
@@ -29,6 +30,25 @@ import { ImageExtension } from "./ImageExtension";
 import { isSafeUrl } from "../lib/linkUtils";
 import { InternalNoteLink } from "./InternalNoteLink";
 
+// The editor starts read-only while loading; TipTap otherwise omits resizing permanently.
+const ResizableTable = Table.extend({
+  addProseMirrorPlugins() {
+    return [
+      columnResizing({
+        handleWidth: this.options.handleWidth,
+        cellMinWidth: this.options.cellMinWidth,
+        defaultCellMinWidth: this.options.cellMinWidth,
+        View: this.options.View,
+        lastColumnResizable: this.options.lastColumnResizable,
+      }),
+      tableEditing({ allowTableNodeSelection: this.options.allowTableNodeSelection }),
+    ];
+  },
+  addNodeView() {
+    // The resizing plugin supplies its own table node view, even during loading.
+    return null;
+  },
+});
 
 function enhancedBash(hljs: any) {
   const base = (bash as any)(hljs);
@@ -405,8 +425,10 @@ export function getExtensions(
         size: 2,
       },
     }),
-    Table.configure({
+    ResizableTable.configure({
       resizable: true,
+      handleWidth: 8,
+      cellMinWidth: 80,
       allowTableNodeSelection: true,
       HTMLAttributes: {
         class: 'notefast-table',

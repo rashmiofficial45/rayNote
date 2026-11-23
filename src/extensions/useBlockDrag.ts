@@ -562,6 +562,7 @@ export function useBlockDrag({
       // Ignore clicks on resize handles, titlebar drag regions, toolbars, tick sliders
       if (
         target.closest("[data-resize-handle]") ||
+        target.closest(".tiptap table") ||
         target.closest("[data-tauri-drag-region]") ||
         target.closest(".floating-code-block-toolbar, .mermaid-controls") ||
         target.closest(".document-tick-slider")

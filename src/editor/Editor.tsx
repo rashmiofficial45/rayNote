@@ -99,10 +99,19 @@ export const EditorCharCount = memo(function EditorCharCount({
     return doc.textContent?.length ?? 0;
   };
 
+  const getDocWordCount = (doc: any): number => {
+    if (!doc) return 0;
+    const text = typeof doc.textBetween === "function"
+      ? doc.textBetween(0, doc.content.size, "\n", " ")
+      : doc.textContent ?? "";
+    return text.trim() ? text.trim().split(/\s+/u).length : 0;
+  };
+
   const [count, setCount] = useState<number>(() => {
     const doc = editor?.state?.doc;
     return getDocCharCount(doc);
   });
+  const [words, setWords] = useState<number>(() => getDocWordCount(editor?.state?.doc));
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -112,6 +121,7 @@ export const EditorCharCount = memo(function EditorCharCount({
       const doc = editor.state?.doc;
       const c = getDocCharCount(doc);
       setCount((prev: number) => (prev === c ? prev : c));
+      setWords(getDocWordCount(doc));
     };
 
     // Immediate initial computation on load or note change
@@ -141,7 +151,9 @@ export const EditorCharCount = memo(function EditorCharCount({
 
   return (
     <div className="editor-char-count">
-      {count.toLocaleString()} {count === 1 ? "character" : "characters"}
+      <span>{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
+      <span aria-hidden="true"> · </span>
+      <span>{count.toLocaleString()} {count === 1 ? "character" : "characters"}</span>
     </div>
   );
 });

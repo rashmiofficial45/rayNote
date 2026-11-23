@@ -136,6 +136,23 @@ describe("useBlockDrag Hook & Event Behavior", () => {
     expect(scrollEl).not.toBeNull();
   });
 
+  it("does not intercept a drag on an empty table cell edge", () => {
+    const table = document.createElement("table");
+    const cell = table.insertRow().insertCell();
+    const paragraph = document.createElement("p");
+    cell.appendChild(paragraph);
+    const mockEditor = createMockEditor(table);
+    let scrollEl!: HTMLDivElement;
+    act(() => root.render(<TestHarness mockEditor={mockEditor} onMount={(el) => { scrollEl = el; }} />));
+    scrollEl.appendChild(mockEditor.view.dom);
+    const event = new MouseEvent("pointerdown", {
+      bubbles: true, cancelable: true, clientX: 400, clientY: 100, button: 0,
+    });
+    act(() => paragraph.dispatchEvent(event));
+    expect(event.defaultPrevented).toBe(false);
+    expect(document.body.classList.contains("is-block-dragging")).toBe(false);
+  });
+
   it("cancels active drag and resets marquee when Escape key is pressed", () => {
     const blockEl = createMockBlockElement();
     const mockEditor = createMockEditor(blockEl);

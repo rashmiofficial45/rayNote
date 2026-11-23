@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { X } from "lucide-react";
 
 interface ProcessSample {
   pid: number;
@@ -91,7 +90,7 @@ const formatPercent = (value: number | null | undefined) => value == null
   ? "—"
   : value > 0 && value < 0.1 ? "<0.1%" : `${value.toFixed(1)}%`;
 
-export function ResourceUsage({ onDismiss }: { onDismiss?: () => void }) {
+export function ResourceUsage() {
   const usage = useResourceUsage();
   const readings = [
     { name: "RAM", value: usage ? `${Math.round(usage.ramBytes / 1_000_000).toLocaleString()} MB` : "—",
@@ -101,18 +100,6 @@ export function ResourceUsage({ onDismiss }: { onDismiss?: () => void }) {
       : "GPU execution time relative to the sampling interval" },
     { name: "CPU", value: formatPercent(usage?.cpu), description: "Share of total CPU capacity across all logical cores" },
   ];
-  if (onDismiss) {
-    return (
-      <div className="editor-resource-usage" role="group" aria-label="rayNote resource usage">
-        {readings.map(({ name, value, description }) => (
-          <span key={name} title={description}>{name} {value}</span>
-        ))}
-        <button type="button" aria-label="Hide resource usage for this session" onClick={onDismiss}>
-          <X size={12} />
-        </button>
-      </div>
-    );
-  }
   return (
     <section className="settings-card settings-resources" aria-labelledby="resource-usage-title">
       <h2 id="resource-usage-title">Live resource usage</h2>
@@ -131,7 +118,8 @@ export function ResourceUsage({ onDismiss }: { onDismiss?: () => void }) {
 }
 
 export function ResourceUsageFooter() {
-  const [visible, setVisible] = useState(true);
-  if (!visible || !("__TAURI_INTERNALS__" in window)) return null;
-  return <ResourceUsage onDismiss={() => setVisible(false)} />;
+  const usage = useResourceUsage();
+  return <div className="editor-resource-usage" title="rayNote physical memory footprint">
+    RAM {usage ? `${Math.round(usage.ramBytes / 1_000_000).toLocaleString()} MB` : "—"}
+  </div>;
 }
