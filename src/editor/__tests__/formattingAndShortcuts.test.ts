@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi } from "vitest";
 import { Editor } from "@tiptap/core";
+import { ALL_COMMAND_ITEMS } from "../SlashCommand";
 import { getExtensions } from "../extensions";
 import { POPULAR_LANGUAGES } from "../CodeBlockComponent";
 import { getAllBlocks, blockSelectionPluginKey } from "../../extensions/BlockSelection";
@@ -430,6 +431,78 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
       expect(editor.isActive("highlight")).toBe(false);
       editor.destroy();
     });
+  });
+
+  it.each([
+    ["heading1", "heading"],
+    ["bullet_list", "bulletList"],
+    ["code_block", "codeBlock"],
+  ])("runs slash action %s on its invocation paragraph", (id, type) => {
+    const editor = createTestEditor("<h1>Title</h1><p>/trigger</p><p>Keep this</p>");
+    editor.commands.setTextSelection(18);
+    ALL_COMMAND_ITEMS.find(item => item.id === id)!.command({
+      editor, range: { from: 8, to: 16 },
+    });
+    expect(editor.state.doc.child(1).type.name).toBe(type);
+    expect(editor.state.doc.child(1).textContent).toBe("");
+    expect(editor.state.doc.child(2).textContent).toBe("Keep this");
+    editor.destroy();
+  });
+
+  it.each([2, 5])("exits inline code at position %i without removing existing formatting", pos => {
+    const editor = createTestEditor("<p><code>code</code><strong>bold</strong><em>italic</em></p>");
+    editor.commands.setTextSelection(pos);
+    expect(editor.isActive("code")).toBe(true);
+    smartToggleMark(editor, "code");
+    expect(editor.isActive("code")).toBe(false);
+    editor.view.dispatch(editor.state.tr.insertText("plain"));
+    expect(editor.getHTML()).toContain("plain");
+    expect(editor.state.doc.nodeAt(pos)?.marks ?? []).toHaveLength(0);
+    expect(editor.getHTML()).toContain("<strong>bold</strong><em>italic</em>");
+    editor.destroy();
+  });
+
+  it("toggles code with the shortcut and exits at the document end without inserting a space", () => {
+    const editor = createTestEditor("<p>Start:</p>");
+    editor.commands.setTextSelection(7);
+    const press = (key: string, metaKey = false) => {
+      const event = new KeyboardEvent("keydown", { key, metaKey, ctrlKey: !metaKey && key === "e" });
+      return editor.view.someProp("handleKeyDown", handler => handler(editor.view, event));
+    };
+    press("e", true);
+    editor.view.dispatch(editor.state.tr.insertText("code"));
+    expect(editor.getHTML()).toContain("<code>code</code>");
+    press("e", true);
+    expect(editor.isActive("code")).toBe(false);
+    press("e", true);
+    expect(press("ArrowRight")).toBe(true);
+    expect(editor.isActive("code")).toBe(false);
+    expect(editor.getText()).toBe("Start:code");
+    editor.view.dispatch(editor.state.tr.insertText(" normal"));
+    const saved = editor.getJSON();
+    editor.commands.setContent(saved);
+    expect(editor.getHTML()).toContain("<code>code</code> normal");
+    editor.destroy();
+  });
+
+  it("keeps themed highlight attributes through HTML and JSON on formatted text", () => {
+    const editor = createTestEditor("<p><strong>bold</strong> <em>italic</em> <code>code</code></p>");
+    editor.commands.setTextSelection({ from: 2, to: 16 });
+    editor.commands.setMark("highlight", { color: "green", style: "underline" });
+    expect(editor.getHTML()).toContain('data-highlight-style="underline"');
+    expect(editor.getHTML()).toMatch(/<code><mark|<mark[^>]*><code/);
+    const saved = editor.getJSON();
+    editor.commands.setContent(editor.getHTML());
+    expect(editor.getJSON()).toEqual(saved);
+    editor.commands.setTextSelection({ from: 2, to: 16 });
+    editor.commands.setMark("highlight", { color: "pink", style: "pastel" });
+    expect(editor.getHTML()).toContain('data-color="pink"');
+    expect(editor.commands.undo()).toBe(true);
+    expect(editor.commands.redo()).toBe(true);
+    editor.commands.selectAll();
+    editor.commands.unsetHighlight();
+    expect(editor.getHTML()).not.toContain("<mark");
+    editor.destroy();
   });
 
   describe("6. Horizontal Rule (Divider)", () => {

@@ -46,6 +46,7 @@ import {
   downloadFile,
   extractTitleFromMarkdown,
 } from "./lib/utils";
+import { dismissSlashCommand } from "./editor/SlashCommand";
 import { ensureFirstLineHeading } from "./editor/markdownUtils";
 import {
   getRecentNotes,
@@ -347,6 +348,9 @@ function App() {
       onCommandsConfigChange: (val) => setCommandsConfig(val || getStoredCommandsConfig()),
       onNotesCleared: () => {
         activeFetchIdRef.current++;
+        navigationHistoryRef.current = { ids: [], index: -1 };
+        pendingNavigationRef.current = null;
+        selectedNoteIdRef.current = null;
         const snapshot = readActiveNoteSnapshot();
         if (snapshot) discardEditorNote(snapshot.id);
         setNotes([]);
@@ -363,7 +367,7 @@ function App() {
     });
   }, []);
 
-  // Ensure the app and window always gain focus on user click, interaction, or scrolling
+  // Ensure the app and window always gain focus on pointer interaction
   useEffect(() => {
     const handleInteraction = () => {
       if (!document.hasFocus()) {
@@ -372,10 +376,8 @@ function App() {
       }
     };
     window.addEventListener("pointerdown", handleInteraction, { passive: true });
-    window.addEventListener("wheel", handleInteraction, { passive: true });
     return () => {
       window.removeEventListener("pointerdown", handleInteraction);
-      window.removeEventListener("wheel", handleInteraction);
     };
   }, []);
 
@@ -406,13 +408,23 @@ function App() {
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // History stack for navigating back/forward
-  const navigationHistoryRef = useRef<{ ids: string[]; index: number }>({ ids: [], index: -1 });
+  const navigationHistoryRef = useRef<{ ids: string[]; index: number }>(activeNoteId ? { ids: [activeNoteId], index: 0 } : { ids: [], index: -1 });
   const pendingNavigationRef = useRef<{ sourceId: string | null; requestId: number; history: { ids: string[]; index: number } } | null>(null);
   const selectedNoteIdRef = useRef(activeNoteId);
   const pruneHistory = useCallback((deleted: Set<string>) => {
-    const history = navigationHistoryRef.current;
-    const index = history.ids.slice(0, history.index + 1).filter(id => !deleted.has(id)).length - 1;
-    navigationHistoryRef.current = { ids: history.ids.filter(id => !deleted.has(id)), index };
+    const prune = (history: { ids: string[]; index: number }) => {
+      const ids: string[] = [];
+      let index = -1;
+      history.ids.forEach((id, oldIndex) => {
+        if (!deleted.has(id) && ids[ids.length - 1] !== id) ids.push(id);
+        if (oldIndex <= history.index) index = ids.length - 1;
+      });
+      return { ids, index };
+    };
+    navigationHistoryRef.current = prune(navigationHistoryRef.current);
+    if (pendingNavigationRef.current) {
+      pendingNavigationRef.current.history = prune(pendingNavigationRef.current.history);
+    }
   }, []);
 
   const activeNote =
@@ -474,6 +486,9 @@ function App() {
         navigationHistoryRef.current = pendingNavigation.history;
         pendingNavigationRef.current = null;
       }
+      const unavailableId = err instanceof Error && err.name === "NoteUnavailableError"
+        ? selectedNoteIdRef.current : null;
+      if (unavailableId && unavailableId !== failedId) pruneHistory(new Set([unavailableId]));
       selectedNoteIdRef.current = failedId;
 
       const isTargetLoadError =
@@ -487,7 +502,7 @@ function App() {
         <AlertTriangle size={14} className="text-amber-400" />
       );
     },
-    [notes, recentNotes, showToast]
+    [notes, recentNotes, showToast, pruneHistory]
   );
 
   /**
@@ -501,6 +516,8 @@ function App() {
    *    (`activeFetchIdRef`) to prevent out-of-order race conditions.
    */
   const handleSelectNote = useCallback((id: string, summaryHint?: NoteSummary, recordHistory = true, historyIndex?: number) => {
+    if (recordHistory && navigationHistoryRef.current.ids[navigationHistoryRef.current.index] === id &&
+        selectedNoteIdRef.current === id) return;
     const requestId = ++activeFetchIdRef.current;
     if (recordHistory || historyIndex !== undefined) {
       const history = navigationHistoryRef.current;
@@ -959,6 +976,7 @@ function App() {
             }, false);
           } else {
             // Note row is cleanly MISSING from DB!
+            pruneHistory(new Set([savedId]));
             let recoveredId: string | null = null;
             const rawRecovered = safeLocalStorageGetItem("notefast_recovered_note_id");
             if (rawRecovered) {
@@ -1998,14 +2016,16 @@ function App() {
       // Go back in history
       if (isTriggered("history_back", "⌘[")) {
         e.preventDefault();
-        handleGoBack();
+        e.stopPropagation();
+        if (!e.repeat && !hasBlockingDialog) handleGoBack();
         return;
       }
 
       // Go forward in history
       if (isTriggered("history_forward", "⌘]")) {
         e.preventDefault();
-        handleGoForward();
+        e.stopPropagation();
+        if (!e.repeat && !hasBlockingDialog) handleGoForward();
         return;
       }
 
@@ -2074,6 +2094,11 @@ function App() {
         }
         if (visiblePanel === "find") {
           closeFind();
+          return;
+        }
+        if (dismissSlashCommand(editor)) {
+          e.preventDefault();
+          e.stopPropagation();
           return;
         }
         if (!escLosesFocus) {

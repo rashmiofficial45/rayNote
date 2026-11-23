@@ -9,7 +9,7 @@ export function DocumentTickSlider({
   scrollContainerRef,
   className = "",
 }: DocumentTickSliderProps) {
-  const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(0);
   const [isScrollable, setIsScrollable] = useState(false);
   const [isCompact, setIsCompact] = useState(() => {
     return typeof window !== "undefined" ? window.innerWidth < 180 || window.innerHeight < 140 : false;
@@ -17,6 +17,7 @@ export function DocumentTickSlider({
   const [isDragging, setIsDragging] = useState(false);
   const [trackHeight, setTrackHeight] = useState(300);
 
+  const tickCount = Math.min(36, Math.max(16, Math.floor(trackHeight / 14)));
   const trackRef = useRef<HTMLDivElement>(null);
   const rafId = useRef<number | null>(null);
   const dragRafId = useRef<number | null>(null);
@@ -39,7 +40,7 @@ export function DocumentTickSlider({
     }
   }, []);
 
-  // Update scroll metrics and progress (0.0 to 1.0)
+  // Update React state only when the displayed tick changes.
   const updateScrollProgress = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -49,13 +50,9 @@ export function DocumentTickSlider({
     const scrollable = maxScroll > 20;
     setIsScrollable(scrollable);
 
-    if (maxScroll > 0) {
-      const progress = Math.max(0, Math.min(1, scrollTop / maxScroll));
-      setScrollProgress(progress);
-    } else {
-      setScrollProgress(0);
-    }
-  }, [scrollContainerRef]);
+    const progress = maxScroll > 0 ? Math.max(0, Math.min(1, scrollTop / maxScroll)) : 0;
+    setActiveIndex(Math.round(progress * (tickCount - 1)));
+  }, [scrollContainerRef, tickCount]);
 
   // Track element observer
   useEffect(() => {
@@ -77,8 +74,9 @@ export function DocumentTickSlider({
     let activeContainer: HTMLElement | null = null;
 
     const onScroll = () => {
-      if (rafId.current) cancelAnimationFrame(rafId.current);
+      if (rafId.current !== null) return;
       rafId.current = requestAnimationFrame(() => {
+        rafId.current = null;
         updateScrollProgress();
       });
     };
@@ -166,19 +164,12 @@ export function DocumentTickSlider({
 
   // Generate discrete tick marks representing sections / parts of the document with big and small bars
   const ticks = useMemo(() => {
-    const count = Math.min(36, Math.max(16, Math.floor(trackHeight / 14)));
-    return Array.from({ length: count }, (_, id) => {
+    return Array.from({ length: tickCount }, (_, id) => {
       // Big and small bar pattern matching the document spine in screenshot
       const isBig = id === 0 || id === 2 || (id > 2 && (id % 7 === 0 || id % 11 === 0));
       return { id, isBig };
     });
-  }, [trackHeight]);
-
-  // Determine which discrete tick part is currently active / crossed
-  const activeIndex = useMemo(() => {
-    if (ticks.length === 0) return 0;
-    return Math.min(ticks.length - 1, Math.max(0, Math.round(scrollProgress * (ticks.length - 1))));
-  }, [scrollProgress, ticks.length]);
+  }, [tickCount]);
 
   // Smoothly scroll to a specific tick part or ratio
   const scrollToRatio = useCallback(

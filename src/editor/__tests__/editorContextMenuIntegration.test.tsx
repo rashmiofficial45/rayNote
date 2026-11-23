@@ -18,7 +18,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe("Editor Secondary Click (Context Menu) Integration", () => {
+describe("Editor pointer interactions", () => {
   let host: HTMLDivElement;
   let root: Root;
 
@@ -35,6 +35,55 @@ describe("Editor Secondary Click (Context Menu) Integration", () => {
     });
     host.remove();
     document.querySelectorAll(".editor-context-menu").forEach((el) => el.remove());
+  });
+
+  it("keeps typing on the slash line after a mouse click in the portalled menu", async () => {
+    await act(async () => root.render(
+      <Editor noteId="slash-click" initialContent="# Title" onUpdate={vi.fn()} />
+    ));
+    const editor = Reflect.get(window, "__RAYNOTE_EDITOR__") as import("@tiptap/core").Editor;
+    await act(async () => {
+      editor.commands.setContent("<h1>Title</h1><p></p><p>Below</p>");
+      editor.view.focus();
+      editor.commands.setTextSelection(8);
+      editor.view.dispatch(editor.state.tr.insertText("/"));
+    });
+    const option = document.querySelector<HTMLButtonElement>(".slash-command-item");
+    expect(option).toBeTruthy();
+    await act(async () => {
+      option!.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+      option!.dispatchEvent(new MouseEvent("click", { bubbles: true, clientY: 250 }));
+    });
+    await act(async () => { editor.commands.insertContent("Here"); });
+    expect(editor.state.doc.child(1).textContent).toBe("Here");
+    expect(editor.state.doc.child(2).textContent).toBe("Below");
+  });
+
+  it("consumes only outward wheel events at the scroll boundaries", async () => {
+    await act(async () => root.render(
+      <Editor noteId="wheel-edge" initialContent="# Title" onUpdate={vi.fn()} />
+    ));
+    const container = host.querySelector<HTMLElement>("[data-scroll-container]")!;
+    Object.defineProperties(container, {
+      clientHeight: { value: 200 },
+      scrollHeight: { value: 1000 },
+    });
+    const wheel = (deltaY: number) => container.dispatchEvent(
+      new WheelEvent("wheel", { deltaY, cancelable: true, bubbles: true })
+    );
+    const scroll = (top: number) => {
+      container.scrollTop = top;
+      container.dispatchEvent(new Event("scroll"));
+    };
+    scroll(0);
+    expect(wheel(-12)).toBe(false);
+    expect(wheel(12)).toBe(true);
+    scroll(400);
+    expect(wheel(12)).toBe(true);
+    expect(wheel(-12)).toBe(true);
+    scroll(800);
+    expect(wheel(12)).toBe(false);
+    expect(wheel(-12)).toBe(true);
   });
 
   it("suppresses default native context menu by calling preventDefault() on contextmenu event", async () => {

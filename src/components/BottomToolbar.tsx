@@ -26,6 +26,8 @@ import {
   Moon,
   Monitor,
 } from "lucide-react";
+import { blockSelectionPluginKey } from "../extensions/BlockSelection";
+import { HIGHLIGHT_COLORS, HIGHLIGHT_STYLES } from "../editor/textHighlight";
 import { smartToggleBlockFormat, smartToggleMark } from "../editor/formatMemory";
 import {
   ACCENT_OPTIONS,
@@ -56,6 +58,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
+  const [highlightOpen, setHighlightOpen] = useState(false);
   const commandsConfig = useCommandsConfig();
 
   const formatTitle = (label: string, id: string, defaultHotkey = "") => {
@@ -169,6 +172,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
   useEffect(() => {
     if (!isMenuOpen) {
+      setHighlightOpen(false);
       setIsFontPickerOpen(false);
       return;
     }
@@ -206,6 +210,9 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
           isUnderline: false,
           isStrike: false,
           isHighlight: false,
+          hasSelectedBlocks: false,
+          highlightColor: null,
+          highlightStyle: "classic",
           isCode: false,
           isHeading1: false,
           isHeading2: false,
@@ -218,12 +225,16 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
           canRedo: false,
         };
       }
+      const highlight = ed.getAttributes("highlight");
       return {
         isBold: ed.isActive("bold"),
         isItalic: ed.isActive("italic"),
         isUnderline: ed.isActive("underline"),
         isStrike: ed.isActive("strike"),
         isHighlight: ed.isActive("highlight"),
+        hasSelectedBlocks: Boolean(blockSelectionPluginKey.getState(ed.state)?.selectedPositions.length),
+        highlightColor: highlight.color ?? null,
+        highlightStyle: highlight.style ?? "classic",
         isCode: ed.isActive("code"),
         isHeading1: ed.isActive("heading", { level: 1 }),
         isHeading2: ed.isActive("heading", { level: 2 }),
@@ -266,8 +277,13 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
   const handleMouseLeave = () => {
     setIsHovered(false);
-    setIsMenuOpen(false);
+    if (!highlightOpen) setIsMenuOpen(false);
     setIsFontPickerOpen(false);
+  };
+
+  const pickerStyle = formatState?.isHighlight ? formatState.highlightStyle : "stripes";
+  const applyHighlight = (color: string | null, style: string) => {
+    smartToggleMark(editor, "highlight", { color, style });
   };
 
   return (
@@ -331,9 +347,12 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleMark(editor, "highlight")}
-              className={`toolbar-btn liquid-btn ${formatState?.isHighlight ? "is-active" : ""}`}
-              title={formatTitle("Highlight", "highlight", "⇧⌘H")}
+              onClick={() => setHighlightOpen(open => !open)}
+              className={`toolbar-btn liquid-btn ${formatState?.isHighlight || highlightOpen ? "is-active" : ""}`}
+              aria-expanded={highlightOpen}
+              aria-controls="editor-highlight-options"
+              aria-label="Highlight options"
+              title={formatTitle("Highlight options", "highlight", "⇧⌘H")}
             >
               <HighlightIcon size={14} />
             </button>
@@ -342,10 +361,42 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
               onClick={() => smartToggleMark(editor, "code")}
               className={`toolbar-btn liquid-btn ${formatState?.isCode ? "is-active" : ""}`}
               title={formatTitle("Inline Code", "code", "⌘E")}
+              aria-label="Inline Code"
+              aria-pressed={formatState?.isCode ?? false}
             >
               <Code size={14} />
             </button>
           </div>
+
+          {highlightOpen && (
+            <div id="editor-highlight-options" className="editor-highlight-options"
+              onMouseDown={event => event.preventDefault()}>
+              <div className="highlight-swatches" role="group" aria-label="Highlight color">
+                {HIGHLIGHT_COLORS.map(color => (
+                  <button key={color} type="button" data-color={color}
+                    data-highlight-style={pickerStyle}
+                    title={color[0].toUpperCase() + color.slice(1)}
+                    aria-label={color[0].toUpperCase() + color.slice(1)}
+                    aria-pressed={formatState?.highlightColor === color}
+                    onClick={() => applyHighlight(color, pickerStyle)} />
+                ))}
+              </div>
+              <div className="highlight-styles" role="group" aria-label="Highlight style">
+                {HIGHLIGHT_STYLES.map(([style, label]) => (
+                  <button key={style} type="button" data-highlight-style={style}
+                    data-color={formatState?.highlightColor ?? "yellow"}
+                    aria-pressed={pickerStyle === style}
+                    onClick={() => applyHighlight(formatState?.highlightColor ?? "yellow", style)}>
+                    <span className="highlight-style-sample" aria-hidden="true" />{label}
+                  </button>
+                ))}
+                <button type="button" aria-label="Remove highlight" disabled={!formatState?.isHighlight && !formatState?.hasSelectedBlocks}
+                  onClick={() => smartToggleMark(editor, "highlight", null)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="expanded-toolbar-divider" />
 

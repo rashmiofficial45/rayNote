@@ -66,6 +66,33 @@ describe('Asynchronous editor document guards', () => {
     expect(editor.getText()).toContain('local edit');
   });
 
+  it('observes native boundary scroll events without writing a second scroll limit', async () => {
+    noteCache.set('note-a', doc('Cached title'), '2026-01-01', 'Cached title');
+    const callbacks: ResizeObserverCallback[] = [];
+    class ResizeProbe {
+      constructor(callback: ResizeObserverCallback) { callbacks.push(callback); }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", ResizeProbe);
+    try {
+      await render('note-a');
+      await act(async () => { await vi.advanceTimersByTimeAsync(25); });
+      const scroll = host.querySelector<HTMLElement>('[data-scroll-container]')!;
+      for (const callback of [...callbacks]) {
+        callback([], new ResizeProbe(() => {}));
+      }
+      const scrollWrite = vi.spyOn(scroll, 'scrollTop', 'set');
+      scroll.scrollTop = 1000;
+      scrollWrite.mockClear();
+      for (let i = 0; i < 6; i++) scroll.dispatchEvent(new Event('scroll'));
+      expect(scrollWrite).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('keeps the live scroll and rendered document when a database refresh only changes metadata', async () => {
     let resolve!: (note: unknown) => void;
     vi.mocked(invoke).mockImplementation(command => command === 'get_note' ? new Promise(r => { resolve = r; }) : Promise.resolve(undefined));

@@ -301,7 +301,11 @@ function toggleBlockFormatAtSelection(editor: Editor, target: FormatKind): boole
  * If block selection is active, applies or removes the mark across all text nodes
  * in the selected blocks without altering block or list container hierarchy.
  */
-export function smartToggleMark(editor: Editor, markType: MarkKind): boolean {
+export function smartToggleMark(
+  editor: Editor,
+  markType: MarkKind,
+  highlight?: { color: string | null; style: string } | null,
+): boolean {
   const { state, view } = editor;
   const blockState = blockSelectionPluginKey.getState(state);
 
@@ -317,9 +321,11 @@ export function smartToggleMark(editor: Editor, markType: MarkKind): boolean {
       case "strike":
         return editor.chain().focus().toggleStrike().run();
       case "highlight":
+        if (highlight === null) return editor.commands.unsetMark("highlight", { extendEmptyMarkRange: true });
+        if (highlight) return editor.commands.setMark("highlight", highlight);
         return editor.chain().focus().toggleHighlight().run();
       case "code":
-        return editor.chain().focus().toggleCode().run();
+        return editor.chain().focus(undefined, { scrollIntoView: false }).toggleCode().run();
     }
   }
 
@@ -350,13 +356,12 @@ export function smartToggleMark(editor: Editor, markType: MarkKind): boolean {
 
   if (!hasAnyText) return false;
 
-  let tr = state.tr;
-  for (const range of textRanges) {
-    if (hasMarkAll) {
-      tr = tr.removeMark(range.from, range.to, pmMarkType);
-    } else {
-      tr = tr.addMark(range.from, range.to, pmMarkType.create());
-    }
+  const remove = highlight === null || (highlight === undefined && hasMarkAll);
+  const mark = remove ? null : pmMarkType.create(highlight ?? undefined);
+  const tr = state.tr;
+  for (const { from, to } of textRanges) {
+    if (mark) tr.addMark(from, to, mark);
+    else tr.removeMark(from, to, pmMarkType);
   }
 
   view.dispatch(tr);

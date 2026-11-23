@@ -657,6 +657,11 @@ body,
   transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.app-shell .title-bar-left:focus-within {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 .title-bar-right {
   display: inline-flex;
   align-self: start;
@@ -765,6 +770,7 @@ body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .
 
 /* ── Close Button (Single Red X — macOS Style) ─────────────────────── */
 .close-btn-x {
+  flex-shrink: 0;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -947,7 +953,7 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
 .editor-wrapper {
   contain: layout style;
   max-width: 100%;
-  overflow-x: hidden !important;
+  overflow: clip;
 }
 
 .tiptap {
@@ -969,7 +975,7 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
   position: relative;
   box-sizing: border-box;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
   overflow-wrap: anywhere;
   word-break: break-word;
   text-rendering: geometricPrecision;
@@ -1823,6 +1829,41 @@ pre.notefast-code-block:hover {
   padding: 1px 4px;
 }
 
+/* Shared palette for the formatting controls and saved text marks. */
+:is(mark, .editor-highlight-options button)[data-color="yellow"] { --highlight-ink: #d5a700; }
+:is(mark, .editor-highlight-options button)[data-color="green"]  { --highlight-ink: #32aa70; }
+:is(mark, .editor-highlight-options button)[data-color="blue"]   { --highlight-ink: #438de6; }
+:is(mark, .editor-highlight-options button)[data-color="pink"]   { --highlight-ink: #db6ea3; }
+:is(mark, .editor-highlight-options button)[data-color="purple"] { --highlight-ink: #a17ade; }
+:is(mark, .editor-highlight-options button)[data-color="orange"] { --highlight-ink: #db883c; }
+:is(mark, .editor-highlight-options button)[data-color="red"]    { --highlight-ink: #db6464; }
+:is(mark, .editor-highlight-options button)[data-color="gray"]   { --highlight-ink: #8591a2; }
+
+.tiptap mark:is([data-color], [data-highlight-style]) {
+  --highlight-tint: var(--highlight-ink, var(--color-accent));
+  padding: 1px 0;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  color: inherit;
+  background: color-mix(in srgb, var(--highlight-tint) 31%, transparent);
+}
+
+.tiptap mark[data-highlight-style="pastel"] {
+  background: color-mix(in srgb, var(--highlight-tint) 17%, transparent);
+}
+
+.tiptap mark[data-highlight-style="underline"] {
+  background: transparent;
+  text-decoration: underline;
+  text-decoration-color: var(--highlight-tint);
+  text-decoration-thickness: 2px;
+  text-underline-offset: .16em;
+}
+
+.tiptap mark[data-color] code, .tiptap mark[data-highlight-style] code {
+  background: transparent;
+}
+
 .tiptap a,
 .editor-link,
 .tiptap a span,
@@ -1983,6 +2024,82 @@ pre.notefast-code-block:hover {
   align-items: center;
   justify-content: center;
   gap: 4px;
+}
+
+.editor-highlight-options {
+  display: grid;
+  gap: 6px;
+  padding: 7px 4px 4px;
+  border-top: 1px solid var(--separator);
+}
+
+.highlight-swatches, .highlight-styles {
+  display: grid;
+  align-items: center;
+  gap: 5px;
+}
+
+.highlight-swatches { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.highlight-styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+.highlight-swatches button, .highlight-style-sample {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--highlight-ink) 50%, transparent);
+  border: 1px solid var(--btn-liquid-border);
+}
+
+.highlight-swatches button { height: 23px; }
+.highlight-style-sample { width: 14px; height: 14px; flex: none; }
+
+.highlight-styles button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 26px;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--text-primary);
+  border-radius: 999px;
+}
+
+:is(mark, .highlight-swatches button)[data-highlight-style="stripes"],
+[data-highlight-style="stripes"] > .highlight-style-sample {
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px,
+    color-mix(in srgb, var(--highlight-ink, var(--color-accent)) 62%, transparent) 4px 6px);
+}
+
+:is(mark, .highlight-swatches button)[data-highlight-style="dots"],
+[data-highlight-style="dots"] > .highlight-style-sample {
+  background-image: radial-gradient(color-mix(in srgb, var(--highlight-ink, var(--color-accent)) 78%, transparent) 1px, transparent 1.5px);
+  background-size: 5px 5px;
+}
+
+.highlight-swatches button[data-highlight-style="pastel"],
+[data-highlight-style="pastel"] > .highlight-style-sample {
+  background: color-mix(in srgb, var(--highlight-ink) 22%, transparent);
+}
+
+.highlight-swatches button[data-highlight-style="underline"],
+[data-highlight-style="underline"] > .highlight-style-sample {
+  background: transparent;
+  box-shadow: inset 0 -3px var(--highlight-ink);
+}
+
+.highlight-swatches button:hover,
+.highlight-swatches button[aria-pressed="true"],
+.editor-highlight-options button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.highlight-styles button:hover,
+.highlight-styles button[aria-pressed="true"] {
+  background: var(--btn-liquid-bg-hover);
+}
+
+.highlight-styles button:disabled {
+  opacity: .4;
 }
 
 .expanded-toolbar-divider {
@@ -2764,20 +2881,10 @@ body:has(.command-overlay) .editor-char-count {
   user-select: none !important;
 }
 
-[data-scroll-container].is-block-dragging {
-  overflow-x: hidden !important;
-  overscroll-behavior: none !important;
-  overscroll-behavior-y: none !important;
-  overscroll-behavior-x: none !important;
-}
-
-[data-scroll-container],
-.editor-wrapper,
-.tiptap {
-  overflow-x: hidden !important;
-  overscroll-behavior: none !important;
-  overscroll-behavior-y: none !important;
-  overscroll-behavior-x: none !important;
+/* Only the viewport owns vertical scrolling. overflow-x: hidden on the
+   editable document also computes overflow-y: auto, creating a nested scroller. */
+[data-scroll-container] {
+  overscroll-behavior: none;
 }
 
 /* Hide native text selection when blocks are selected */

@@ -1,8 +1,10 @@
 import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import { getStoredCommandsConfig } from "../lib/commandsConfig";
 import { Extension } from "@tiptap/react";
-import Suggestion, { SuggestionProps, SuggestionKeyDownProps, SuggestionOptions, findSuggestionMatch } from "@tiptap/suggestion";
+import Suggestion, { SuggestionProps, SuggestionKeyDownProps, SuggestionOptions, exitSuggestion, findSuggestionMatch } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
+import { PluginKey, type Transaction } from "@tiptap/pm/state";
+import { getEditorNoteId } from "../lib/db";
 import { Editor, Range } from "@tiptap/core";
 import "@tiptap/extension-underline";
 import tippy, { Instance as TippyInstance } from "tippy.js";
@@ -45,6 +47,21 @@ export interface CommandItem {
   command: (props: { editor: Editor; range: Range }) => void;
 }
 
+const slashCommandKey = new PluginKey<{ active: boolean; range: Range }>("raynoteSlashCommand");
+
+export function dismissSlashCommand(editor: Editor | undefined): boolean {
+  if (!editor || editor.isDestroyed || !slashCommandKey.getState(editor.state)?.active) return false;
+  exitSuggestion(editor.view, slashCommandKey);
+  return true;
+}
+
+function atSlashInvocation(editor: Editor, range: Range) {
+  return editor.chain()
+    .setTextSelection(range.from)
+    .deleteRange(range)
+    .focus(undefined, { scrollIntoView: false });
+}
+
 export const ALL_COMMAND_ITEMS: CommandItem[] = [
   {
     id: "heading1",
@@ -53,10 +70,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["h1", "heading1", "1"],
     icon: <Heading1 size={13} />,
     command: ({ editor, range }) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
+      atSlashInvocation(editor, range)
         .setNode("heading", { level: 1 })
         .run();
     },
@@ -68,10 +82,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["h2", "heading2", "2"],
     icon: <Heading2 size={13} />,
     command: ({ editor, range }) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
+      atSlashInvocation(editor, range)
         .setNode("heading", { level: 2 })
         .run();
     },
@@ -83,10 +94,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["h3", "heading3", "3"],
     icon: <Heading3 size={13} />,
     command: ({ editor, range }) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
+      atSlashInvocation(editor, range)
         .setNode("heading", { level: 3 })
         .run();
     },
@@ -98,7 +106,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["todo", "task", "tasks", "checklist", "check"],
     icon: <CheckSquare size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleTaskList().run();
+      atSlashInvocation(editor, range).toggleTaskList().run();
     },
   },
   {
@@ -108,7 +116,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["bullet", "bullets", "ul", "list"],
     icon: <List size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBulletList().run();
+      atSlashInvocation(editor, range).toggleBulletList().run();
     },
   },
   {
@@ -118,7 +126,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["number", "numbered", "num", "ordered", "ol", "1."],
     icon: <ListOrdered size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleOrderedList().run();
+      atSlashInvocation(editor, range).toggleOrderedList().run();
     },
   },
   {
@@ -128,7 +136,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["divider", "hr", "line", "rule", "separator"],
     icon: <Minus size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setHorizontalRule().run();
+      atSlashInvocation(editor, range).setHorizontalRule().run();
     },
   },
   {
@@ -138,7 +146,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["code", "codeblock", "pre"],
     icon: <Code2 size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
+      atSlashInvocation(editor, range).toggleCodeBlock().run();
     },
   },
   {
@@ -148,35 +156,51 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["image", "img", "photo", "picture", "screenshot", "upload"],
     icon: <ImageIcon size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).run();
+      atSlashInvocation(editor, range).run();
+      const noteId = getEditorNoteId();
       const input = document.createElement("input");
       input.type = "file";
       input.accept = "image/*";
-      input.onchange = (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const dataUrl = ev.target?.result as string;
-            if (dataUrl) {
-              const img = new Image();
-              img.onload = () => {
-                const editorWidth = editor.view.dom.clientWidth || 600;
-                const initialWidth = Math.round(
-                  Math.min(img.naturalWidth || 500, Math.max(300, editorWidth - 32))
-                );
-                editor.chain().focus().setImage({
-                  src: dataUrl,
-                  alt: file.name,
-                  width: `${initialWidth}px`,
-                  alignment: "center",
-                }).run();
-              };
-              img.src = dataUrl;
-            }
-          };
-          reader.readAsDataURL(file);
+      let position = range.from;
+      let valid = true;
+      const mapPosition = ({ transaction }: { transaction: Transaction }) => {
+        const mapped = transaction.mapping.mapResult(position, -1);
+        position = mapped.pos;
+        valid &&= !mapped.deletedAcross && getEditorNoteId() === noteId;
+      };
+      const stopTracking = () => editor.off("transaction", mapPosition);
+      const canInsert = () => valid && !editor.isDestroyed && editor.isEditable && getEditorNoteId() === noteId;
+      editor.on("transaction", mapPosition);
+      input.oncancel = stopTracking;
+      input.onchange = () => {
+        const file = input.files?.[0];
+        if (!file || !canInsert()) {
+          stopTracking();
+          return;
         }
+        const reader = new FileReader();
+        reader.onerror = reader.onabort = stopTracking;
+        reader.onload = () => {
+          if (typeof reader.result !== "string") {
+            stopTracking();
+            return;
+          }
+          const src = reader.result;
+          const image = new Image();
+          image.onerror = stopTracking;
+          image.onload = () => {
+            stopTracking();
+            if (!canInsert()) return;
+            const editorWidth = editor.view.dom.clientWidth || 600;
+            const width = Math.round(Math.min(image.naturalWidth || 500, Math.max(300, editorWidth - 32)));
+            editor.chain().insertContentAt(position, {
+              type: "image",
+              attrs: { src, alt: file.name, width: `${width}px`, alignment: "center" },
+            }).focus(undefined, { scrollIntoView: false }).run();
+          };
+          image.src = src;
+        };
+        reader.readAsDataURL(file);
       };
       input.click();
     },
@@ -188,7 +212,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["inline", "code", "inlinecode", "ic"],
     icon: <Code size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleCode().run();
+      atSlashInvocation(editor, range).toggleCode().run();
     },
   },
   {
@@ -198,7 +222,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["quote", "blockquote", "bq"],
     icon: <Quote size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBlockquote().run();
+      atSlashInvocation(editor, range).toggleBlockquote().run();
     },
   },
   {
@@ -207,7 +231,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["text", "paragraph", "p", "plain"],
     icon: <Type size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).setParagraph().run();
+      atSlashInvocation(editor, range).setParagraph().run();
     },
   },
   {
@@ -217,7 +241,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["bold", "b"],
     icon: <Bold size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleBold().run();
+      atSlashInvocation(editor, range).toggleBold().run();
     },
   },
   {
@@ -227,7 +251,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["italic", "i", "em"],
     icon: <Italic size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleItalic().run();
+      atSlashInvocation(editor, range).toggleItalic().run();
     },
   },
   {
@@ -237,7 +261,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["underline", "u"],
     icon: <UnderlineIcon size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleUnderline().run();
+      atSlashInvocation(editor, range).toggleUnderline().run();
     },
   },
   {
@@ -247,7 +271,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["strike", "strikethrough", "del"],
     icon: <Strikethrough size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleStrike().run();
+      atSlashInvocation(editor, range).toggleStrike().run();
     },
   },
   {
@@ -257,7 +281,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["highlight", "mark", "hl"],
     icon: <Highlighter size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).toggleHighlight().run();
+      atSlashInvocation(editor, range).toggleHighlight().run();
     },
   },
   {
@@ -266,10 +290,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["table", "grid"],
     icon: <TableIcon size={13} />,
     command: ({ editor, range }) => {
-      editor
-        .chain()
-        .focus()
-        .deleteRange(range)
+      atSlashInvocation(editor, range)
         .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
         .run();
     },
@@ -281,7 +302,7 @@ export const ALL_COMMAND_ITEMS: CommandItem[] = [
     aliases: ["link", "url", "href", "hyperlink"],
     icon: <Link2 size={13} />,
     command: ({ editor, range }) => {
-      editor.chain().focus().deleteRange(range).run();
+      atSlashInvocation(editor, range).run();
       window.dispatchEvent(
         new CustomEvent("raynote:open-link-popover", {
           detail: { mode: "edit" },
@@ -439,6 +460,7 @@ export const CommandList = forwardRef<CommandListRef, CommandListProps>(
               key={item.title}
               type="button"
               className={`slash-command-item ${isSelected ? "is-selected" : ""}`}
+              onMouseDown={(event) => event.preventDefault()}
               onClick={() => selectItem(index)}
               onMouseMove={(e) => handlePointerAction(e, index)}
             >
@@ -536,7 +558,12 @@ const renderItems = () => {
     });
   };
 
-  const handleWindowResizeOrScroll = () => {
+  const selectCurrentItem = (item: CommandItem) => {
+    if (latestProps?.items.includes(item)) latestProps.command(item);
+  };
+
+  const handleWindowResizeOrScroll = (event: Event) => {
+    if (event.target instanceof Node && component?.element.contains(event.target)) return;
     if (latestProps) {
       updateMenuSizingAndPosition(latestProps);
     }
@@ -546,7 +573,7 @@ const renderItems = () => {
     onStart: (props: SuggestionProps<CommandItem>) => {
       latestProps = props;
       component = new ReactRenderer(CommandList, {
-        props,
+        props: { ...props, command: selectCurrentItem },
         editor: props.editor,
       });
 
@@ -594,7 +621,7 @@ const renderItems = () => {
     },
     onUpdate(props: SuggestionProps<CommandItem>) {
       latestProps = props;
-      component?.updateProps(props);
+      component?.updateProps({ ...props, command: selectCurrentItem });
       updateMenuSizingAndPosition(props);
     },
     onKeyDown(props: SuggestionKeyDownProps) {
@@ -616,11 +643,13 @@ const renderItems = () => {
 
 export const SlashCommand = Extension.create({
   name: "slashCommand",
+  priority: 1200,
 
   addOptions() {
     return {
       suggestion: {
         char: "/",
+        pluginKey: slashCommandKey,
         findSuggestionMatch: (config: Parameters<typeof findSuggestionMatch>[0]) => {
           const trigger = getStoredCommandsConfig().find(c => c.id === "slash")?.hotkey;
           return findSuggestionMatch({ ...config, char: trigger?.length === 1 ? trigger : "/" });
@@ -634,6 +663,9 @@ export const SlashCommand = Extension.create({
           range: Range;
           props: CommandItem;
         }) => {
+          const current = slashCommandKey.getState(editor.state);
+          if (!editor.isEditable || !current?.active) return;
+          if (current.range.from !== range.from || current.range.to !== range.to) return;
           props.command({ editor, range });
         },
         allow: () => getStoredCommandsConfig().find(c => c.id === "slash")?.enabled !== false,

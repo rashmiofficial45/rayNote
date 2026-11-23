@@ -5,7 +5,7 @@ import Document from "@tiptap/extension-document";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
-import Highlight from "@tiptap/extension-highlight";
+import { TextHighlight } from "./textHighlight";
 import Typography from "@tiptap/extension-typography";
 import { MermaidCodeBlock } from "./MermaidCodeBlock";
 import Link from "@tiptap/extension-link";
@@ -309,6 +309,19 @@ export const TitleBarDefaultExtension = Extension.create<PasteTitleOptions>({
   },
 });
 
+const EditorStarterKit = StarterKit.extend({
+  addExtensions() {
+    return (this.parent?.() ?? []).map(extension => extension.name === "code"
+      ? extension.extend({
+          // Allow a highlight on code while retaining its existing link and text-style exclusions.
+          excludes: "bold italic strike underline link",
+          // TipTap's default ArrowRight inserts a space at the end of a paragraph.
+          exitable: false,
+        })
+      : extension);
+  },
+});
+
 export function getExtensions(
   slashCommandExtension?: any,
   pasteTitleOptions?: PasteTitleOptions
@@ -317,7 +330,7 @@ export function getExtensions(
     CustomDocument,
     TitleBarDefaultExtension.configure(pasteTitleOptions),
     PasteTitleExtension.configure(pasteTitleOptions),
-    StarterKit.configure({
+    EditorStarterKit.configure({
       document: false,
       codeBlock: false, // we use CodeBlockLowlight instead
       horizontalRule: false, // replaced by smart HorizontalRuleExtension below
@@ -359,9 +372,7 @@ export function getExtensions(
     TaskItem.configure({
       nested: true,
     }),
-    Highlight.configure({
-      multicolor: false,
-    }),
+    TextHighlight,
     Typography,
     MermaidCodeBlock.configure({
       lowlight,

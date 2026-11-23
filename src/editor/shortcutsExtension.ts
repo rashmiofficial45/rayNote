@@ -129,6 +129,14 @@ export const ShortcutsExtension = Extension.create({
       "Mod-Shift--": () => this.editor.commands.setHorizontalRule(),
       "Mod-_": () => this.editor.commands.setHorizontalRule(),
 
+      ArrowRight: () => {
+        const { selection } = this.editor.state;
+        if (!(selection instanceof TextSelection) || !selection.empty ||
+            selection.head !== selection.$head.end() || selection.$head.after(1) !== this.editor.state.doc.content.size ||
+            !this.editor.isActive("code")) return false;
+        return this.editor.commands.unsetCode();
+      },
+
       // Insert or edit a link with ⌘L. ⌘K belongs to the command palette.
       "Mod-l": () => {
         if (!this.editor.isEditable) return true;

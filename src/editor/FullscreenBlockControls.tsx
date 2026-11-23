@@ -149,7 +149,7 @@ export function FullscreenBlockControls({ editor, zoomLevel = 1, scrollContainer
     };
     scroll.addEventListener("pointermove", onPointer);
     scroll.addEventListener("pointerleave", onLeave);
-    scroll.addEventListener("scroll", onScroll);
+    scroll.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onUpdate);
     window.addEventListener("blur", onUpdate);
     window.addEventListener("keydown", onKey, true);

@@ -1136,7 +1136,11 @@ export function Editor({
           // CACHE MISS: fetch from SQLite asynchronously
           try {
             const fullNote = await getNote(noteId);
-            if (!fullNote) throw new Error("Note could not be loaded");
+            if (!fullNote) {
+              const error = new Error("Note could not be loaded");
+              error.name = "NoteUnavailableError";
+              throw error;
+            }
             if (!cancelled && !editor.isDestroyed) {
               noteCache.set(noteId, fullNote.content, fullNote.updated_at, fullNote.title, 0, false);
               const applied = await loadAndApplyDoc(fullNote.content, noteId, 0);
@@ -1186,38 +1190,43 @@ export function Editor({
   // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
   useEffect(() => {
     const container = scrollContainerRef.current;
-    const content = editor?.view.dom;
-    if (!container || !content) return;
+    if (!container || !editor) return;
 
-    let maxContentScroll = Infinity;
-    const clampScroll = () => {
-      if (container.scrollTop > maxContentScroll) {
-        container.scrollTop = maxContentScroll;
+    const atEdge = () => container.scrollTop <= 0 ||
+      container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+
+    // Cancel outward trackpad gestures before WebKit starts elastic scrolling.
+    // Keep the interior of the note on the asynchronous scrolling path.
+    const guardEdge = (event: WheelEvent) => {
+      if (!event.cancelable || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      const outward = event.deltaY < 0 ? container.scrollTop <= 0 :
+        event.deltaY > 0 && container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+      if (!outward) return;
+      for (let el = event.target instanceof Element ? event.target : null;
+        el && el !== container; el = el.parentElement) {
+        if (el.scrollHeight <= el.clientHeight || !/^(auto|scroll)$/.test(getComputedStyle(el).overflowY)) continue;
+        if (event.deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return;
       }
+      event.preventDefault();
     };
-    const updateScrollLimit = () => {
-      const viewport = container.getBoundingClientRect();
-      const contentBottom = content.getBoundingClientRect().bottom;
-      maxContentScroll = Math.max(0, Math.ceil(container.scrollTop + contentBottom - viewport.bottom));
-      clampScroll();
+    const syncGuard = () => {
+      if (atEdge()) container.addEventListener("wheel", guardEdge, { passive: false });
+      else container.removeEventListener("wheel", guardEdge);
     };
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updateScrollLimit);
-    observer?.observe(container);
-    observer?.observe(content);
-
     const handleScroll = () => {
-      clampScroll();
-      if (container.scrollLeft !== 0) {
-        container.scrollLeft = 0;
-      }
+      syncGuard();
       if (currentNoteIdRef.current) {
         noteCache.updateScrollTop(currentNoteIdRef.current, container.scrollTop);
       }
     };
-
+    const resize = new ResizeObserver(syncGuard);
+    resize.observe(container);
+    resize.observe(editor.view.dom);
+    syncGuard();
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
-      observer?.disconnect();
+      resize.disconnect();
+      container.removeEventListener("wheel", guardEdge);
       container.removeEventListener("scroll", handleScroll);
     };
   }, [editor]);
@@ -1472,33 +1481,11 @@ export function Editor({
     };
   }, [saveNow]);
 
-  // Prevent overscroll rubber-band bounce when scrolling past top or bottom
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (el.scrollTop <= 0 && e.deltaY < 0) {
-        e.preventDefault();
-      } else if (
-        el.scrollHeight > el.clientHeight &&
-        el.scrollTop + el.clientHeight >= el.scrollHeight &&
-        e.deltaY > 0
-      ) {
-        e.preventDefault();
-      }
-    };
-
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => {
-      el.removeEventListener("wheel", handleWheel);
-    };
-  }, []);
-
   const handleWrapperClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const target = e.target as HTMLElement | null;
-      if (!target) return;
+      // React portal events bubble through EditorContent even when the popup is in document.body.
+      if (!target || !e.currentTarget.contains(target)) return;
 
       // Clicks inside .tiptap or its child elements are handled natively by ProseMirror
       if (target.closest(".tiptap")) return;
@@ -1607,7 +1594,6 @@ export function Editor({
           <SmoothCaret
             editor={editor}
             zoomLevel={zoomLevel}
-            scrollContainerRef={scrollContainerRef}
             isFindOpen={Boolean(isFindOpen)}
           />
           <ImageFullscreenContext.Provider value={isFullscreen}>

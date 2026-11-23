@@ -7,7 +7,6 @@ import { TextSelection } from "@tiptap/pm/state";
 interface SmoothCaretProps {
   editor: Editor | null;
   zoomLevel?: number;
-  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   isFindOpen?: boolean;
 }
 
@@ -98,7 +97,6 @@ export class SmoothCaretRetryController {
 export function SmoothCaret({
   editor,
   zoomLevel = 1.2,
-  scrollContainerRef: _scrollContainerRef,
   isFindOpen,
 }: SmoothCaretProps) {
   const caretRef = useRef<HTMLDivElement>(null);
@@ -296,8 +294,7 @@ export function SmoothCaret({
     // Mouse selection may change its visual affinity without changing the PM offset.
     const handleSelectionChange = () => scheduleCaretUpdate(isMouseDownRef.current);
     dom?.ownerDocument.addEventListener("selectionchange", handleSelectionChange);
-    const scrollContainer = _scrollContainerRef?.current;
-    scrollContainer?.addEventListener("scroll", handleComposition, { passive: true });
+    // The caret shares the content coordinate space and moves with it when scrolling.
 
     // Zero layout reads inside transaction handlers: only mark dirty & schedule 1 rAF
     const handleTransaction = () => {
@@ -379,7 +376,6 @@ export function SmoothCaret({
         dom.removeEventListener("load", handleComposition, { capture: true });
       }
       dom?.ownerDocument.removeEventListener("selectionchange", handleSelectionChange);
-      scrollContainer?.removeEventListener("scroll", handleComposition);
       editor.off("transaction", handleTransaction);
       editor.off("selectionUpdate", handleTransaction);
       editor.off("focus", handleFocus);
@@ -398,7 +394,7 @@ export function SmoothCaret({
         clearTimeout(blinkTimeoutRef.current);
       }
     };
-  }, [editor, scheduleCaretUpdate, isEnabled, _scrollContainerRef]);
+  }, [editor, scheduleCaretUpdate, isEnabled]);
 
   // Update on zoom change
   useEffect(() => {

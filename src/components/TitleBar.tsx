@@ -63,6 +63,7 @@ export function TitleBar({
   const hideHotkey = getCommandHotkey(commandsConfig, "hide", "⌘W").hotkey;
   const fullscreenHotkey = getCommandHotkey(commandsConfig, "toggle_fullscreen", "⌃F").hotkey;
 
+
   // Native drag on mousedown (skip if clicking buttons or the command menu)
   useEffect(() => {
     const titleBar = titleBarRef.current;

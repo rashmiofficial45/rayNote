@@ -119,6 +119,55 @@ describe('Remaining App data-integrity and command regressions', () => {
     expect(state.search.isOpen).toBe(false);
   });
 
+  it('visits the startup note and ignores duplicate opens without discarding Forward', async () => {
+    localStorage.setItem('notefast_active_note_id', 'a');
+    await mount();
+    await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('b', summary('b')));
+    await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('b', summary('b')));
+    await palette();
+    await act(async () => state.palette.onGoBack());
+    expect(state.editor.noteId).toBe('a');
+    await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('a', summary('a')));
+    await act(async () => state.palette.onGoForward());
+    expect(state.editor.noteId).toBe('b');
+  });
+
+  it('walks through five visits with configurable history shortcuts', async () => {
+    localStorage.setItem('notefast_commands_config', JSON.stringify([{ id: 'history_back', hotkey: '⌘J' }]));
+    await mount();
+    for (const id of ['b', 'c', 'd', 'e']) {
+      await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__(id, summary(id)));
+    }
+    const press = (key: string) => act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, metaKey: true, bubbles: true, cancelable: true }));
+    });
+    await press('[');
+    expect(state.editor.noteId).toBe('e');
+    for (const id of ['d', 'c', 'b', 'a', 'a']) {
+      await press('j');
+      expect(state.editor.noteId).toBe(id);
+    }
+    for (const id of ['b', 'c', 'd', 'e', 'e']) {
+      await press(']');
+      expect(state.editor.noteId).toBe(id);
+    }
+  });
+
+  it('drops a confirmed unavailable history entry after reverting the failed switch', async () => {
+    await mount();
+    for (const id of ['b', 'c']) {
+      await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__(id, summary(id)));
+    }
+    await palette();
+    await act(async () => state.palette.onGoBack());
+    const error = new Error('Note could not be loaded');
+    error.name = 'NoteUnavailableError';
+    await act(async () => state.editor.onSwitchFailed('c', error));
+    expect(state.editor.noteId).toBe('c');
+    await act(async () => state.palette.onGoBack());
+    expect(state.editor.noteId).toBe('a');
+  });
+
   it('removes a deleted inactive note from navigation history (B32)', async () => {
     await mount();
     await act(async () => (window as any).__RAYNOTE_SELECT_NOTE__('b', summary('b')));

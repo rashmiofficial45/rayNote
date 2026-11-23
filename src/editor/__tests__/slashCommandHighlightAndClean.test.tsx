@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { Editor, EditorContent } from "@tiptap/react";
+import { getExtensions } from "../extensions";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { act, createRef } from "react";
 import { createRoot, Root } from "react-dom/client";
@@ -20,6 +22,55 @@ describe("SlashCommand Menu Highlighting & Minimal UI", () => {
     act(() => root.unmount());
     host.remove();
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ["mouse", "/", "heading"],
+    ["keyboard", "/bullet", "bulletList"],
+    ["keyboard", "/codeblock", "codeBlock"],
+    ["escape", "/", "paragraph"],
+  ])("handles %s for %s through the live suggestion", async (input, query, type) => {
+    const editor = new Editor({
+      extensions: getExtensions(SlashCommand),
+      content: "<h1>Title</h1><p></p><p>Next paragraph</p>",
+    });
+    const key = (name: string) => editor.view.dom.dispatchEvent(
+      new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
+    );
+    try {
+      await act(async () => root.render(<EditorContent editor={editor} />));
+      await act(async () => {
+        editor.view.focus();
+        editor.commands.setTextSelection(8);
+        editor.view.dispatch(editor.state.tr.insertText(query));
+      });
+      const option = document.querySelector<HTMLButtonElement>(".slash-command-item");
+      expect(option).not.toBeNull();
+      await act(async () => {
+        // Apply an edit before the active suggestion and scroll before choosing.
+        editor.view.dispatch(editor.state.tr.insertText("!", 2, 2));
+        window.dispatchEvent(new Event("scroll"));
+      });
+      const currentOption = document.querySelector<HTMLButtonElement>(".slash-command-item");
+      expect(currentOption).not.toBeNull();
+      await act(async () => {
+        if (input === "mouse") {
+          const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+          expect(currentOption!.dispatchEvent(down)).toBe(false);
+          currentOption!.click();
+        } else {
+          key(input === "escape" ? "Escape" : "Enter");
+        }
+      });
+      if (input === "escape") {
+        await act(async () => currentOption!.click());
+      }
+      expect(editor.state.doc.child(1).type.name).toBe(type);
+      expect(editor.state.doc.child(1).textContent).toBe(input === "escape" ? query : "");
+      expect(editor.state.doc.child(2).textContent).toBe("Next paragraph");
+    } finally {
+      await act(async () => editor.destroy());
+    }
   });
 
   it("filters items by alias and title correctly", () => {
