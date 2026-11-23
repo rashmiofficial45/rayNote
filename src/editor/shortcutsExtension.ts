@@ -1,5 +1,5 @@
 import { Extension } from "@tiptap/react";
-import { Selection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
+import { NodeSelection, Selection, TextSelection, Plugin, PluginKey } from "@tiptap/pm/state";
 import { joinBackward } from "@tiptap/pm/commands";
 import { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
@@ -500,8 +500,7 @@ export const ShortcutsExtension = Extension.create({
 
 /**
  * Handles Backspace when cursor is at the very beginning of a paragraph ($from.parentOffset === 0).
- * Merges the paragraph's content into the preceding block/line, or deletes the empty line
- * and places the cursor on the previous line.
+ * Selects a preceding divider, or applies the normal merge or deletion for other blocks.
  */
 export function handleBackspaceAtStart(editor: { view: EditorView }): boolean {
   const { state, dispatch } = editor.view;
@@ -519,7 +518,13 @@ export function handleBackspaceAtStart(editor: { view: EditorView }): boolean {
   const nodeBefore = $before.nodeBefore;
   if (!nodeBefore) return false;
 
-  // Case 1: Preceding node is an atom (e.g. horizontalRule)
+  if (nodeBefore.type.name === "horizontalRule") {
+    const dividerPos = beforePos - nodeBefore.nodeSize;
+    dispatch(state.tr.setSelection(NodeSelection.create(state.doc, dividerPos)).scrollIntoView());
+    return true;
+  }
+
+  // Case 1: Preceding node is another atom
   if (nodeBefore.isAtom) {
     const tr = state.tr.delete(beforePos - nodeBefore.nodeSize, beforePos);
     dispatch(tr);

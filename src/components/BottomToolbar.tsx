@@ -2,8 +2,9 @@ import { listenToSettingsSync } from "../lib/settingsSync";
 import { getStoredCommandsConfig, useCommandsConfig, getCommandHotkey } from "../lib/commandsConfig";
 import { Editor, useEditorState } from "@tiptap/react";
 import "@tiptap/extension-underline";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import {
+  Heading,
   Heading1,
   Heading2,
   List,
@@ -22,6 +23,9 @@ import {
   ALargeSmall,
   Type,
   ChevronDown,
+  X,
+  Plus,
+  Palette,
   Sun,
   Moon,
   Monitor,
@@ -42,7 +46,7 @@ import {
   setStoredThemeMode,
 } from "../lib/theme";
 
-import { getCurrentWindow } from "@tauri-apps/api/window";
+type FormatGroup = "headings" | "text" | "highlight" | "lists" | "insert" | "appearance";
 
 interface BottomToolbarProps {
   editor: Editor | null;
@@ -50,15 +54,13 @@ interface BottomToolbarProps {
 
 export function BottomToolbar({ editor }: BottomToolbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const isHoveredRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formatButtonRef = useRef<HTMLButtonElement>(null);
   const [currentAccent, setCurrentAccent] = useState<AccentColor>(getStoredAccent);
   const [currentFont, setCurrentFont] = useState<string>(getStoredFont);
   const [currentThemeMode, setCurrentThemeMode] = useState<ThemeMode>(getStoredThemeMode);
+  const [group, setGroup] = useState<FormatGroup | null>(null);
   const [isFontPickerOpen, setIsFontPickerOpen] = useState(false);
-  const [highlightOpen, setHighlightOpen] = useState(false);
   const commandsConfig = useCommandsConfig();
 
   const formatTitle = (label: string, id: string, defaultHotkey = "") => {
@@ -68,7 +70,6 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
   useEffect(() => {
     const stopSettings = listenToSettingsSync({ onThemeModeChange: setCurrentThemeMode, onAccentChange: setCurrentAccent, onFontChange: setCurrentFont });
-    let disposed = false;
     const handleAccent = (e: Event) => {
       const customEvent = e as CustomEvent<{ accent?: AccentColor }>;
       if (customEvent.detail?.accent) setCurrentAccent(customEvent.detail.accent);
@@ -85,72 +86,11 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     window.addEventListener("notefast_font_changed", handleFont);
     window.addEventListener("notefast_theme_changed", handleTheme);
 
-    let unlistenFocus: (() => void) | undefined;
-    getCurrentWindow()
-      .onFocusChanged(({ payload: focused }) => {
-        if (!focused) {
-          isHoveredRef.current = false;
-          setIsHovered(false);
-          setIsMenuOpen(false);
-          setIsFontPickerOpen(false);
-        }
-      })
-      .then((fn) => {
-        if (disposed) fn(); else unlistenFocus = fn;
-      })
-      .catch(() => {});
-
-    // Active pointer tracking: only dispatches state when crossing window boundaries
-    const handlePointerMove = (e: PointerEvent) => {
-      const inPage =
-        e.clientX >= 0 &&
-        e.clientX <= window.innerWidth &&
-        e.clientY >= 0 &&
-        e.clientY <= window.innerHeight;
-
-      if (isHoveredRef.current !== inPage) {
-        isHoveredRef.current = inPage;
-        setIsHovered(inPage);
-        if (!inPage) {
-          setIsMenuOpen(false);
-          setIsFontPickerOpen(false);
-        }
-      }
-    };
-
-    const handleReset = () => {
-      if (isHoveredRef.current) {
-        isHoveredRef.current = false;
-        setIsHovered(false);
-        setIsMenuOpen(false);
-        setIsFontPickerOpen(false);
-      }
-    };
-
-    const handleMouseOut = (e: MouseEvent) => {
-      if (!e.relatedTarget) {
-        handleReset();
-      }
-    };
-
-    window.addEventListener("pointermove", handlePointerMove, { passive: true });
-    window.addEventListener("mouseout", handleMouseOut);
-    window.addEventListener("blur", handleReset);
-    document.addEventListener("mouseleave", handleReset);
-
-
     return () => {
-      disposed = true;
       stopSettings();
       window.removeEventListener("notefast_accent_changed", handleAccent);
       window.removeEventListener("notefast_font_changed", handleFont);
       window.removeEventListener("notefast_theme_changed", handleTheme);
-      if (unlistenFocus) unlistenFocus();
-      window.removeEventListener("pointermove", handlePointerMove);
-      window.removeEventListener("mouseout", handleMouseOut);
-      window.removeEventListener("blur", handleReset);
-      document.removeEventListener("mouseleave", handleReset);
-      if (leaveTimerRef.current) clearTimeout(leaveTimerRef.current);
     };
   }, []);
 
@@ -172,31 +112,28 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
 
   useEffect(() => {
     if (!isMenuOpen) {
-      setHighlightOpen(false);
+      setGroup(null);
       setIsFontPickerOpen(false);
       return;
     }
 
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsMenuOpen(false);
-        setIsFontPickerOpen(false);
+    if (document.activeElement === formatButtonRef.current) {
+      containerRef.current?.querySelector<HTMLButtonElement>(".toolbar-btn")?.focus();
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector(".command-overlay")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (containerRef.current?.contains(document.activeElement)) {
+        formatButtonRef.current?.focus();
       }
+      setIsMenuOpen(false);
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsMenuOpen(false);
-        setIsFontPickerOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
   }, [isMenuOpen]);
 
   const formatState = useEditorState({
@@ -267,95 +204,41 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
     formatState?.isCodeBlock
   );
 
-  const handleMouseEnter = () => {
-    if (leaveTimerRef.current) {
-      clearTimeout(leaveTimerRef.current);
-      leaveTimerRef.current = null;
-    }
-    setIsHovered(true);
-  };
-
-  const handleMouseLeave = () => {
-    setIsHovered(false);
-    if (!highlightOpen) setIsMenuOpen(false);
-    setIsFontPickerOpen(false);
-  };
-
   const pickerStyle = formatState?.isHighlight ? formatState.highlightStyle : "stripes";
   const applyHighlight = (color: string | null, style: string) => {
     smartToggleMark(editor, "highlight", { color, style });
   };
 
+  const groupButton = (id: FormatGroup, label: string, icon: ReactNode, active = false) => (
+    <button
+      type="button"
+      className={`toolbar-btn format-group-btn ${active || group === id ? "is-active" : ""}`}
+      aria-label={label}
+      title={label}
+      aria-expanded={group === id}
+      aria-controls={group === id ? "editor-format-options" : undefined}
+      onMouseDown={event => event.preventDefault()}
+      onClick={() => {
+        setGroup(current => current === id ? null : id);
+        setIsFontPickerOpen(false);
+      }}
+    >
+      {icon}
+      <ChevronDown className="format-group-chevron" aria-hidden="true" />
+    </button>
+  );
+
   return (
     <div
       ref={containerRef}
-      className={`bottom-toolbar-corner-container ${isMenuOpen ? "is-menu-open" : ""} ${isHovered ? "is-hovered" : ""}`}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      className={`bottom-toolbar-corner-container ${isMenuOpen ? "is-menu-open" : ""}`}
     >
       {isMenuOpen && (
         <div id="editor-format-menu" className="bottom-toolbar-expanded-menu" role="group" aria-label="Editor formatting">
-          <div className="expanded-toolbar-row" role="group" aria-label="Text formatting">
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "heading1")}
-              className={`toolbar-btn ${formatState?.isHeading1 ? "is-active" : ""}`}
-              title={formatTitle("Heading 1", "heading1", "⌘⌥1")}
-            >
-              <Heading1 size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "heading2")}
-              className={`toolbar-btn ${formatState?.isHeading2 ? "is-active" : ""}`}
-              title={formatTitle("Heading 2", "heading2", "⌘⌥2")}
-            >
-              <Heading2 size={14} />
-            </button>
-            <div className="toolbar-separator" />
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleMark(editor, "bold")}
-              className={`toolbar-btn ${formatState?.isBold ? "is-active" : ""}`}
-              title={formatTitle("Bold", "bold", "⌘B")}
-            >
-              <Bold size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleMark(editor, "italic")}
-              className={`toolbar-btn ${formatState?.isItalic ? "is-active" : ""}`}
-              title={formatTitle("Italic", "italic", "⌘I")}
-            >
-              <Italic size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleMark(editor, "underline")}
-              className={`toolbar-btn ${formatState?.isUnderline ? "is-active" : ""}`}
-              title={formatTitle("Underline", "underline", "⌘U")}
-            >
-              <UnderlineIcon size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleMark(editor, "strike")}
-              className={`toolbar-btn ${formatState?.isStrike ? "is-active" : ""}`}
-              title={formatTitle("Strikethrough", "strike", "⇧⌘X")}
-            >
-              <Strikethrough size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => setHighlightOpen(open => !open)}
-              className={`toolbar-btn ${formatState?.isHighlight || highlightOpen ? "is-active" : ""}`}
-              aria-expanded={highlightOpen}
-              aria-controls="editor-highlight-options"
-              aria-label="Highlight options"
-              title={formatTitle("Highlight options", "highlight", "⇧⌘H")}
-            >
-              <HighlightIcon size={14} />
-            </button>
+          <div className="format-dock-strip">
+            {groupButton("headings", "Headings", <Heading size={16} />, formatState?.isHeading1 || formatState?.isHeading2)}
+            {groupButton("text", "Text styles", <Italic size={16} />, formatState?.isBold || formatState?.isItalic || formatState?.isUnderline || formatState?.isStrike)}
+            {groupButton("highlight", "Highlight options", <HighlightIcon size={16} />, formatState?.isHighlight)}
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "code")}
@@ -366,184 +249,263 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             >
               <Code size={14} />
             </button>
-          </div>
-
-          {highlightOpen && (
-            <div id="editor-highlight-options" className="editor-highlight-options"
-              onMouseDown={event => event.preventDefault()}>
-              <div className="highlight-options-header">
-                <span>Highlight</span>
-                <button type="button" className="highlight-remove" aria-label="Remove highlight"
-                  disabled={!formatState?.isHighlight && !formatState?.hasSelectedBlocks}
-                  onClick={() => smartToggleMark(editor, "highlight", null)}>
-                  Clear
-                </button>
-              </div>
-              <div className="highlight-swatches" role="group" aria-label="Highlight color">
-                {HIGHLIGHT_COLORS.map(color => (
-                  <button key={color} type="button" data-color={color}
-                    data-highlight-style={pickerStyle}
-                    title={color[0].toUpperCase() + color.slice(1)}
-                    aria-label={color[0].toUpperCase() + color.slice(1)}
-                    aria-pressed={formatState?.highlightColor === color}
-                    onClick={() => applyHighlight(color, pickerStyle)} />
-                ))}
-              </div>
-              <div className="highlight-styles" role="group" aria-label="Highlight style">
-                {HIGHLIGHT_STYLES.map(([style, label]) => (
-                  <button key={style} type="button" data-highlight-style={style}
-                    data-color={formatState?.highlightColor ?? "yellow"}
-                    aria-pressed={pickerStyle === style}
-                    onClick={() => applyHighlight(formatState?.highlightColor ?? "yellow", style)}>
-                    <span className="highlight-style-sample" aria-hidden="true">Aa</span>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="expanded-toolbar-divider" />
-
-          <div className="expanded-toolbar-row" role="group" aria-label="Block formatting">
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "bulletList")}
-              className={`toolbar-btn ${formatState?.isBulletList ? "is-active" : ""}`}
-              title={formatTitle("Bullet List", "bullet_list", "⇧⌘8")}
-            >
-              <List size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "orderedList")}
-              className={`toolbar-btn ${formatState?.isOrderedList ? "is-active" : ""}`}
-              title={formatTitle("Numbered List", "ordered_list", "⇧⌘7")}
-            >
-              <ListOrdered size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "taskList")}
-              className={`toolbar-btn ${formatState?.isTaskList ? "is-active" : ""}`}
-              title={formatTitle("Task List", "checklist", "⇧⌘9")}
-            >
-              <CheckSquare size={14} />
-            </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => smartToggleBlockFormat(editor, "blockquote")}
-              className={`toolbar-btn ${formatState?.isBlockquote ? "is-active" : ""}`}
-              title={formatTitle("Quote", "blockquote", "⇧⌘B")}
-            >
-              <Quote size={14} />
-            </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "codeBlock")}
               className={`toolbar-btn ${formatState?.isCodeBlock ? "is-active" : ""}`}
+              aria-pressed={formatState?.isCodeBlock ?? false}
               title={formatTitle("Code Block", "code_block", "⌘⌥C")}
             >
               <Code2 size={14} />
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => editor.chain().focus().setHorizontalRule().run()}
-              className="toolbar-btn"
-              title={formatTitle("Divider", "divider", "---")}
+              onClick={() => smartToggleBlockFormat(editor, "blockquote")}
+              className={`toolbar-btn ${formatState?.isBlockquote ? "is-active" : ""}`}
+              aria-pressed={formatState?.isBlockquote ?? false}
+              title={formatTitle("Quote", "blockquote", "⇧⌘B")}
             >
-              <Minus size={14} />
+              <Quote size={14} />
             </button>
-            <button
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { if (getStoredCommandsConfig().find(c => c.id === "tables")?.enabled !== false) editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
-              className="toolbar-btn"
-              title="Insert Table (3x3)"
-            >
-              <TableIcon size={14} />
-            </button>
+            {groupButton("lists", "Lists", formatState?.isOrderedList ? <ListOrdered size={16} /> : <List size={16} />, formatState?.isBulletList || formatState?.isOrderedList || formatState?.isTaskList)}
+            {groupButton("insert", "Insert", <Plus size={16} />)}
+            {groupButton("appearance", "Appearance", <Palette size={16} />)}
           </div>
 
-          <div className="expanded-toolbar-divider" />
+          {group && (
+            <div id="editor-format-options" className="format-dock-options" role="group" aria-label="Format options">
+              {group === "headings" && (
+                <div className="expanded-toolbar-row" role="group" aria-label="Heading levels">
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => smartToggleBlockFormat(editor, "heading1")}
+                    className={`toolbar-btn ${formatState?.isHeading1 ? "is-active" : ""}`}
+                    aria-pressed={formatState?.isHeading1 ?? false}
+                    title={formatTitle("Heading 1", "heading1", "⌘⌥1")}
+                  >
+                    <Heading1 size={14} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => smartToggleBlockFormat(editor, "heading2")}
+                    className={`toolbar-btn ${formatState?.isHeading2 ? "is-active" : ""}`}
+                    aria-pressed={formatState?.isHeading2 ?? false}
+                    title={formatTitle("Heading 2", "heading2", "⌘⌥2")}
+                  >
+                    <Heading2 size={14} />
+                  </button>
+                </div>
+              )}
+              {group === "text" && (
+                <>
+                  <div className="expanded-toolbar-row" role="group" aria-label="Text styles">
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => smartToggleMark(editor, "bold")}
+                      className={`toolbar-btn ${formatState?.isBold ? "is-active" : ""}`}
+                      aria-pressed={formatState?.isBold ?? false}
+                      title={formatTitle("Bold", "bold", "⌘B")}
+                    >
+                      <Bold size={14} />
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => smartToggleMark(editor, "italic")}
+                      className={`toolbar-btn ${formatState?.isItalic ? "is-active" : ""}`}
+                      aria-pressed={formatState?.isItalic ?? false}
+                      title={formatTitle("Italic", "italic", "⌘I")}
+                    >
+                      <Italic size={14} />
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => smartToggleMark(editor, "underline")}
+                      className={`toolbar-btn ${formatState?.isUnderline ? "is-active" : ""}`}
+                      aria-pressed={formatState?.isUnderline ?? false}
+                      title={formatTitle("Underline", "underline", "⌘U")}
+                    >
+                      <UnderlineIcon size={14} />
+                    </button>
+                    <button
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => smartToggleMark(editor, "strike")}
+                      className={`toolbar-btn ${formatState?.isStrike ? "is-active" : ""}`}
+                      aria-pressed={formatState?.isStrike ?? false}
+                      title={formatTitle("Strikethrough", "strike", "⇧⌘X")}
+                    >
+                      <Strikethrough size={14} />
+                    </button>
+                  </div>
+                </>
+              )}
+              {group === "highlight" && (
+                <div id="editor-highlight-options" className="editor-highlight-options"
+                  onMouseDown={event => event.preventDefault()}>
+                  <div className="highlight-options-header">
+                    <span>Highlight</span>
+                    <button type="button" className="highlight-remove" aria-label="Remove highlight"
+                      disabled={!formatState?.isHighlight && !formatState?.hasSelectedBlocks}
+                      onClick={() => smartToggleMark(editor, "highlight", null)}>
+                      Clear
+                    </button>
+                  </div>
+                  <div className="highlight-swatches" role="group" aria-label="Highlight color">
+                    {HIGHLIGHT_COLORS.map(color => (
+                      <button key={color} type="button" data-color={color}
+                        data-highlight-style={pickerStyle}
+                        title={color[0].toUpperCase() + color.slice(1)}
+                        aria-label={color[0].toUpperCase() + color.slice(1)}
+                        aria-pressed={formatState?.highlightColor === color}
+                        onClick={() => applyHighlight(color, pickerStyle)} />
+                    ))}
+                  </div>
+                  <div className="highlight-styles" role="group" aria-label="Highlight style">
+                    {HIGHLIGHT_STYLES.map(([style, label]) => (
+                      <button key={style} type="button" data-highlight-style={style}
+                        data-color={formatState?.highlightColor ?? "yellow"}
+                        aria-pressed={pickerStyle === style}
+                        onClick={() => applyHighlight(formatState?.highlightColor ?? "yellow", style)}>
+                        <span className="highlight-style-sample" aria-hidden="true">Aa</span>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {group === "lists" && (
+                <div className="expanded-toolbar-row" role="group" aria-label="List styles">
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => smartToggleBlockFormat(editor, "bulletList")}
+                    className={`toolbar-btn ${formatState?.isBulletList ? "is-active" : ""}`}
+                    aria-pressed={formatState?.isBulletList ?? false}
+                    title={formatTitle("Bullet List", "bullet_list", "⇧⌘8")}
+                  >
+                    <List size={14} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => smartToggleBlockFormat(editor, "orderedList")}
+                    className={`toolbar-btn ${formatState?.isOrderedList ? "is-active" : ""}`}
+                    aria-pressed={formatState?.isOrderedList ?? false}
+                    title={formatTitle("Numbered List", "ordered_list", "⇧⌘7")}
+                  >
+                    <ListOrdered size={14} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => smartToggleBlockFormat(editor, "taskList")}
+                    className={`toolbar-btn ${formatState?.isTaskList ? "is-active" : ""}`}
+                    aria-pressed={formatState?.isTaskList ?? false}
+                    title={formatTitle("Task List", "checklist", "⇧⌘9")}
+                  >
+                    <CheckSquare size={14} />
+                  </button>
+                </div>
+              )}
+              {group === "insert" && (
+                <div className="expanded-toolbar-row" role="group" aria-label="Insert blocks">
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => editor.chain().focus().setHorizontalRule().run()}
+                    className="toolbar-btn"
+                    title={formatTitle("Divider", "divider", "---")}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => { if (getStoredCommandsConfig().find(c => c.id === "tables")?.enabled !== false) editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
+                    className="toolbar-btn"
+                    title="Insert Table (3x3)"
+                  >
+                    <TableIcon size={14} />
+                  </button>
+                </div>
+              )}
+              {group === "appearance" && (
+                <>
+                  <div className="toolbar-theme-row">
+                    <div className="toolbar-theme-mode-group" title="Theme Mode: Dark, Light, or System">
+                      <button
+                        type="button"
+                        onClick={() => handleThemeModeChange("dark")}
+                        className={`theme-mode-btn ${currentThemeMode === "dark" ? "is-selected" : ""}`}
+                        title="Dark Mode"
+                        aria-label="Dark Mode"
+                      >
+                        <Moon size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleThemeModeChange("light")}
+                        className={`theme-mode-btn ${currentThemeMode === "light" ? "is-selected" : ""}`}
+                        title="Light Mode"
+                        aria-label="Light Mode"
+                      >
+                        <Sun size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleThemeModeChange("system")}
+                        className={`theme-mode-btn ${currentThemeMode === "system" ? "is-selected" : ""}`}
+                        title="System (Auto macOS)"
+                        aria-label="System Mode"
+                      >
+                        <Monitor size={11} />
+                      </button>
+                    </div>
 
-          {/* Row 3: Appearance Mode (Dark/Light/System) + Accent Shade + Font Picker */}
-          <div className="toolbar-theme-row">
-            <div className="toolbar-theme-mode-group" title="Theme Mode: Dark, Light, or System">
-              <button
-                type="button"
-                onClick={() => handleThemeModeChange("dark")}
-                className={`theme-mode-btn ${currentThemeMode === "dark" ? "is-selected" : ""}`}
-                title="Dark Mode"
-                aria-label="Dark Mode"
-              >
-                <Moon size={11} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleThemeModeChange("light")}
-                className={`theme-mode-btn ${currentThemeMode === "light" ? "is-selected" : ""}`}
-                title="Light Mode"
-                aria-label="Light Mode"
-              >
-                <Sun size={11} />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleThemeModeChange("system")}
-                className={`theme-mode-btn ${currentThemeMode === "system" ? "is-selected" : ""}`}
-                title="System (Auto macOS)"
-                aria-label="System Mode"
-              >
-                <Monitor size={11} />
-              </button>
-            </div>
+                    <div className="toolbar-separator" />
 
-            <div className="toolbar-separator" />
+                    <div className="toolbar-accent-group" title="Themes: 6 Liquid Glass Palettes">
+                      {ACCENT_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => handleAccentChange(opt.id)}
+                          className={`accent-color-btn ${currentAccent === opt.id ? "is-selected" : ""}`}
+                          title={`Accent Shade: ${opt.name}`}
+                          aria-label={`Accent: ${opt.name}`}
+                        >
+                          <span
+                            className="accent-color-btn-dot"
+                            style={{ backgroundColor: opt.color }}
+                          />
+                        </button>
+                      ))}
+                    </div>
 
-            <div className="toolbar-accent-group" title="Themes: 6 Liquid Glass Palettes">
-              {ACCENT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() => handleAccentChange(opt.id)}
-                  className={`accent-color-btn ${currentAccent === opt.id ? "is-selected" : ""}`}
-                  title={`Accent Shade: ${opt.name}`}
-                  aria-label={`Accent: ${opt.name}`}
-                >
-                  <span
-                    className="accent-color-btn-dot"
-                    style={{ backgroundColor: opt.color }}
-                  />
-                </button>
-              ))}
-            </div>
+                    <div className="toolbar-separator" />
 
-            <div className="toolbar-separator" />
+                    <button
+                      onClick={() => setIsFontPickerOpen((prev) => !prev)}
+                      className="toolbar-font-btn"
+                      title="Change Editor Font"
+                    >
+                      <Type size={12} />
+                      <span>{FONT_OPTIONS.find((f) => f.id === currentFont)?.name || "Font"}</span>
+                      <ChevronDown size={11} style={{ opacity: 0.6 }} />
+                    </button>
+                  </div>
 
-            <button
-              onClick={() => setIsFontPickerOpen((prev) => !prev)}
-              className="toolbar-font-btn"
-              title="Change Editor Font"
-            >
-              <Type size={12} />
-              <span>{FONT_OPTIONS.find((f) => f.id === currentFont)?.name || "Font"}</span>
-              <ChevronDown size={11} style={{ opacity: 0.6 }} />
-            </button>
-          </div>
-
-          {/* Collapsible 6-Font Grid */}
-          {isFontPickerOpen && (
-            <div className="toolbar-font-dropdown">
-              {FONT_OPTIONS.map((font) => (
-                <button
-                  key={font.id}
-                  onClick={() => handleFontChange(font.id)}
-                  className={`toolbar-font-item ${currentFont === font.id ? "is-active" : ""}`}
-                  style={{ fontFamily: font.family }}
-                  title={font.name}
-                >
-                  {font.name}
-                </button>
-              ))}
+                  {/* Collapsible 6-Font Grid */}
+                  {isFontPickerOpen && (
+                    <div className="toolbar-font-dropdown">
+                      {FONT_OPTIONS.map((font) => (
+                        <button
+                          key={font.id}
+                          onClick={() => handleFontChange(font.id)}
+                          className={`toolbar-font-item ${currentFont === font.id ? "is-active" : ""}`}
+                          style={{ fontFamily: font.family }}
+                          title={font.name}
+                        >
+                          {font.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
         </div>
@@ -552,15 +514,17 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
       <div className="bottom-corner-buttons-row">
         <button
           type="button"
+          ref={formatButtonRef}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={() => setIsMenuOpen((prev) => !prev)}
-          className={`format-corner-btn liquid-btn ${hasActiveFormatting ? "has-formatting" : ""} ${isMenuOpen ? "is-active" : ""}`}
-          title="Format (Aa)"
+          className={`format-corner-btn ${hasActiveFormatting ? "has-formatting" : ""} ${isMenuOpen ? "is-active" : ""}`}
+          title={isMenuOpen ? "Close formatting (Esc)" : "Format (Aa)"}
           aria-label="Format"
           aria-expanded={isMenuOpen}
           aria-controls="editor-format-menu"
         >
-          <ALargeSmall size={19} />
-          {hasActiveFormatting && <span className="format-indicator-dot" />}
+          {isMenuOpen ? <X size={19} /> : <ALargeSmall size={19} />}
+          {!isMenuOpen && hasActiveFormatting && <span className="format-indicator-dot" />}
         </button>
       </div>
     </div>

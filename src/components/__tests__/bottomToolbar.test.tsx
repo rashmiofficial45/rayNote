@@ -82,6 +82,61 @@ describe("BottomToolbar UI Component", () => {
     expect(container.querySelector(".bottom-toolbar-expanded-menu")).toBeNull();
   });
 
+  it.each([
+    ["Bold", "strong", "Text styles"],
+    ["Italic", "em", "Text styles"],
+    ["Underline", "u", "Text styles"],
+    ["Strikethrough", "s", "Text styles"],
+    ["Inline Code", "code", null],
+    ["Heading 1", "h1", "Headings"],
+    ["Heading 2", "h2", "Headings"],
+    ["Bullet List", "ul", "Lists"],
+    ["Numbered List", "ol", "Lists"],
+    ["Task List", 'ul[data-type="taskList"]', "Lists"],
+    ["Quote", "blockquote", null],
+    ["Code Block", "pre", null],
+    ["Divider", "hr", "Insert"],
+    ["Insert Table", "table", "Insert"],
+  ])("applies %s using the dock control", (label, selector, group) => {
+    editor.commands.selectAll();
+    act(() => root.render(<BottomToolbar editor={editor} />));
+    act(() => container.querySelector<HTMLButtonElement>(".format-corner-btn")!.click());
+    if (group) act(() => container.querySelector<HTMLButtonElement>(`[aria-label="${group}"]`)!.click());
+    const button = container.querySelector<HTMLButtonElement>(`button[title^="${label}"]`);
+    expect(button).not.toBeNull();
+    act(() => button!.click());
+    const output = document.createElement("div");
+    output.innerHTML = editor.getHTML();
+    expect(output.querySelector(selector)).not.toBeNull();
+    if (label === "Divider") expect(output.textContent).toContain("Initial editor text");
+  });
+
+  it("preserves selected text when opening the dock and applies and clears highlighting", () => {
+    editor.commands.selectAll();
+    const selection = editor.state.selection;
+    act(() => root.render(<BottomToolbar editor={editor} />));
+    act(() => container.querySelector<HTMLButtonElement>(".format-corner-btn")!.click());
+    expect(editor.state.selection.eq(selection)).toBe(true);
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Highlight options"]')!.click());
+    act(() => container.querySelector<HTMLButtonElement>('.highlight-swatches [data-color="yellow"]')!.click());
+    expect(editor.getHTML()).toContain("<mark");
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Remove highlight"]')!.click());
+    expect(editor.getHTML()).not.toContain("<mark");
+  });
+
+  it("returns keyboard focus to Format after closing the dock with Escape", () => {
+    act(() => root.render(<BottomToolbar editor={editor} />));
+    const toggle = container.querySelector<HTMLButtonElement>(".format-corner-btn")!;
+    toggle.focus();
+    act(() => toggle.click());
+    expect(document.activeElement).toBe(container.querySelector(".toolbar-btn"));
+    act(() => document.activeElement?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+    ));
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(toggle);
+  });
+
   it("displays and selects theme modes (dark, light, system)", () => {
     const setThemeSpy = vi.spyOn(themeModule, "setStoredThemeMode");
 
@@ -95,6 +150,7 @@ describe("BottomToolbar UI Component", () => {
       formatBtn.click();
     });
 
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
     const lightBtn = container.querySelector("button[aria-label='Light Mode']") as HTMLButtonElement;
     expect(lightBtn).not.toBeNull();
 
@@ -118,6 +174,7 @@ describe("BottomToolbar UI Component", () => {
       formatBtn.click();
     });
 
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
     const accentButtons = container.querySelectorAll(".accent-color-btn");
     expect(accentButtons.length).toBe(6);
 
@@ -144,6 +201,7 @@ describe("BottomToolbar UI Component", () => {
       formatBtn.click();
     });
 
+    act(() => container.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
     const fontBtn = container.querySelector(".toolbar-font-btn") as HTMLButtonElement;
     expect(fontBtn).not.toBeNull();
 

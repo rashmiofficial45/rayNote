@@ -131,6 +131,37 @@ describe("CommandPalette Notes Search Integration", () => {
     expect(container.textContent).not.toContain("Groceries & Shopping");
   });
 
+  it.each([
+    ["Green", { color: "green" }],
+    ["Crosshatch", { style: "crosshatch" }],
+    ["Clear highlight", null],
+  ])("runs %s from the Highlight submenu using Enter", (label, options) => {
+    const onHighlight = vi.fn();
+    const onClose = vi.fn();
+    act(() => root.render(
+      <CommandPalette
+        isOpen notes={mockNotes} activeNoteId="note-1" zoomLevel={1}
+        onHighlight={onHighlight} onClose={onClose}
+        onNewNote={vi.fn()} onDuplicateNote={vi.fn()} onSelectNote={vi.fn()}
+        onDeleteNote={vi.fn()} onTogglePin={vi.fn()} onGoBack={vi.fn()} onGoForward={vi.fn()}
+      />
+    ));
+    const command = [...container.querySelectorAll<HTMLButtonElement>(".command-item")]
+      .find(button => button.querySelector(".command-item-label")?.textContent === "Highlight");
+    expect(command).toBeDefined();
+    act(() => command!.click());
+
+    const input = container.querySelector("input")!;
+    expect(input.placeholder).toContain("highlight colors");
+    act(() => {
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set?.call(input, label);
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+    expect(onHighlight).toHaveBeenCalledExactlyOnceWith(options);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("holds at the last command during key repeat and wraps on a fresh press", () => {
     act(() => root.render(
       <CommandPalette

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Editor } from "@tiptap/core";
+import { NodeSelection } from "@tiptap/pm/state";
 import { getExtensions } from "../extensions";
 import { insertHorizontalRuleSmart } from "../horizontalRuleExtension";
 
@@ -123,6 +124,22 @@ describe("HorizontalRuleExtension Smart Insertion & Input Rules", () => {
   });
 
   describe("Shortcuts and Markdown Input Rules", () => {
+    it.each(["", "After"])("selects the divider on Backspace from the next paragraph (%s)", (text) => {
+      editor.commands.setContent(`<p>Before</p><hr><p>${text}</p>`);
+      const before = editor.getJSON();
+      const dividerPos = editor.state.doc.child(0).nodeSize;
+      editor.commands.setTextSelection(dividerPos + editor.state.doc.child(1).nodeSize + 1);
+
+      const handled = editor.view.someProp("handleKeyDown", handler =>
+        handler(editor.view, new KeyboardEvent("keydown", { key: "Backspace" }))
+      );
+
+      expect(handled).toBe(true);
+      expect(editor.getJSON()).toEqual(before);
+      expect(editor.state.selection).toBeInstanceOf(NodeSelection);
+      expect(editor.state.selection.from).toBe(dividerPos);
+    });
+
     it("types after a selected divider without replacing it", () => {
       editor.commands.setContent("<p>Before</p><hr><p>After</p>");
       const dividerPos = editor.state.doc.child(0).nodeSize;

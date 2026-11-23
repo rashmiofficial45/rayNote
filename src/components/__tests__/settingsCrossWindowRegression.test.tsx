@@ -26,6 +26,7 @@ async function drawToolbar() {
   stop = listenToSettingsSync();
   await act(async () => root.render(<BottomToolbar editor={editor} />));
   act(() => (host.querySelector('[aria-label="Format"]') as HTMLButtonElement).click());
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
 }
 describe('Cross-window preference controls', () => {
   it('mounts Settings when WebKit storage access is denied (B33)', async () => {

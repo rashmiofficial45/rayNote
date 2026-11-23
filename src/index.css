@@ -376,36 +376,6 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Smooth Theme Cross-Fade View Transitions ─────────── */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 0.3s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-html,
-body,
-#root,
-.app-shell,
-.title-bar,
-.editor-wrapper,
-.tiptap,
-.command-palette,
-.command-palette-shell,
-.settings-modal,
-.settings-window,
-.md-viewer-modal,
-.bottom-dock,
-.sidebar-drawer,
-.liquid-btn,
-.command-input,
-.command-item {
-  transition: background-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 /* ── iOS 26 Liquid Glass Button System ─────────────────── */
 .liquid-btn {
   display: inline-flex;
@@ -456,7 +426,6 @@ body,
   contain: layout size;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
   color: var(--text-primary);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
   overscroll-behavior-x: none !important;
@@ -556,15 +525,16 @@ body,
   bottom: 0;
   left: 0;
   right: 0;
-  height: 52px;
+  height: 92px;
   pointer-events: none;
   z-index: 15;
   background: linear-gradient(
-    0deg,
+    to top,
     rgba(var(--app-bg-rgb), 1) 0%,
-    rgba(var(--app-bg-rgb), 0.96) 28%,
-    rgba(var(--app-bg-rgb), 0.72) 58%,
-    rgba(var(--app-bg-rgb), 0.28) 84%,
+    rgba(var(--app-bg-rgb), 0.96) 17%,
+    rgba(var(--app-bg-rgb), 0.75) 39%,
+    rgba(var(--app-bg-rgb), 0.38) 66%,
+    rgba(var(--app-bg-rgb), 0.10) 86%,
     rgba(var(--app-bg-rgb), 0) 100%
   );
   border-bottom-left-radius: 28px;
@@ -1819,7 +1789,11 @@ pre.notefast-code-block:hover {
 
 /* Text formatting */
 .tiptap strong { font-weight: 600; color: var(--text-primary); }
-.tiptap em { font-style: italic; }
+.tiptap em,
+.tiptap i {
+  font-style: italic;
+  font-synthesis: style;
+}
 .tiptap s { text-decoration: line-through; color: var(--text-muted); }
 
 .tiptap mark {
@@ -1910,47 +1884,45 @@ pre.notefast-code-block:hover {
   text-decoration-color: var(--color-accent-border);
 }
 
-/* ── Bottom Right Format Button & Menu (Auto-Hides When Cursor Moves Away) ─ */
+/* ── Editor Format Dock ────────────────────────────────── */
 .bottom-toolbar-corner-container {
   position: absolute;
-  bottom: 14px;
-  right: 14px;
+  bottom: var(--editor-footer-bottom);
+  right: var(--editor-footer-inset);
+  min-height: var(--editor-footer-height);
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   z-index: 60;
-  isolation: isolate;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(2px);
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Reveal format button when cursor enters the page */
-.app-shell:hover .bottom-toolbar-corner-container,
-.app-shell.is-cursor-in-page .bottom-toolbar-corner-container,
-.bottom-toolbar-corner-container:hover,
-.bottom-toolbar-corner-container.is-hovered,
 .bottom-toolbar-corner-container.is-menu-open {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  transform: translateY(0) !important;
+  left: var(--editor-footer-inset);
+  justify-content: center;
+  padding-inline: 48px;
+  pointer-events: none;
 }
 
-.app-shell:hover .bottom-toolbar-corner-container > *,
-.app-shell.is-cursor-in-page .bottom-toolbar-corner-container > *,
-.bottom-toolbar-corner-container:hover > *,
-.bottom-toolbar-corner-container.is-hovered > *,
-.bottom-toolbar-corner-container.is-menu-open > * {
-  pointer-events: auto !important;
+.bottom-toolbar-corner-container.is-menu-open :is(.format-dock-strip, .format-dock-options, .bottom-corner-buttons-row) {
+  pointer-events: auto;
 }
 
-/* Force hide when cursor moves away from the page or app is idle */
-.app-shell:not(:hover):not(.is-cursor-in-page) .bottom-toolbar-corner-container:not(.is-menu-open),
-.app-shell.is-idle .bottom-toolbar-corner-container {
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transform: translateY(2px) !important;
+.editor-wrapper:has(> .bottom-toolbar-corner-container.is-menu-open) > .editor-status-footer {
+  display: none;
+}
+
+.editor-wrapper:has(> .bottom-toolbar-corner-container.is-menu-open) > .app-bottom-blend {
+  height: 104px;
+}
+
+.bottom-toolbar-corner-container.is-menu-open .bottom-corner-buttons-row {
+  position: absolute;
+  inset: 50% 0 auto auto;
+  transform: translateY(-50%);
+}
+
+.format-corner-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .format-corner-btn {
@@ -1968,7 +1940,7 @@ pre.notefast-code-block:hover {
   cursor: pointer;
   opacity: 0.95;
   pointer-events: auto;
-  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .format-corner-btn:hover,
@@ -1979,19 +1951,11 @@ pre.notefast-code-block:hover {
 .format-corner-btn:hover {
   background: var(--btn-liquid-bg-hover);
   color: var(--text-primary);
-  transform: translateY(-1px) scale(1.05);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), var(--app-inner-highlight);
 }
 
 .format-corner-btn:active {
-  transform: translateY(0) scale(0.95);
-}
-
-.format-corner-btn.is-active {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent-hover) !important;
-  color: #ffffff !important;
-  box-shadow: 0 0 5px color-mix(in srgb, var(--color-accent-glow) 60%, transparent), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35) !important;
+  background: var(--btn-liquid-bg-hover);
 }
 
 .format-corner-btn .format-indicator-dot {
@@ -2011,31 +1975,91 @@ pre.notefast-code-block:hover {
   gap: 8px;
 }
 
-.bottom-toolbar-expanded-menu {
-  --format-panel-tint: rgb(25 28 36 / 56%);
-  --format-panel-rim: rgb(227 237 255 / 29%);
+.editor-wrapper {
+  --editor-footer-inset: clamp(8px, 2.6vw, 14px);
+  --editor-footer-bottom: 10px;
+  --editor-footer-height: 46px;
+  --format-panel-tint: rgb(48 54 67 / 21%);
+  --format-panel-rim: rgb(227 237 255 / 34%);
   --format-panel-section-line: rgb(227 237 255 / 17%);
-  --format-panel-reflection: rgb(255 255 255 / 19%);
-  --format-panel-shadow: 0 12px 32px rgb(0 0 0 / 38%);
-  margin-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px;
-  max-width: calc(100vw - 32px);
-  max-height: calc(100dvh - 100px);
-  overflow: auto;
-  overscroll-behavior: contain;
-  background: var(--surface-glass-elevated);
-  border: 1px solid var(--format-panel-rim);
-  border-radius: 22px;
-  box-shadow: inset 0 1px 0 var(--format-panel-reflection), var(--format-panel-shadow);
-  animation: slideUp 0.12s ease-out;
-  transform-origin: bottom right;
+  --format-panel-reflection: rgb(255 255 255 / 31%);
+  --format-panel-shadow: 0 3px 12px rgb(0 0 0 / 24%);
 }
 
-:is(.light, [data-theme="light"], [data-resolved-theme="light"]) .bottom-toolbar-expanded-menu {
-  --format-panel-tint: rgb(245 249 255 / 52%);
+.format-dock-strip,
+.format-dock-options,
+.format-corner-btn {
+  background: var(--surface-glass-elevated);
+  border: 1px solid var(--format-panel-rim);
+  box-shadow: inset 0 1px 1px var(--format-panel-reflection), inset 0 -1px 1px rgb(0 0 0 / 16%), var(--format-panel-shadow);
+}
+
+.format-dock-strip {
+  --format-button-width: clamp(26px, calc((100vw - 86px) / 9), 40px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.format-dock-strip .toolbar-btn {
+  position: relative;
+  flex: none;
+  width: var(--format-button-width);
+  height: 36px;
+  padding: 0;
+}
+
+.format-dock-strip .toolbar-btn > svg,
+.format-dock-options .toolbar-btn > svg,
+.format-corner-btn > svg {
+  display: block;
+  flex: none;
+  width: 17px;
+  height: 17px;
+}
+
+.format-dock-strip .toolbar-btn > .format-group-chevron {
+  position: absolute;
+  inset-inline-end: 2px;
+  bottom: 3px;
+  width: 8px;
+  height: 8px;
+}
+
+.format-dock-strip .toolbar-btn:hover,
+.format-dock-strip .toolbar-btn:active,
+.format-dock-options .toolbar-btn:hover,
+.format-dock-options .toolbar-btn:active {
+  transform: none;
+}
+
+.format-dock-options {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 100%;
+  max-height: min(52dvh, 320px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 16px;
+  padding: 8px;
+}
+
+@media (max-width: 510px) {
+  .bottom-toolbar-corner-container.is-menu-open {
+    padding-inline: 0 44px;
+  }
+}
+
+.light .editor-wrapper,
+[data-theme="light"] .editor-wrapper,
+[data-resolved-theme="light"] .editor-wrapper {
+  --format-panel-tint: rgb(245 249 255 / 26%);
   --format-panel-rim: rgb(62 79 104 / 30%);
   --format-panel-section-line: rgb(62 79 104 / 20%);
   --format-panel-reflection: rgb(255 255 255 / 78%);
@@ -2043,15 +2067,15 @@ pre.notefast-code-block:hover {
 }
 
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .bottom-toolbar-expanded-menu {
-    background: var(--format-panel-tint);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    backdrop-filter: blur(20px) saturate(160%);
+  :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
+    background: linear-gradient(155deg, rgb(255 255 255 / 23%), transparent 67%), var(--format-panel-tint);
+    -webkit-backdrop-filter: blur(7px) saturate(180%);
+    backdrop-filter: blur(7px) saturate(180%);
   }
 }
 
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .bottom-toolbar-expanded-menu {
+  :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
     background: var(--surface-glass-elevated);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
@@ -2059,13 +2083,13 @@ pre.notefast-code-block:hover {
 }
 
 @media (prefers-contrast: more) {
-  .bottom-toolbar-expanded-menu {
+  :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
     border-color: var(--text-muted);
     --format-panel-section-line: var(--text-muted);
   }
 }
 
-.bottom-toolbar-expanded-menu :is(.expanded-toolbar-divider, .toolbar-separator) {
+.bottom-toolbar-expanded-menu .toolbar-separator {
   background: var(--format-panel-section-line);
 }
 
@@ -2080,6 +2104,8 @@ pre.notefast-code-block:hover {
   justify-content: center;
   gap: 4px;
 }
+
+.format-dock-options .toolbar-btn { width: 36px; height: 34px; }
 
 .editor-highlight-options {
   display: grid;
@@ -2211,12 +2237,6 @@ pre.notefast-code-block:hover {
 
 @media (max-width: 340px) {
   .highlight-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-.expanded-toolbar-divider {
-  height: 1px;
-  background: var(--separator);
-  margin: 3px 4px;
 }
 
 .toolbar-btn {
@@ -3636,9 +3656,9 @@ body:has(.command-overlay) .editor-status-footer {
 /* ── Character Count (Subtle iOS Status Bottom Center) ────── */
 .editor-status-footer {
   position: absolute;
-  bottom: 12px;
-  left: 20px;
-  right: 20px;
+  bottom: var(--editor-footer-bottom);
+  inset-inline: var(--editor-footer-inset);
+  min-height: var(--editor-footer-height);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -3647,9 +3667,11 @@ body:has(.command-overlay) .editor-status-footer {
 }
 
 .editor-char-count, .editor-resource-usage {
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1.35;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
   letter-spacing: 0.015em;
   user-select: none;
   pointer-events: none;
@@ -3669,9 +3691,15 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .editor-char-count { grid-column: 2; grid-row: 1; }
 
-@media (max-width: 440px) {
-  .editor-status-footer { left: 12px; right: 12px; }
-  .editor-char-count, .editor-resource-usage { font-size: 10px; }
+@media (max-width: 560px) {
+  .editor-status-footer { grid-template-columns: 1fr minmax(0, 2fr) 1fr; }
+  .editor-char-count, .editor-resource-usage { font-size: 12px; }
+  .editor-char-count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .editor-char-count > [aria-hidden="true"] { display: none; }
 }
 
 .settings-resources { padding: 14px 16px; }
@@ -3696,7 +3724,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 .toolbar-theme-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 4px 2px 2px 2px;
 }
@@ -6674,7 +6703,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   .editor-context-submenu,
   .slash-command-menu,
   .code-lang-liquid-menu,
-  .bottom-toolbar-expanded-menu,
+  .format-dock-strip,
+  .format-dock-options,
   .command-palette,
   .smart-search-modal,
   .shortcuts-modal-container,

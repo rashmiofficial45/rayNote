@@ -164,6 +164,22 @@ describe("Theme Engine (theme.ts)", () => {
 
       window.removeEventListener("notefast_theme_changed", listener);
     });
+
+    it("applies rapid theme changes without taking view-transition snapshots", () => {
+      const startViewTransition = vi.fn();
+      const descriptor = Object.getOwnPropertyDescriptor(document, "startViewTransition");
+      Object.defineProperty(document, "startViewTransition", { configurable: true, value: startViewTransition });
+      try {
+        setStoredThemeMode("light");
+        expect(document.documentElement.dataset.resolvedTheme).toBe("light");
+        setStoredThemeMode("dark");
+        expect(document.documentElement.dataset.resolvedTheme).toBe("dark");
+        expect(startViewTransition).not.toHaveBeenCalled();
+      } finally {
+        if (descriptor) Object.defineProperty(document, "startViewTransition", descriptor);
+        else Reflect.deleteProperty(document, "startViewTransition");
+      }
+    });
   });
 
   describe("Accent Color Management", () => {

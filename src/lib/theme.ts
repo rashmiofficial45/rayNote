@@ -3,8 +3,7 @@ import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
  * NoteFast Design System & Theme Engine (theme.ts)
  *
  * Responsibilities:
- * - Dynamic Theme Modes: Manages Dark, Light, and automatic System (prefers-color-scheme) modes,
- *   supporting smooth DOM animations via the native browser `document.startViewTransition` API.
+ * - Dynamic Theme Modes: Manages Dark, Light, and automatic System (prefers-color-scheme) modes.
  * - Curated macOS Accent Palettes: Injects custom CSS color tokens for Violet, Red, Emerald,
  *   Ocean, Sunset Amber, and Rose Quartz.
  * - Fluid Typography Engine: Configures font families (Inter, Comic Shanns, Nunito, Virgil,
@@ -76,31 +75,21 @@ import { broadcastSync } from "./settingsSync";
  * Applies the requested theme mode ('dark', 'light', 'system') to the document root element:
  * - Toggles `.dark` and `.light` CSS classes.
  * - Sets dataset attributes (`data-theme-mode`, `data-resolved-theme`).
- * - Uses `document.startViewTransition` when available for fluid crossfade animation.
+ * - Updates synchronously so glass surfaces keep sampling the live backdrop.
  */
-export function applyThemeMode(mode: ThemeMode, useTransition = false): void {
+export function applyThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const isDark = mode === "dark" || (mode === "system" && prefersDark);
+  const root = document.documentElement;
+  const isDark = mode === "dark" ||
+    (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const resolvedTheme = isDark ? "dark" : "light";
 
-  const updateDOM = () => {
-    document.documentElement.classList.toggle("dark", isDark);
-    document.documentElement.classList.toggle("light", !isDark);
-    document.documentElement.dataset.theme = isDark ? "dark" : "light";
-    document.documentElement.dataset.themeMode = mode;
-    document.documentElement.dataset.resolvedTheme = isDark ? "dark" : "light";
-    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
-  };
-
-  if (useTransition && typeof (document as any).startViewTransition === "function") {
-    try {
-      (document as any).startViewTransition(updateDOM);
-      return;
-    } catch {
-      // Fallback
-    }
-  }
-  updateDOM();
+  root.classList.toggle("dark", isDark);
+  root.classList.toggle("light", !isDark);
+  root.dataset.theme = resolvedTheme;
+  root.dataset.themeMode = mode;
+  root.dataset.resolvedTheme = resolvedTheme;
+  root.style.colorScheme = resolvedTheme;
 }
 
 /**
@@ -109,7 +98,7 @@ export function applyThemeMode(mode: ThemeMode, useTransition = false): void {
 export function setStoredThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
   safeLocalStorageSetItem("notefast_theme_mode", mode);
-  applyThemeMode(mode, true);
+  applyThemeMode(mode);
   broadcastSync({ type: "theme_mode", value: mode });
   window.dispatchEvent(new CustomEvent("notefast_theme_changed", { detail: { mode } }));
 }

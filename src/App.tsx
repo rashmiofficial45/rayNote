@@ -46,6 +46,8 @@ import {
   downloadFile,
   extractTitleFromMarkdown,
 } from "./lib/utils";
+import type { Editor } from "@tiptap/core";
+import { smartToggleMark } from "./editor/formatMemory";
 import { dismissSlashCommand } from "./editor/SlashCommand";
 import { ensureFirstLineHeading } from "./editor/markdownUtils";
 import {
@@ -2101,6 +2103,7 @@ function App() {
           e.stopPropagation();
           return;
         }
+        if (document.querySelector(".bottom-toolbar-corner-container.is-menu-open")) return;
         if (!escLosesFocus) {
           e.preventDefault();
           e.stopPropagation();
@@ -2311,6 +2314,16 @@ function App() {
         <CommandPalette
           isOpen
           onClose={closePalette}
+          onHighlight={activeNoteId && readOnlyNoteId !== activeNoteId ? options => {
+            const editor = (window as Window & { __RAYNOTE_EDITOR__?: Editor }).__RAYNOTE_EDITOR__;
+            if (!editor?.isEditable || editor.isDestroyed || getEditorNoteId() !== activeNoteId) return;
+            const current = editor.getAttributes("highlight");
+            editor.commands.focus(undefined, { scrollIntoView: false });
+            smartToggleMark(editor, "highlight", options === null ? null : {
+              color: options.color ?? current.color ?? "yellow",
+              style: options.style ?? current.style ?? "stripes",
+            });
+          } : undefined}
           notes={notes}
           activeNoteId={activeNoteId}
           initialView={paletteInitialView}

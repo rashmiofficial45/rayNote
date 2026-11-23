@@ -68,6 +68,7 @@ describe("Phase 4: Typing Path Optimizations & Format Menu State", () => {
         formatBtn.click();
       });
 
+      act(() => container.querySelector<HTMLButtonElement>('[aria-label="Text styles"]')!.click());
       const boldBtn = container.querySelector("button[title='Bold (⌘B)']") as HTMLButtonElement;
       expect(boldBtn).not.toBeNull();
       expect(boldBtn.classList.contains("is-active")).toBe(false);
@@ -91,6 +92,7 @@ describe("Phase 4: Typing Path Optimizations & Format Menu State", () => {
         formatBtn.click();
       });
 
+      act(() => container.querySelector<HTMLButtonElement>('[aria-label="Headings"]')!.click());
       const h1Btn = container.querySelector("button[title='Heading 1 (⌘⌥1)']") as HTMLButtonElement;
       const h2Btn = container.querySelector("button[title='Heading 2 (⌘⌥2)']") as HTMLButtonElement;
 
@@ -120,6 +122,7 @@ describe("Phase 4: Typing Path Optimizations & Format Menu State", () => {
         formatBtn.click();
       });
 
+      act(() => container.querySelector<HTMLButtonElement>('[aria-label="Lists"]')!.click());
       const bulletBtn = container.querySelector("button[title='Bullet List (⇧⌘8)']") as HTMLButtonElement;
       const orderedBtn = container.querySelector("button[title='Numbered List (⇧⌘7)']") as HTMLButtonElement;
       const taskBtn = container.querySelector("button[title='Task List (⇧⌘9)']") as HTMLButtonElement;

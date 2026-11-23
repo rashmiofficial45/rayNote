@@ -1,6 +1,7 @@
 import { nextMenuIndex, revealMenuItem } from "../lib/menuNavigation";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "../lib/storage";
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { HIGHLIGHT_COLORS, HIGHLIGHT_STYLES } from "../editor/textHighlight";
 import { NoteSummary, hideWindow, quitApp, openSettingsWindow } from "../lib/db";
 
 const PaletteSubViews = lazy(() => import("./PaletteSubViews"));
@@ -37,6 +38,7 @@ import {
   Sliders,
   AlertTriangle,
   Maximize,
+  Highlighter,
 } from "lucide-react";
 import {
   ACCENT_OPTIONS,
@@ -96,9 +98,10 @@ export interface CommandPaletteProps {
   onPromptClearAllNotes?: () => void;
   onOpenTrash?: () => void;
   onOpenSmartSearch?: () => void;
+  onHighlight?: (options: { color?: string; style?: string } | null) => void;
 }
 
-type PaletteView = "actions" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom";
+type PaletteView = "actions" | "settings" | "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom" | "sub_highlight";
 
 export interface ActionItem {
   id: string;
@@ -148,6 +151,7 @@ export function CommandPalette({
   onPromptClearAllNotes,
   onOpenTrash,
   onOpenSmartSearch,
+  onHighlight,
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -351,6 +355,21 @@ export function CommandPalette({
       action: () => {
         onClose();
         onExportAllNotes?.();
+      },
+    },
+
+    {
+      id: "sub-highlight-picker",
+      category: "Formatting",
+      label: "Highlight",
+      badge: "Submenu",
+      icon: <Highlighter size={14} />,
+      disabled: !onHighlight,
+      keywords: ["highlight", "mark", "color", "pattern"],
+      action: () => {
+        setView("sub_highlight");
+        setSearch("");
+        setSelectedIndex(0);
       },
     },
 
@@ -883,6 +902,23 @@ export function CommandPalette({
 
     return otherCommandActions;
   }, [search, rawFilteredActions, aliases]);
+  const highlightAction = (category: string, label: string, options: Parameters<NonNullable<typeof onHighlight>>[0]): ActionItem => ({
+    id: `highlight-${category}-${label}`,
+    category,
+    label,
+    icon: <Highlighter size={14} />,
+    action: () => {
+      onClose();
+      onHighlight?.(options);
+    },
+  });
+
+  const filteredHighlight = view === "sub_highlight" ? filterList([
+    ...HIGHLIGHT_COLORS.map(color => highlightAction("Color", color[0].toUpperCase() + color.slice(1), { color })),
+    ...HIGHLIGHT_STYLES.map(([style, label]) => highlightAction("Pattern", label, { style })),
+    highlightAction("Highlight", "Clear highlight", null),
+  ]) : [];
+
   const filteredAppearance = filterList(appearanceSubActions);
   const filteredAccents = filterList(accentSubActions);
   const filteredFonts = filterList(fontSubActions);
@@ -890,6 +926,8 @@ export function CommandPalette({
 
   const getActiveItems = () => {
     switch (view) {
+      case "sub_highlight":
+        return filteredHighlight;
       case "sub_appearance":
         return filteredAppearance;
       case "sub_accents":
@@ -924,7 +962,8 @@ export function CommandPalette({
     view === "sub_appearance" ||
     view === "sub_accents" ||
     view === "sub_fonts" ||
-    view === "sub_zoom";
+    view === "sub_zoom" ||
+    view === "sub_highlight";
 
   const currentItems = getActiveItems();
 
@@ -1015,18 +1054,7 @@ export function CommandPalette({
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        const list =
-          view === "sub_appearance"
-            ? filteredAppearance
-            : view === "sub_accents"
-              ? filteredAccents
-              : view === "sub_fonts"
-                ? filteredFonts
-                : view === "sub_zoom"
-                  ? filteredZoom
-                  : filteredActions;
-
-        const action = list[selectedIndex];
+        const action = currentItems[selectedIndex];
         if (action && !action.disabled) action.action();
         return;
       }
@@ -1036,13 +1064,9 @@ export function CommandPalette({
       initialView,
       isSubView,
       search,
-      currentItems.length,
+      currentItems,
       selectedIndex,
-      filteredActions,
-      filteredAppearance,
-      filteredAccents,
-      filteredFonts,
-      filteredZoom,
+      onOpenSmartSearch,
       onClose,
     ]
   );
@@ -1087,7 +1111,9 @@ export function CommandPalette({
                     ? "Search accent themes…"
                     : view === "sub_fonts"
                       ? "Search typography…"
-                      : "Search zoom levels…"
+                      : view === "sub_highlight"
+                        ? "Search highlight colors and patterns…"
+                        : "Search zoom levels…"
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1183,7 +1209,7 @@ export function CommandPalette({
             })}
 
           {/* Sub-Views: Appearance / Accents / Fonts / Zoom (Code-split with React.lazy) */}
-          {isSubView && (
+          {isSubView && view !== "sub_highlight" && (
             <Suspense fallback={null}>
               <PaletteSubViews
                 view={view as "sub_appearance" | "sub_accents" | "sub_fonts" | "sub_zoom"}
@@ -1196,6 +1222,23 @@ export function CommandPalette({
               />
             </Suspense>
           )}
+
+          {view === "sub_highlight" && filteredHighlight.map((item, idx) => (
+            <div key={item.id}>
+              {item.category !== filteredHighlight[idx - 1]?.category && (
+                <div className="command-category-header">{item.category}</div>
+              )}
+              <button
+                type="button"
+                className={`command-item ${idx === selectedIndex ? "is-selected" : ""}`}
+                onClick={item.action}
+                onMouseMove={event => handleItemMouseMove(idx, event)}
+              >
+                <span className="command-item-icon">{item.icon}</span>
+                <span className="command-item-label">{item.label}</span>
+              </button>
+            </div>
+          ))}
 
           {currentItems.length === 0 && (
             <div style={{ padding: "24px 16px", textAlign: "center", color: "var(--text-muted)", fontSize: 13 }}>

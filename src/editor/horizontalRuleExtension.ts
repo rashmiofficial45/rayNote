@@ -34,6 +34,16 @@ export function insertHorizontalRuleSmart(
 
   const hrNode = hrType.create();
 
+  if ($from.depth === 0) {
+    const insertPos = selection.to;
+    const $insert = tr.doc.resolve(insertPos);
+    if ($insert.depth !== 0 || !$insert.parent.canReplaceWith($insert.index(), $insert.index(), hrType)) return false;
+    tr.insert(insertPos, hrNode);
+    selectParagraphAfterDivider(tr, insertPos);
+    if (dispatch) dispatch(tr.scrollIntoView());
+    return true;
+  }
+
   // Find if we are inside a taskItem, listItem, or blockquote
   let targetDepth = -1;
   let containerDepth = -1;
@@ -141,6 +151,14 @@ export function insertHorizontalRuleSmart(
   }
 
   // ── 3. Top-Level Paragraph ──
+  if (!matchedRange && blockNode.content.size > 0) {
+    const insertPos = $from.after(1);
+    tr.insert(insertPos, hrNode);
+    selectParagraphAfterDivider(tr, insertPos);
+    if (dispatch) dispatch(tr.scrollIntoView());
+    return true;
+  }
+
   // Replace current paragraph with <hr> and append a clean paragraph below
   tr.replaceRangeWith(blockBefore, blockAfter, hrNode);
   const defaultType = schema.nodes.paragraph || schema.topNodeType.contentMatch.defaultType;
