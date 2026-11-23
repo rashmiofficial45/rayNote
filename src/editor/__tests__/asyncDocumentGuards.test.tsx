@@ -30,6 +30,30 @@ beforeEach(() => {
 });
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 describe('Asynchronous editor document guards', () => {
+  it('focuses a cold note as soon as it is ready and restores the current caret on refocus', async () => {
+    let resolve!: (note: unknown) => void;
+    vi.mocked(invoke).mockImplementation(command => command === 'get_note' ? new Promise(r => { resolve = r; }) : Promise.resolve(undefined));
+    await render('note-a');
+    expect(editor.isEditable).toBe(false);
+
+    await act(async () => {
+      resolve({ id: 'note-a', content: doc('Ready to type'), updated_at: '2026-01-01' });
+      await vi.advanceTimersByTimeAsync(17);
+    });
+    expect(editor.isEditable).toBe(true);
+    expect(document.activeElement).toBe(editor.view.dom);
+    expect(editor.state.selection.from).toBe(editor.state.doc.content.size - 1);
+
+    act(() => {
+      editor.commands.setTextSelection(3);
+      editor.view.dom.blur();
+      window.dispatchEvent(new Event('focus'));
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(17); });
+    expect(document.activeElement).toBe(editor.view.dom);
+    expect(editor.state.selection.from).toBe(3);
+  });
+
   it('retains edits typed after cached document appears while SQLite revalidation is pending', async () => {
     let resolve!: (note: unknown) => void;
     vi.mocked(invoke).mockImplementation((command) => command === 'get_note' ? new Promise(r => { resolve = r; }) : Promise.resolve(undefined));

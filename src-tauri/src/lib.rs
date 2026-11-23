@@ -568,7 +568,7 @@ pub fn run() {
             // Initialize database
             let app_dir = app.path().app_data_dir().expect("Failed to get app data dir");
             let db = std::sync::Arc::new(Database::new(app_dir.clone()).expect("Failed to initialize database"));
-            app.manage(db.clone());
+            app.manage(db);
 
             // Restore window size if previously saved
             let state_file = app_dir.join("window_state.json");
@@ -663,12 +663,6 @@ pub fn run() {
             if show_menu_bar {
                 let _ = set_menu_bar_visible(app.handle().clone(), true);
             }
-
-            // Warm note summaries cache in background right after window is shown
-            let db_warm = db.clone();
-            tauri::async_runtime::spawn_blocking(move || {
-                let _ = db_warm.get_all_notes_arc();
-            });
 
             Ok(())
         })

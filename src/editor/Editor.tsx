@@ -1168,6 +1168,12 @@ export function Editor({
       } finally {
         if (!cancelled && editor && !editor.isDestroyed) {
           editor.setEditable(Boolean(currentNoteIdRef.current) && !readOnlyRef.current, false);
+          if (currentNoteIdRef.current === noteId && editor.isEditable) {
+            const active = document.activeElement;
+            if (!active || active === document.body || active === editor.view.dom) {
+              editor.commands.focus("end", { scrollIntoView: false });
+            }
+          }
         }
         if ((import.meta as any).env?.DEV) {
           const switchDuration = performance.now() - switchStart;
@@ -1253,61 +1259,31 @@ export function Editor({
   // Notion-style Block Drag & Auto-Scroll
   useBlockDrag({ editor, scrollContainerRef, rubberBandRef: selectionBoxRef });
 
-  /**
-   * Focus restoration without resetting restored scroll position:
-   */
+  // Refocus on window activation without replacing the caret or selection.
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
-
-    const focusNote = () => {
-      if (editor && !editor.isDestroyed && !editor.isFocused && currentNoteIdRef.current === noteId) {
-        // focus with scrollIntoView: false prevents jumping away from restored scrollTop
-        editor.commands.focus("end", { scrollIntoView: false });
+    if (!editor) return;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    const refocus = () => {
+      if (editor.isDestroyed || !editor.isEditable || editor.isFocused) return;
+      const active = document.activeElement;
+      if (!active || active === document.body || active === editor.view.dom) {
+        editor.commands.focus(undefined, { scrollIntoView: false });
       }
     };
 
-    focusNote();
-    const t1 = setTimeout(focusNote, 40);
-    const t2 = setTimeout(focusNote, 150);
-
-    const handleWindowFocus = () => {
-      focusNote();
-    };
-
-    window.addEventListener("focus", handleWindowFocus);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      window.removeEventListener("focus", handleWindowFocus);
-    };
-  }, [editor, noteId]);
-
-  /**
-   * Refocus editor on Tauri app-focused event
-   */
-  useEffect(() => {
-    let isCleanedUp = false;
-    let unlisten: (() => void) | undefined;
-    getCurrentWindow()
-      .listen("app-focused", () => {
-        if (editorRef.current && !editorRef.current.isDestroyed) {
-          editorRef.current.commands.focus("end", { scrollIntoView: false });
-        }
-      })
-      .then((fn) => {
-        if (isCleanedUp) {
-          fn();
-        } else {
-          unlisten = fn;
-        }
-      })
-      .catch(() => { });
+    window.addEventListener("focus", refocus);
+    getCurrentWindow().listen("app-focused", refocus).then(stop => {
+      if (disposed) stop();
+      else unlisten = stop;
+    }).catch(() => {});
 
     return () => {
-      isCleanedUp = true;
+      disposed = true;
       unlisten?.();
+      window.removeEventListener("focus", refocus);
     };
-  }, []);
+  }, [editor]);
 
   /**
    * Keystroke auto-focus restoration
@@ -1338,8 +1314,8 @@ export function Editor({
       if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
       const a = document.activeElement;
       if (a && a !== document.body) return;
-      if (!editor.isDestroyed && !editor.isFocused) {
-        editor.commands.focus("end", { scrollIntoView: false });
+      if (!editor.isDestroyed && editor.isEditable && !editor.isFocused) {
+        editor.view.focus();
       }
     };
     window.addEventListener("keydown", onKeyDown, true);

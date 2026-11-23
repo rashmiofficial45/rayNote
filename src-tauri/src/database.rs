@@ -530,30 +530,46 @@ impl Database {
         Ok((*arc).clone())
     }
 
-    /// Returns the top recent notes directly from in-memory cache (< 0.01ms).
+    /// Returns only the requested recent results, without warming the full search cache.
     pub fn get_recent_notes(&self, limit: usize) -> Result<Vec<SearchResult>> {
-        let all = self.get_all_notes_arc()?;
-        let recent = all
-            .iter()
-            .take(limit)
-            .map(|n| SearchResult {
-                id: n.id.clone(),
-                title: n.title.clone(),
-                snippet: n.preview.clone(),
-                score: if n.is_pinned { 100.0 } else { 50.0 },
-                match_type: "recent".to_string(),
-                updated_at: n.updated_at.clone(),
-                is_pinned: n.is_pinned,
-            })
-            .collect();
-
-        Ok(recent)
+        Ok(self.get_recent_summaries(limit)?.into_iter().map(|note| SearchResult {
+            id: note.id,
+            title: note.title,
+            snippet: note.preview,
+            score: if note.is_pinned { 100.0 } else { 50.0 },
+            match_type: "recent".to_string(),
+            updated_at: note.updated_at,
+            is_pinned: note.is_pinned,
+        }).collect())
     }
 
-    /// Returns the top recent note summaries directly from in-memory cache (< 0.01ms).
     pub fn get_recent_summaries(&self, limit: usize) -> Result<Vec<NoteSummary>> {
-        let all = self.get_all_notes_arc()?;
-        Ok(all.iter().take(limit).cloned().collect())
+        if let Ok(cache) = self.meta_cache.read() {
+            if let Some(notes) = cache.as_ref() {
+                return Ok(notes.iter().take(limit).cloned().collect());
+            }
+        }
+
+        let conn = self.reader.lock().unwrap_or_else(|e| e.into_inner());
+        let mut stmt = conn.prepare_cached(
+            "SELECT id, title, preview, created_at, updated_at, is_pinned
+             FROM notes
+             ORDER BY is_pinned DESC, updated_at DESC, id ASC
+             LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([i64::try_from(limit).unwrap_or(i64::MAX)], |row| {
+            let title: String = row.get(1)?;
+            Ok(NoteSummary {
+                id: row.get(0)?,
+                title_lower: normalize_query(&title),
+                title,
+                preview: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                is_pinned: row.get::<_, i32>(5)? != 0,
+            })
+        })?;
+        rows.collect()
     }
 
     /// Keyset navigation for Option+Up / Option+Down across all notes in (is_pinned DESC, updated_at DESC, id ASC) order.
@@ -1305,6 +1321,29 @@ impl Database {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_recent_summaries_are_bounded_on_cold_start() {
+        let dir = std::env::temp_dir().join(format!("raynote_recent_{}", uuid::Uuid::new_v4()));
+        let db = Database::new(dir.clone()).unwrap();
+        db.writer.lock().unwrap().execute_batch(
+            "INSERT INTO notes (id, title, created_at, updated_at, is_pinned) VALUES
+             ('c', 'Pinned', '2026-01-01', '2026-01-01', 1),
+             ('b', 'Beta', '2026-01-01', '2026-01-03', 0),
+             ('a', 'Alpha', '2026-01-01', '2026-01-03', 0);"
+        ).unwrap();
+
+        let cold = db.get_recent_summaries(2).unwrap();
+        assert!(db.meta_cache.read().unwrap().is_none());
+        assert_eq!(cold.iter().map(|note| note.id.as_str()).collect::<Vec<_>>(), ["c", "a"]);
+        assert!(db.get_recent_summaries(0).unwrap().is_empty());
+
+        db.get_all_notes_arc().unwrap();
+        let warm = db.get_recent_summaries(2).unwrap();
+        assert_eq!(warm.iter().map(|note| note.id.as_str()).collect::<Vec<_>>(), ["c", "a"]);
+        drop(db);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn test_legacy_schema_migrates_before_covering_index() {

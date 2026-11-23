@@ -1335,16 +1335,6 @@ function App() {
     };
   }, [flushPendingTitle]);
 
-  // Prefetch secondary Settings window, Markdown modal, and CommandPalette sub-views chunks after 1500ms idle timer
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      import("./SettingsApp");
-      import("./components/MarkdownViewerModal");
-      import("./components/PaletteSubViews");
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
   /**
    * Updates note content and metadata:
    * - Receives explicit target `id` captured when save started, NEVER reading mutable active note state.
@@ -2149,7 +2139,7 @@ function App() {
     return () => window.removeEventListener("raynote:navigate-note", handleNavigateNoteEvent);
   }, [handleSelectNote]);
 
-  if (isLoading) {
+  if (isLoading && !activeNoteId) {
     return (
       <div className="app-shell flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
