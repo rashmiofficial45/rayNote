@@ -485,6 +485,18 @@ describe("Exhaustive Formatting & Shortcuts Verification Suite", () => {
     editor.destroy();
   });
 
+  it.each(["crosshatch", "bands", "dots"])("preserves the %s highlight style through HTML", (style) => {
+    const editor = createTestEditor("<p>Pattern</p>");
+    editor.commands.selectAll();
+    editor.commands.setMark("highlight", { color: "blue", style });
+    const html = editor.getHTML();
+    expect(html).toContain(`data-highlight-style="${style}"`);
+    const saved = editor.getJSON();
+    editor.commands.setContent(html);
+    expect(editor.getJSON()).toEqual(saved);
+    editor.destroy();
+  });
+
   it("keeps themed highlight attributes through HTML and JSON on formatted text", () => {
     const editor = createTestEditor("<p><strong>bold</strong> <em>italic</em> <code>code</code></p>");
     editor.commands.setTextSelection({ from: 2, to: 16 });

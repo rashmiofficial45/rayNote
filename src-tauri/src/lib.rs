@@ -2,6 +2,8 @@ pub mod database;
 pub mod search;
 pub mod commands;
 mod window_geometry;
+mod resource_usage;
+use resource_usage::get_resource_sample;
 
 use database::Database;
 use commands::*;
@@ -631,6 +633,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_all_notes,
+            get_resource_sample,
             set_toggle_shortcut,
             take_pending_note_link,
             get_recent_notes,

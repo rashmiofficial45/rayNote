@@ -10,7 +10,8 @@ export const HIGHLIGHT_STYLES = [
   ["pastel", "Pastel"],
   ["underline", "Underline"],
   ["stripes", "Stripes"],
-  ["dots", "Dots"],
+  ["crosshatch", "Crosshatch"],
+  ["bands", "Bands"],
 ] as const;
 
 export const TextHighlight = Highlight.extend({
@@ -30,7 +31,7 @@ export const TextHighlight = Highlight.extend({
       style: {
         default: null,
         parseHTML: element => element.getAttribute("data-highlight-style"),
-        renderHTML: ({ style }) => HIGHLIGHT_STYLES.some(([id]) => id === style)
+        renderHTML: ({ style }) => style === "dots" || HIGHLIGHT_STYLES.some(([id]) => id === style)
           ? { "data-highlight-style": style }
           : {},
       },

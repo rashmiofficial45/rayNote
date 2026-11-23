@@ -1,3 +1,4 @@
+import { ResourceUsage } from "./components/ResourceUsage";
 import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestEditorFlush } from "./lib/editorFlush";
@@ -1246,6 +1247,7 @@ export default function SettingsApp() {
         {/* ─── PANE 4: ABOUT ─── */}
         {activePane === "about" && (
           <div className="settings-pane-content">
+            <ResourceUsage />
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">

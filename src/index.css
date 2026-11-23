@@ -1839,23 +1839,31 @@ pre.notefast-code-block:hover {
 :is(mark, .editor-highlight-options button)[data-color="red"]    { --highlight-ink: #db6464; }
 :is(mark, .editor-highlight-options button)[data-color="gray"]   { --highlight-ink: #8591a2; }
 
-.tiptap mark:is([data-color], [data-highlight-style]) {
+:is(.tiptap mark:is([data-color], [data-highlight-style]), .editor-highlight-options button[data-color]) {
   --highlight-tint: var(--highlight-ink, var(--color-accent));
+  --highlight-stroke: color-mix(in srgb, var(--highlight-tint) 84%, white);
+  --highlight-fill: 38%;
+  --highlight-pastel-fill: 24%;
+  --highlight-pattern-strength: 27%;
+  --highlight-pattern-base: 15%;
+}
+
+:is(.light, [data-theme="light"], [data-resolved-theme="light"])
+  :is(.tiptap mark:is([data-color], [data-highlight-style]), .editor-highlight-options button[data-color]) {
+  --highlight-stroke: color-mix(in srgb, var(--highlight-tint) 68%, #182033);
+  --highlight-pattern-strength: 43%;
+}
+
+.tiptap mark:is([data-color], [data-highlight-style]) {
   padding: 1px 0;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
   color: inherit;
-  background: color-mix(in srgb, var(--highlight-tint) 31%, transparent);
-}
-
-.tiptap mark[data-highlight-style="pastel"] {
-  background: color-mix(in srgb, var(--highlight-tint) 17%, transparent);
 }
 
 .tiptap mark[data-highlight-style="underline"] {
-  background: transparent;
   text-decoration: underline;
-  text-decoration-color: var(--highlight-tint);
+  text-decoration-color: var(--highlight-stroke);
   text-decoration-thickness: 2px;
   text-underline-offset: .16em;
 }
@@ -2004,23 +2012,70 @@ pre.notefast-code-block:hover {
 }
 
 .bottom-toolbar-expanded-menu {
+  --format-panel-tint: rgb(25 28 36 / 56%);
+  --format-panel-rim: rgb(227 237 255 / 29%);
+  --format-panel-section-line: rgb(227 237 255 / 17%);
+  --format-panel-reflection: rgb(255 255 255 / 19%);
+  --format-panel-shadow: 0 12px 32px rgb(0 0 0 / 38%);
   margin-bottom: 10px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 10px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 100px);
+  overflow: auto;
+  overscroll-behavior: contain;
   background: var(--surface-glass-elevated);
-  backdrop-filter: blur(34px) saturate(210%);
-  -webkit-backdrop-filter: blur(34px) saturate(210%);
-  border: 1px solid var(--surface-glass-border);
+  border: 1px solid var(--format-panel-rim);
   border-radius: 22px;
-  box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
+  box-shadow: inset 0 1px 0 var(--format-panel-reflection), var(--format-panel-shadow);
   animation: slideUp 0.12s ease-out;
   transform-origin: bottom right;
 }
 
+:is(.light, [data-theme="light"], [data-resolved-theme="light"]) .bottom-toolbar-expanded-menu {
+  --format-panel-tint: rgb(245 249 255 / 52%);
+  --format-panel-rim: rgb(62 79 104 / 30%);
+  --format-panel-section-line: rgb(62 79 104 / 20%);
+  --format-panel-reflection: rgb(255 255 255 / 78%);
+  --format-panel-shadow: 0 12px 30px rgb(35 54 78 / 20%);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .bottom-toolbar-expanded-menu {
+    background: var(--format-panel-tint);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    backdrop-filter: blur(20px) saturate(160%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .bottom-toolbar-expanded-menu {
+    background: var(--surface-glass-elevated);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .bottom-toolbar-expanded-menu {
+    border-color: var(--text-muted);
+    --format-panel-section-line: var(--text-muted);
+  }
+}
+
+.bottom-toolbar-expanded-menu :is(.expanded-toolbar-divider, .toolbar-separator) {
+  background: var(--format-panel-section-line);
+}
+
+.bottom-toolbar-expanded-menu :is(.editor-highlight-options, .toolbar-theme-mode-group, .toolbar-font-btn) {
+  border-color: var(--format-panel-section-line);
+}
+
 .expanded-toolbar-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -2028,14 +2083,32 @@ pre.notefast-code-block:hover {
 
 .editor-highlight-options {
   display: grid;
-  gap: 6px;
-  padding: 7px 4px 4px;
-  border-top: 1px solid var(--separator);
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--surface-glass-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-glass-elevated) 30%, transparent);
 }
+
+.highlight-options-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.highlight-remove {
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.highlight-remove:disabled { opacity: .45; }
 
 .highlight-swatches, .highlight-styles {
   display: grid;
-  align-items: center;
   gap: 5px;
 }
 
@@ -2043,63 +2116,101 @@ pre.notefast-code-block:hover {
 .highlight-styles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
 .highlight-swatches button, .highlight-style-sample {
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--highlight-ink) 50%, transparent);
-  border: 1px solid var(--btn-liquid-border);
+  border-radius: 5px;
+  border: 1px solid var(--surface-glass-border);
 }
 
-.highlight-swatches button { height: 23px; }
-.highlight-style-sample { width: 14px; height: 14px; flex: none; }
+.highlight-swatches button { height: 22px; }
+
+.highlight-style-sample {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 18px;
+  flex: none;
+  font-size: 10px;
+  font-weight: 650;
+}
 
 .highlight-styles button {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 26px;
-  padding: 2px 4px;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 5px;
   font-size: 11px;
   color: var(--text-primary);
-  border-radius: 999px;
+  border-radius: 8px;
+}
+
+/* Share the same fill and pattern between editor text, swatches, and samples. */
+:is(.tiptap mark:is([data-color], [data-highlight-style]), .highlight-swatches button, .highlight-style-sample) {
+  background-color: color-mix(in srgb, var(--highlight-tint) var(--highlight-fill), transparent);
+}
+
+:is(mark, .highlight-swatches button, .highlight-styles button)[data-highlight-style="pastel"] {
+  --highlight-fill: var(--highlight-pastel-fill);
+}
+
+:is(mark, .highlight-swatches button, .highlight-styles button)[data-highlight-style="underline"] {
+  --highlight-fill: 0%;
+}
+
+:is(mark, .highlight-swatches button, .highlight-styles button):is(
+  [data-highlight-style="stripes"], [data-highlight-style="crosshatch"],
+  [data-highlight-style="bands"], [data-highlight-style="dots"]
+) {
+  --highlight-fill: var(--highlight-pattern-base);
+  --pattern-ink: color-mix(in srgb, var(--highlight-stroke) var(--highlight-pattern-strength), transparent);
 }
 
 :is(mark, .highlight-swatches button)[data-highlight-style="stripes"],
 [data-highlight-style="stripes"] > .highlight-style-sample {
-  background-image: repeating-linear-gradient(135deg, transparent 0 4px,
-    color-mix(in srgb, var(--highlight-ink, var(--color-accent)) 62%, transparent) 4px 6px);
+  background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--pattern-ink) 4px 6px);
 }
 
-:is(mark, .highlight-swatches button)[data-highlight-style="dots"],
-[data-highlight-style="dots"] > .highlight-style-sample {
-  background-image: radial-gradient(color-mix(in srgb, var(--highlight-ink, var(--color-accent)) 78%, transparent) 1px, transparent 1.5px);
+:is(mark, .highlight-swatches button)[data-highlight-style="crosshatch"],
+[data-highlight-style="crosshatch"] > .highlight-style-sample {
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 5px, var(--pattern-ink) 5px 6.5px),
+    repeating-linear-gradient(-45deg, transparent 0 5px, var(--pattern-ink) 5px 6.5px);
+}
+
+:is(mark, .highlight-swatches button)[data-highlight-style="bands"],
+[data-highlight-style="bands"] > .highlight-style-sample {
+  background-image: repeating-linear-gradient(0deg, transparent 0 4px, var(--pattern-ink) 4px 6px);
+}
+
+/* Existing notes can still contain the retired dotted pattern. */
+:is(mark, .highlight-swatches button)[data-highlight-style="dots"] {
+  background-image: radial-gradient(var(--pattern-ink) 1px, transparent 1.5px);
   background-size: 5px 5px;
-}
-
-.highlight-swatches button[data-highlight-style="pastel"],
-[data-highlight-style="pastel"] > .highlight-style-sample {
-  background: color-mix(in srgb, var(--highlight-ink) 22%, transparent);
 }
 
 .highlight-swatches button[data-highlight-style="underline"],
 [data-highlight-style="underline"] > .highlight-style-sample {
-  background: transparent;
-  box-shadow: inset 0 -3px var(--highlight-ink);
+  box-shadow: inset 0 -2px var(--highlight-stroke);
 }
 
 .highlight-swatches button:hover,
 .highlight-swatches button[aria-pressed="true"],
-.editor-highlight-options button:focus-visible {
+.bottom-toolbar-expanded-menu button:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
 
 .highlight-styles button:hover,
+.highlight-remove:enabled:hover,
 .highlight-styles button[aria-pressed="true"] {
   background: var(--btn-liquid-bg-hover);
 }
 
-.highlight-styles button:disabled {
-  opacity: .4;
+.highlight-styles button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+@media (max-width: 340px) {
+  .highlight-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 .expanded-toolbar-divider {
@@ -2171,7 +2282,7 @@ body:has(.command-overlay, .smart-search-overlay) .title-bar-right > .title-bar-
 body:has(.command-overlay) .close-btn-x,
 body:has(.command-overlay) .format-corner-btn,
 body:has(.command-overlay) .doc-tick-slider-wrapper,
-body:has(.command-overlay) .editor-char-count {
+body:has(.command-overlay) .editor-status-footer {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 0.15s ease;
@@ -3523,23 +3634,75 @@ body:has(.command-overlay) .editor-char-count {
 }
 
 /* ── Character Count (Subtle iOS Status Bottom Center) ────── */
-.editor-char-count {
+.editor-status-footer {
   position: absolute;
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.editor-char-count, .editor-resource-usage {
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.015em;
   user-select: none;
   pointer-events: none;
-  z-index: 20;
   opacity: 0.85;
   white-space: nowrap;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
   transition: opacity 0.15s ease, color 0.2s ease;
 }
+
+body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointer-events: none; }
+
+.editor-resource-usage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: auto;
+}
+
+.editor-resource-usage span + span {
+  padding-inline-start: 6px;
+  border-inline-start: 1px solid var(--separator);
+}
+
+.editor-resource-usage button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+.editor-resource-usage button:hover { background: var(--btn-liquid-bg-hover); }
+.editor-resource-usage button:focus-visible { outline: 2px solid var(--color-accent); }
+
+.settings-resources { padding: 14px 16px; }
+.settings-resources h2 { font-size: 14px; font-weight: 650; }
+.settings-resources p { margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+.settings-resources dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.settings-resources dl > div {
+  padding: 8px 10px;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+}
+.settings-resources dt { color: var(--text-muted); font-size: 11px; }
+.settings-resources dd { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.settings-resources dd + dd { font-size: 11px; font-weight: 400; color: var(--text-muted); }
 
 /* ── Format Popover Theme & Font Row ───────────────────────── */
 .toolbar-theme-row {

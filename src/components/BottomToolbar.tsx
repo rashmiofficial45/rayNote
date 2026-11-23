@@ -294,12 +294,12 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
       onMouseLeave={handleMouseLeave}
     >
       {isMenuOpen && (
-        <div className="bottom-toolbar-expanded-menu">
-          <div className="expanded-toolbar-row">
+        <div id="editor-format-menu" className="bottom-toolbar-expanded-menu" role="group" aria-label="Editor formatting">
+          <div className="expanded-toolbar-row" role="group" aria-label="Text formatting">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "heading1")}
-              className={`toolbar-btn liquid-btn ${formatState?.isHeading1 ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isHeading1 ? "is-active" : ""}`}
               title={formatTitle("Heading 1", "heading1", "⌘⌥1")}
             >
               <Heading1 size={14} />
@@ -307,7 +307,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "heading2")}
-              className={`toolbar-btn liquid-btn ${formatState?.isHeading2 ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isHeading2 ? "is-active" : ""}`}
               title={formatTitle("Heading 2", "heading2", "⌘⌥2")}
             >
               <Heading2 size={14} />
@@ -316,7 +316,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "bold")}
-              className={`toolbar-btn liquid-btn ${formatState?.isBold ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isBold ? "is-active" : ""}`}
               title={formatTitle("Bold", "bold", "⌘B")}
             >
               <Bold size={14} />
@@ -324,7 +324,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "italic")}
-              className={`toolbar-btn liquid-btn ${formatState?.isItalic ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isItalic ? "is-active" : ""}`}
               title={formatTitle("Italic", "italic", "⌘I")}
             >
               <Italic size={14} />
@@ -332,7 +332,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "underline")}
-              className={`toolbar-btn liquid-btn ${formatState?.isUnderline ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isUnderline ? "is-active" : ""}`}
               title={formatTitle("Underline", "underline", "⌘U")}
             >
               <UnderlineIcon size={14} />
@@ -340,7 +340,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "strike")}
-              className={`toolbar-btn liquid-btn ${formatState?.isStrike ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isStrike ? "is-active" : ""}`}
               title={formatTitle("Strikethrough", "strike", "⇧⌘X")}
             >
               <Strikethrough size={14} />
@@ -348,7 +348,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => setHighlightOpen(open => !open)}
-              className={`toolbar-btn liquid-btn ${formatState?.isHighlight || highlightOpen ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isHighlight || highlightOpen ? "is-active" : ""}`}
               aria-expanded={highlightOpen}
               aria-controls="editor-highlight-options"
               aria-label="Highlight options"
@@ -359,7 +359,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleMark(editor, "code")}
-              className={`toolbar-btn liquid-btn ${formatState?.isCode ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isCode ? "is-active" : ""}`}
               title={formatTitle("Inline Code", "code", "⌘E")}
               aria-label="Inline Code"
               aria-pressed={formatState?.isCode ?? false}
@@ -371,6 +371,14 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
           {highlightOpen && (
             <div id="editor-highlight-options" className="editor-highlight-options"
               onMouseDown={event => event.preventDefault()}>
+              <div className="highlight-options-header">
+                <span>Highlight</span>
+                <button type="button" className="highlight-remove" aria-label="Remove highlight"
+                  disabled={!formatState?.isHighlight && !formatState?.hasSelectedBlocks}
+                  onClick={() => smartToggleMark(editor, "highlight", null)}>
+                  Clear
+                </button>
+              </div>
               <div className="highlight-swatches" role="group" aria-label="Highlight color">
                 {HIGHLIGHT_COLORS.map(color => (
                   <button key={color} type="button" data-color={color}
@@ -387,24 +395,21 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
                     data-color={formatState?.highlightColor ?? "yellow"}
                     aria-pressed={pickerStyle === style}
                     onClick={() => applyHighlight(formatState?.highlightColor ?? "yellow", style)}>
-                    <span className="highlight-style-sample" aria-hidden="true" />{label}
+                    <span className="highlight-style-sample" aria-hidden="true">Aa</span>
+                    {label}
                   </button>
                 ))}
-                <button type="button" aria-label="Remove highlight" disabled={!formatState?.isHighlight && !formatState?.hasSelectedBlocks}
-                  onClick={() => smartToggleMark(editor, "highlight", null)}>
-                  Remove
-                </button>
               </div>
             </div>
           )}
 
           <div className="expanded-toolbar-divider" />
 
-          <div className="expanded-toolbar-row">
+          <div className="expanded-toolbar-row" role="group" aria-label="Block formatting">
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "bulletList")}
-              className={`toolbar-btn liquid-btn ${formatState?.isBulletList ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isBulletList ? "is-active" : ""}`}
               title={formatTitle("Bullet List", "bullet_list", "⇧⌘8")}
             >
               <List size={14} />
@@ -412,7 +417,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "orderedList")}
-              className={`toolbar-btn liquid-btn ${formatState?.isOrderedList ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isOrderedList ? "is-active" : ""}`}
               title={formatTitle("Numbered List", "ordered_list", "⇧⌘7")}
             >
               <ListOrdered size={14} />
@@ -420,7 +425,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "taskList")}
-              className={`toolbar-btn liquid-btn ${formatState?.isTaskList ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isTaskList ? "is-active" : ""}`}
               title={formatTitle("Task List", "checklist", "⇧⌘9")}
             >
               <CheckSquare size={14} />
@@ -428,7 +433,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "blockquote")}
-              className={`toolbar-btn liquid-btn ${formatState?.isBlockquote ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isBlockquote ? "is-active" : ""}`}
               title={formatTitle("Quote", "blockquote", "⇧⌘B")}
             >
               <Quote size={14} />
@@ -436,7 +441,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => smartToggleBlockFormat(editor, "codeBlock")}
-              className={`toolbar-btn liquid-btn ${formatState?.isCodeBlock ? "is-active" : ""}`}
+              className={`toolbar-btn ${formatState?.isCodeBlock ? "is-active" : ""}`}
               title={formatTitle("Code Block", "code_block", "⌘⌥C")}
             >
               <Code2 size={14} />
@@ -444,7 +449,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => editor.chain().focus().setHorizontalRule().run()}
-              className="toolbar-btn liquid-btn"
+              className="toolbar-btn"
               title={formatTitle("Divider", "divider", "---")}
             >
               <Minus size={14} />
@@ -452,7 +457,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => { if (getStoredCommandsConfig().find(c => c.id === "tables")?.enabled !== false) editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); }}
-              className="toolbar-btn liquid-btn"
+              className="toolbar-btn"
               title="Insert Table (3x3)"
             >
               <TableIcon size={14} />
@@ -551,6 +556,8 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
           className={`format-corner-btn liquid-btn ${hasActiveFormatting ? "has-formatting" : ""} ${isMenuOpen ? "is-active" : ""}`}
           title="Format (Aa)"
           aria-label="Format"
+          aria-expanded={isMenuOpen}
+          aria-controls="editor-format-menu"
         >
           <ALargeSmall size={19} />
           {hasActiveFormatting && <span className="format-indicator-dot" />}

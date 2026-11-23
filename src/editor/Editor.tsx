@@ -1,3 +1,4 @@
+import { ResourceUsageFooter } from "../components/ResourceUsage";
 import { clearFormatMemory } from "./formatMemory";
 /**
  * TipTap Note Editor Engine (Editor.tsx)
@@ -1624,7 +1625,10 @@ export function Editor({
         />
       </div>
       <DocumentTickSlider scrollContainerRef={scrollContainerRef} />
-      <EditorCharCount editor={editor} noteId={noteId} />
+      <div className="editor-status-footer">
+        <EditorCharCount editor={editor} noteId={noteId} />
+        <ResourceUsageFooter />
+      </div>
       {/* Bottom frosted glass blend scrim for scrolling text */}
       <div className="app-bottom-blend" aria-hidden="true" />
       {!readOnly && <BottomToolbar editor={editor} />}
