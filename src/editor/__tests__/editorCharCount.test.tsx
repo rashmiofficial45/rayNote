@@ -37,12 +37,6 @@ describe("EditorCharCount Component", () => {
           get textContent() {
             return currentText;
           },
-          get content() {
-            return { size: currentText.length };
-          },
-          textBetween(from: number, to: number) {
-            return currentText.slice(from, to);
-          },
         },
       },
       on: vi.fn((event: string, callback: (...args: any[]) => void) => {
@@ -78,8 +72,7 @@ describe("EditorCharCount Component", () => {
     });
 
     const el = container.querySelector(".editor-char-count");
-    expect(el?.textContent).toContain("0 words");
-    expect(el?.textContent).toContain("0 characters");
+    expect(el?.textContent).toBe("0 characters");
   });
 
   it("renders 1 character correctly with singular pluralization", () => {
@@ -90,7 +83,7 @@ describe("EditorCharCount Component", () => {
     });
 
     const el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("1 character");
+    expect(el?.textContent).toBe("1 character");
   });
 
   it("formats large character counts with commas", () => {
@@ -101,7 +94,7 @@ describe("EditorCharCount Component", () => {
     });
 
     const el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe((12500).toLocaleString() + " characters");
+    expect(el?.textContent).toBe((12500).toLocaleString() + " characters");
   });
 
   it("updates count when document changes via transaction", () => {
@@ -112,7 +105,7 @@ describe("EditorCharCount Component", () => {
     });
 
     let el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("5 characters");
+    expect(el?.textContent).toBe("5 characters");
 
     act(() => {
       mockEditor.emitTransaction(true, "Hello, world!");
@@ -122,8 +115,7 @@ describe("EditorCharCount Component", () => {
     });
 
     el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("13 characters");
-    expect(el?.firstElementChild?.textContent).toBe("2 words");
+    expect(el?.textContent).toBe("13 characters");
   });
 
   it("does not trigger recalculation or state update when transaction.docChanged is false", () => {
@@ -134,7 +126,7 @@ describe("EditorCharCount Component", () => {
     });
 
     let el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("14 characters");
+    expect(el?.textContent).toBe("14 characters");
 
     // Simulating cursor move / selection transaction without document change
     act(() => {
@@ -142,7 +134,7 @@ describe("EditorCharCount Component", () => {
     });
 
     el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("14 characters");
+    expect(el?.textContent).toBe("14 characters");
   });
 
   it("resynchronizes count when switching to a different note", () => {
@@ -152,7 +144,7 @@ describe("EditorCharCount Component", () => {
       root.render(<EditorCharCount editor={mockEditor} noteId="note-1" />);
     });
 
-    expect(container.querySelector(".editor-char-count")?.lastElementChild?.textContent).toBe("18 characters");
+    expect(container.querySelector(".editor-char-count")?.textContent).toBe("18 characters");
 
     // Simulate switching active note
     mockEditor.setDocText("Short");
@@ -160,7 +152,7 @@ describe("EditorCharCount Component", () => {
       root.render(<EditorCharCount editor={mockEditor} noteId="note-2" />);
     });
 
-    expect(container.querySelector(".editor-char-count")?.lastElementChild?.textContent).toBe("5 characters");
+    expect(container.querySelector(".editor-char-count")?.textContent).toBe("5 characters");
   });
 
   it("cleans up transaction listener on unmount", () => {
@@ -185,6 +177,6 @@ describe("EditorCharCount Component", () => {
     });
 
     const el = container.querySelector(".editor-char-count");
-    expect(el?.lastElementChild?.textContent).toBe("0 characters");
+    expect(el?.textContent).toBe("0 characters");
   });
 });

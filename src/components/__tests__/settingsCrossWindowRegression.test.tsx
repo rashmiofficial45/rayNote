@@ -8,6 +8,8 @@ import { BottomToolbar } from '../BottomToolbar';
 import SettingsApp from '../../SettingsApp';
 import { listenToSettingsSync } from '../../lib/settingsSync';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
+import { getPreferredBrowser } from '../../lib/webBrowsers';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ notes_count: 0, size_bytes: 0, db_path: '/tmp/disposable.db' }) }));
 vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn().mockResolvedValue(undefined), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onFocusChanged: vi.fn().mockResolvedValue(() => {}) }) }));
@@ -29,6 +31,35 @@ async function drawToolbar() {
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
 }
 describe('Cross-window preference controls', () => {
+  it('updates the browser picker when macOS reports added and removed browsers', async () => {
+    const native = vi.mocked(invoke);
+    const stockResponse = native.getMockImplementation()!;
+    let browsers = [{ bundleId: 'com.apple.Safari', name: 'Safari' }];
+    native.mockImplementation((command, ...args) => command === 'list_web_browsers'
+      ? Promise.resolve(browsers) as ReturnType<typeof invoke>
+      : stockResponse(command, ...args));
+
+    try {
+      await act(async () => root.render(<SettingsApp />));
+      const picker = host.querySelector<HTMLSelectElement>('#web-browser')!;
+      expect(Array.from(picker.options, (option) => option.text)).toEqual(['System Default', 'Safari']);
+      await act(async () => {
+        picker.value = 'com.apple.Safari';
+        picker.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      expect(getPreferredBrowser()).toBe('com.apple.Safari');
+
+      browsers = [{ bundleId: 'org.mozilla.firefox', name: 'Firefox' }];
+      await act(async () => { window.dispatchEvent(new Event('focus')); });
+      expect(Array.from(picker.options, (option) => option.text)).toEqual([
+        'System Default', 'Preferred Browser Unavailable', 'Firefox',
+      ]);
+      expect(host.querySelector('#web-browser-description')?.textContent).toContain('system default');
+    } finally {
+      native.mockImplementation(stockResponse);
+    }
+  });
+
   it('mounts Settings when WebKit storage access is denied (B33)', async () => {
     vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => { throw new DOMException('Denied', 'SecurityError'); });
     await expect(act(async () => root.render(<SettingsApp />))).resolves.toBeUndefined();

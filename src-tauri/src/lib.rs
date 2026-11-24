@@ -3,6 +3,7 @@ pub mod search;
 pub mod commands;
 mod window_geometry;
 mod resource_usage;
+mod web_browsers;
 use resource_usage::get_resource_sample;
 
 use database::Database;
@@ -129,6 +130,50 @@ fn start_hover_focus_watcher(app: tauri::AppHandle) {
         let a = app.clone();
         let _ = app.run_on_main_thread(move || hover_focus_tick(&a));
     });
+}
+
+#[cfg(target_os = "macos")]
+fn watch_panel_leave(window: tauri::WebviewWindow) {
+    use objc2_app_kit::{
+        NSEvent, NSEventMask, NSRunningApplication, NSWorkspace, NSWorkspaceApplicationKey,
+        NSWorkspaceDidActivateApplicationNotification,
+    };
+    use tauri_nspanel::objc2_foundation::{NSNotification, NSOperationQueue};
+
+    let pid = std::process::id() as i32;
+    let center = NSWorkspace::sharedWorkspace().notificationCenter();
+    let app_switch_window = window.clone();
+    let callback = block2::RcBlock::new(move |notification: std::ptr::NonNull<NSNotification>| {
+        let notification = unsafe { notification.as_ref() };
+        let application = notification
+            .userInfo()
+            .and_then(|info| info.objectForKey(unsafe { NSWorkspaceApplicationKey }))
+            .and_then(|app| app.downcast::<NSRunningApplication>().ok());
+        if application.is_some_and(|app| app.processIdentifier() != pid) {
+            let _ = app_switch_window.emit("panel-left", ());
+        }
+    });
+    // The workspace retains this process-wide subscription until rayNote exits.
+    unsafe {
+        let _observer = center.addObserverForName_object_queue_usingBlock(
+            Some(NSWorkspaceDidActivateApplicationNotification),
+            None,
+            Some(&NSOperationQueue::mainQueue()),
+            &callback,
+        );
+    }
+
+    // A click in the already-active app can leave a nonactivating panel without
+    // an activation notification. Global monitors see only events sent to other apps.
+    let outside_click = block2::RcBlock::new(move |_: std::ptr::NonNull<NSEvent>| {
+        if window.is_visible().unwrap_or(false) {
+            let _ = window.emit("panel-left", ());
+        }
+    });
+    let _monitor = NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
+        NSEventMask::LeftMouseDown | NSEventMask::RightMouseDown | NSEventMask::OtherMouseDown,
+        &outside_click,
+    );
 }
 
 #[cfg(target_os = "macos")]
@@ -612,6 +657,9 @@ pub fn run() {
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 setup_macos_panel(app);
+                if let Some(window) = app.get_webview_window("main") {
+                    watch_panel_leave(window);
+                }
                 start_hover_focus_watcher(app.handle().clone());
             }
 
@@ -634,6 +682,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_all_notes,
             get_resource_sample,
+            web_browsers::list_web_browsers,
+            web_browsers::open_web_link_in_browser,
             set_toggle_shortcut,
             take_pending_note_link,
             get_recent_notes,

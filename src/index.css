@@ -1912,6 +1912,13 @@ pre.notefast-code-block:hover {
 
 .editor-wrapper:has(> .bottom-toolbar-corner-container.is-menu-open) > .app-bottom-blend {
   height: 104px;
+  background: linear-gradient(
+    to top,
+    rgba(var(--app-bg-rgb), 1),
+    rgba(var(--app-bg-rgb), 0.55) 17%,
+    rgba(var(--app-bg-rgb), 0.22) 38%,
+    rgba(var(--app-bg-rgb), 0) 100%
+  );
 }
 
 .bottom-toolbar-corner-container.is-menu-open .bottom-corner-buttons-row {
@@ -1979,10 +1986,11 @@ pre.notefast-code-block:hover {
   --editor-footer-inset: clamp(8px, 2.6vw, 14px);
   --editor-footer-bottom: 10px;
   --editor-footer-height: 46px;
-  --format-panel-tint: rgb(48 54 67 / 21%);
-  --format-panel-rim: rgb(227 237 255 / 34%);
+  --format-panel-glass: rgb(13 15 20 / 38%);
+  --format-panel-backdrop: blur(12px) brightness(85%) saturate(155%);
+  --format-panel-rim: rgb(227 237 255 / 24%);
   --format-panel-section-line: rgb(227 237 255 / 17%);
-  --format-panel-reflection: rgb(255 255 255 / 31%);
+  --format-panel-reflection: rgb(255 255 255 / 14%);
   --format-panel-shadow: 0 3px 12px rgb(0 0 0 / 24%);
 }
 
@@ -2059,7 +2067,8 @@ pre.notefast-code-block:hover {
 .light .editor-wrapper,
 [data-theme="light"] .editor-wrapper,
 [data-resolved-theme="light"] .editor-wrapper {
-  --format-panel-tint: rgb(245 249 255 / 26%);
+  --format-panel-glass: linear-gradient(155deg, rgb(255 255 255 / 23%), transparent 67%), rgb(245 249 255 / 26%);
+  --format-panel-backdrop: blur(7px) saturate(180%);
   --format-panel-rim: rgb(62 79 104 / 30%);
   --format-panel-section-line: rgb(62 79 104 / 20%);
   --format-panel-reflection: rgb(255 255 255 / 78%);
@@ -2068,9 +2077,9 @@ pre.notefast-code-block:hover {
 
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
-    background: linear-gradient(155deg, rgb(255 255 255 / 23%), transparent 67%), var(--format-panel-tint);
-    -webkit-backdrop-filter: blur(7px) saturate(180%);
-    backdrop-filter: blur(7px) saturate(180%);
+    background: var(--format-panel-glass);
+    -webkit-backdrop-filter: var(--format-panel-backdrop);
+    backdrop-filter: var(--format-panel-backdrop);
   }
 }
 
@@ -3656,9 +3665,8 @@ body:has(.command-overlay) .editor-status-footer {
 /* ── Character Count (Subtle iOS Status Bottom Center) ────── */
 .editor-status-footer {
   position: absolute;
-  bottom: var(--editor-footer-bottom);
+  bottom: var(--editor-footer-inset);
   inset-inline: var(--editor-footer-inset);
-  min-height: var(--editor-footer-height);
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -3667,10 +3675,11 @@ body:has(.command-overlay) .editor-status-footer {
 }
 
 .editor-char-count, .editor-resource-usage {
-  font-size: 13px;
+  justify-self: center;
+  font-size: 14px;
   line-height: 1.35;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text-muted-base);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.015em;
   user-select: none;
@@ -3686,20 +3695,12 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   grid-column: 1;
   grid-row: 1;
   justify-self: start;
-  font-variant-numeric: tabular-nums;
 }
 
 .editor-char-count { grid-column: 2; grid-row: 1; }
 
 @media (max-width: 560px) {
-  .editor-status-footer { grid-template-columns: 1fr minmax(0, 2fr) 1fr; }
-  .editor-char-count, .editor-resource-usage { font-size: 12px; }
-  .editor-char-count {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-  .editor-char-count > [aria-hidden="true"] { display: none; }
+  .editor-char-count, .editor-resource-usage { font-size: 13px; }
 }
 
 .settings-resources { padding: 14px 16px; }

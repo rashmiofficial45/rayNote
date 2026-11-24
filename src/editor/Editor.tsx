@@ -99,19 +99,10 @@ export const EditorCharCount = memo(function EditorCharCount({
     return doc.textContent?.length ?? 0;
   };
 
-  const getDocWordCount = (doc: any): number => {
-    if (!doc) return 0;
-    const text = typeof doc.textBetween === "function"
-      ? doc.textBetween(0, doc.content.size, "\n", " ")
-      : doc.textContent ?? "";
-    return text.trim() ? text.trim().split(/\s+/u).length : 0;
-  };
-
   const [count, setCount] = useState<number>(() => {
     const doc = editor?.state?.doc;
     return getDocCharCount(doc);
   });
-  const [words, setWords] = useState<number>(() => getDocWordCount(editor?.state?.doc));
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -121,7 +112,6 @@ export const EditorCharCount = memo(function EditorCharCount({
       const doc = editor.state?.doc;
       const c = getDocCharCount(doc);
       setCount((prev: number) => (prev === c ? prev : c));
-      setWords(getDocWordCount(doc));
     };
 
     // Immediate initial computation on load or note change
@@ -151,9 +141,7 @@ export const EditorCharCount = memo(function EditorCharCount({
 
   return (
     <div className="editor-char-count">
-      <span>{words.toLocaleString()} {words === 1 ? "word" : "words"}</span>
-      <span aria-hidden="true"> · </span>
-      <span>{count.toLocaleString()} {count === 1 ? "character" : "characters"}</span>
+      {count.toLocaleString()} {count === 1 ? "character" : "characters"}
     </div>
   );
 });
@@ -288,6 +276,9 @@ export function Editor({
     mode: "preview",
     data: null,
   });
+  const closeLinkPopover = useCallback(() => {
+    setLinkPopover((current) => current.isOpen ? { ...current, isOpen: false } : current);
+  }, []);
   const [readOnly, setReadOnly] = useState(false);
   const readOnlyRef = useRef(false);
   const applyingDocumentRef = useRef(false);
@@ -683,6 +674,17 @@ export function Editor({
           right: 0,
         },
         handleDOMEvents: {
+          click: (_view, event) => {
+            if (event.button !== 0 || !(event.metaKey || event.ctrlKey)) return false;
+            const href = (event.target as Element | null)?.closest("a[href]")?.getAttribute("href");
+            if (!href || href === "#") return false;
+
+            event.preventDefault();
+            event.stopPropagation();
+            closeLinkPopover();
+            void safeOpenUrl(href, { onNavigateNote: onNavigateToNoteRef.current });
+            return true;
+          },
           blur: () => {
             saveNow();
             return false;
@@ -1354,11 +1356,9 @@ export function Editor({
       e.preventDefault();
       e.stopPropagation();
 
-      const isMetaOrCtrl = e.metaKey || e.ctrlKey;
       const isReadOnly = readOnlyRef.current || !editorRef.current?.isEditable;
 
-      // In read-only mode OR on Cmd/Ctrl+Click in edit mode: open destination directly
-      if (isReadOnly || isMetaOrCtrl) {
+      if (isReadOnly) {
         safeOpenUrl(href, { onNavigateNote: onNavigateToNoteRef.current });
         return;
       }
@@ -1656,7 +1656,7 @@ export function Editor({
         isOpen={linkPopover.isOpen}
         mode={linkPopover.mode}
         linkData={linkPopover.data}
-        onClose={() => setLinkPopover((prev) => ({ ...prev, isOpen: false }))}
+        onClose={closeLinkPopover}
         onNavigateNote={onNavigateToNoteRef.current}
         onSwitchToEdit={() => setLinkPopover((prev) => ({ ...prev, mode: "edit" }))}
       />

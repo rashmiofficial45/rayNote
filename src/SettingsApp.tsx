@@ -1,4 +1,5 @@
 import { ResourceUsage } from "./components/ResourceUsage";
+import { WebBrowserSetting } from "./components/WebBrowserSetting";
 import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestEditorFlush } from "./lib/editorFlush";
@@ -816,6 +817,8 @@ export default function SettingsApp() {
                 </div>
               </div>
             </div>
+
+            <WebBrowserSetting />
 
             {/* Window & Zoom Card (Raycast Style) */}
             <div className="settings-card">

@@ -16,6 +16,10 @@ import {
 import { noteContentToMarkdown } from "../../lib/utils";
 import { markdownToTipTapHtml } from "../markdownUtils";
 import { resolveContextMenuState } from "../contextMenuUtils";
+import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { setPreferredBrowser } from "../../lib/webBrowsers";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +57,48 @@ describe("Comprehensive Link Handling Regression Suite (Phases 1-13)", () => {
     host.remove();
     document.querySelectorAll(".raynote-link-popover").forEach((el) => el.remove());
     document.querySelectorAll(".editor-context-menu").forEach((el) => el.remove());
+    setPreferredBrowser("");
+  });
+
+  it("routes Command-click on web and note links ahead of block selection", async () => {
+    const targetId = "linked-note";
+    const webUrl = "https://example.com/raynote";
+    const navigate = vi.fn();
+    vi.mocked(invoke).mockClear();
+    setPreferredBrowser("com.example.browser");
+    await act(async () => {
+      root.render(
+        <Editor
+          noteId="link-source"
+          initialContent={`<p><a href="${webUrl}"><strong>Web</strong></a></p><p><a href="${createInternalNoteUrl(targetId)}">Note</a></p>`}
+          onUpdate={vi.fn()}
+          onNavigateToNote={navigate}
+        />,
+      );
+    });
+    const commandClick = async (selector: string) => {
+      const element = host.querySelector(selector);
+      expect(element).not.toBeNull();
+      const event = new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true });
+      await act(async () => { element?.dispatchEvent(event); });
+      expect(event.defaultPrevented).toBe(true);
+      expect(host.querySelector("[data-block-selected]")).toBeNull();
+      expect(document.querySelector(".raynote-link-popover")).toBeNull();
+    };
+    await commandClick(".tiptap a strong");
+    expect(invoke).toHaveBeenCalledWith("open_web_link_in_browser", {
+      url: webUrl, bundleId: "com.example.browser",
+    });
+    await commandClick('.tiptap a[href^="raynote:"]');
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(targetId);
+    expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === "open_web_link_in_browser")).toHaveLength(1);
+  });
+
+  it("uses the system browser when the selected browser becomes unavailable", async () => {
+    setPreferredBrowser("com.removed.browser");
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("The selected browser is unavailable"));
+    await expect(safeOpenUrl("https://example.com")).resolves.toBe(true);
+    expect(openUrl).toHaveBeenCalledWith("https://example.com");
   });
 
   function createTestEditor(content = ""): TipTapEditor {
@@ -484,6 +530,46 @@ describe("Comprehensive Link Handling Regression Suite (Phases 1-13)", () => {
 
     const preview = document.querySelector('[aria-label="Link preview"]');
     expect(preview?.textContent).toBe(destination);
+  });
+
+  it("dismisses the link preview on an outside click or native app switch", async () => {
+    const nativeWindow = getCurrentWindow();
+    vi.mocked(nativeWindow.listen).mockClear();
+    await act(async () => {
+      root.render(
+        <Editor
+          noteId="preview-dismissal"
+          initialContent={'<p><a href="https://example.com">Destination</a></p><p>Outside</p>'}
+          onUpdate={vi.fn()}
+        />,
+      );
+    });
+
+    const preview = () => document.querySelector('[aria-label="Link preview"]');
+    const click = async (target: Element | null) => {
+      expect(target).not.toBeNull();
+      await act(async () => {
+        target?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      });
+    };
+    const link = host.querySelector(".tiptap a");
+    await click(link);
+    expect(preview()).not.toBeNull();
+    await click(preview()?.querySelector(".link-preview-label") ?? null);
+    expect(preview()).not.toBeNull();
+    await click(host.querySelector(".tiptap p:last-child"));
+    expect(preview()).toBeNull();
+
+    vi.mocked(nativeWindow.listen).mockClear();
+    await click(link);
+    expect(preview()).not.toBeNull();
+    const activation = vi.mocked(nativeWindow.listen).mock.calls
+      .find(([name]) => name === "panel-left");
+    expect(activation).toBeDefined();
+    await act(async () => {
+      activation?.[1]({ event: "panel-left", id: 0, payload: null });
+    });
+    expect(preview()).toBeNull();
   });
 
   // 23. Repeated popup opening and cleanup

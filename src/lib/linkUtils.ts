@@ -11,6 +11,7 @@
  */
 
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getPreferredBrowser, openInPreferredBrowser } from "./webBrowsers";
 
 /** Allowed URI schemes for external links */
 export const ALLOWED_EXTERNAL_SCHEMES = ["http:", "https:", "mailto:", "tel:"] as const;
@@ -174,6 +175,16 @@ export async function safeOpenUrl(
   }
 
   const normalized = normalizeUrl(trimmed);
+
+  const preferredBrowser = getPreferredBrowser();
+  if (preferredBrowser && /^https?:\/\//i.test(normalized)) {
+    try {
+      await openInPreferredBrowser(normalized, preferredBrowser);
+      return true;
+    } catch {
+      // The browser may have been removed since it was selected.
+    }
+  }
 
   // 3. Open External URL via Tauri Opener Plugin
   try {

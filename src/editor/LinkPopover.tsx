@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { Editor } from "@tiptap/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   ExternalLink,
   Copy,
@@ -143,19 +144,15 @@ export function LinkPopover({
     };
   }, [isOpen, mode, linkData, editor]);
 
-  // Dismiss on click outside or window blur
+  // Native panel activation can change independently of WebKit's focus.
   useEffect(() => {
     if (!isOpen) return;
 
-    const handlePointerDownOutside = (e: MouseEvent | TouchEvent) => {
-      const popoverEl = popoverRef.current;
-      if (popoverEl && !popoverEl.contains(e.target as Node)) {
-        // If clicking on the anchor link itself in preview mode, don't double toggle
-        if (linkData?.anchorEl && linkData.anchorEl.contains(e.target as Node)) {
-          return;
-        }
-        onClose();
-      }
+    const dismissOutside = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (popoverRef.current?.contains(target) || linkData?.anchorEl?.contains(target)) return;
+      onClose();
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -167,12 +164,34 @@ export function LinkPopover({
       }
     };
 
-    document.addEventListener("mousedown", handlePointerDownOutside, true);
+    document.addEventListener("pointerdown", dismissOutside, true);
+    document.addEventListener("click", dismissOutside, true);
     document.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("blur", onClose);
 
+    let disposed = false;
+    const unlisteners: (() => void)[] = [];
+    const dismiss = () => { if (!disposed) onClose(); };
+    const register = async (listen: () => Promise<() => void>) => {
+      try {
+        const unlisten = await listen();
+        if (disposed) unlisten();
+        else unlisteners.push(unlisten);
+      } catch {
+        // The preview also runs in environments without a native window.
+      }
+    };
+    void register(() => getCurrentWindow().listen("panel-left", dismiss));
+    void register(() => getCurrentWindow().listen("panel-will-hide", dismiss));
+    void register(() => getCurrentWindow().onFocusChanged(({ payload: focused }) => {
+      if (!focused) dismiss();
+    }));
+
     return () => {
-      document.removeEventListener("mousedown", handlePointerDownOutside, true);
+      disposed = true;
+      for (const unlisten of unlisteners) unlisten();
+      document.removeEventListener("pointerdown", dismissOutside, true);
+      document.removeEventListener("click", dismissOutside, true);
       document.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("blur", onClose);
     };

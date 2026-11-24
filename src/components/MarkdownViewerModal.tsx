@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { safeOpenUrl } from "../lib/linkUtils";
 import DOMPurify from "dompurify";
 import {
   FileText,
@@ -247,7 +247,9 @@ export function MarkdownViewerModal({
           if (!href || href.startsWith('#')) return;
           event.preventDefault();
           if (/^(https?:|mailto:)/i.test(href)) {
-            openUrl(href).catch(() => onShowToast?.("Could not open link"));
+            void safeOpenUrl(href).then((opened) => {
+              if (!opened) onShowToast?.("Could not open link");
+            });
           }
         }}>
           {viewMode === "rendered" ? (
