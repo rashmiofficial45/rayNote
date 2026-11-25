@@ -1,4 +1,3 @@
-import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
 /**
  * NoteFast Tauri IPC Database Client (db.ts)
  *
@@ -11,7 +10,12 @@ import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./storage";
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { clearActiveNoteSnapshot } from "./storage";
+import {
+  STORAGE_KEYS,
+  clearActiveNoteSnapshot,
+  safeLocalStorageGetItem,
+  safeLocalStorageSetItem,
+} from "./storage";
 
 /**
  * Lightweight note summary representation used for drawer listing,
@@ -37,9 +41,8 @@ export interface Note extends NoteSummary {
  * Fetches recent note summaries from SQLite/cache (default limit 30), sorted by pinned status first,
  * then descending by updated timestamp.
  */
-export async function getRecentNotes(limit: number = 30): Promise<NoteSummary[]> {
-  const res = await invoke<NoteSummary[]>("get_all_notes", { limit });
-  return res || [];
+export function getRecentNotes(limit = 30): Promise<NoteSummary[]> {
+  return getAllNotes(limit);
 }
 
 export async function getAllNotes(limit?: number): Promise<NoteSummary[]> {
@@ -250,13 +253,13 @@ export async function deleteNote(id: string): Promise<void> {
   clearActiveNoteSnapshot(id);
   try {
     if (typeof localStorage !== "undefined") {
-      const cached = safeLocalStorageGetItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem(STORAGE_KEYS.CACHED_NOTES);
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed)) {
             const filtered = parsed.filter((n: any) => n.id !== id);
-            safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(filtered));
+            safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(filtered));
           }
         } catch {}
       }

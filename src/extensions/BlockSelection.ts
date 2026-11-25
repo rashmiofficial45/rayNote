@@ -5,7 +5,6 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { DOMSerializer, Fragment, Slice } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
-import { cva } from "../lib/utils";
 import { sliceToMarkdown } from "../editor/markdownUtils";
 import { selectParagraphAfterDivider } from "../editor/horizontalRuleExtension";
 
@@ -17,22 +16,7 @@ export interface BlockSelectionState {
 
 export const blockSelectionPluginKey = new PluginKey<BlockSelectionState>("blockSelection");
 
-export const blockSelectionVariants = cva(
-  "raynote-block-selected bg-sky-500/[0.08] transition-colors duration-100",
-  {
-    variants: {
-      position: {
-        single: "rounded-md",
-        first: "rounded-md",
-        middle: "rounded-md",
-        last: "rounded-md",
-      },
-    },
-    defaultVariants: {
-      position: "single",
-    },
-  }
-);
+const blockSelectionClass = "raynote-block-selected bg-sky-500/[0.08] transition-colors duration-100 rounded-md";
 
 export interface BlockInfo {
   pos: number;
@@ -740,11 +724,9 @@ export const BlockSelection = Extension.create({
                 positionVariant = "last";
               }
 
-              const className = blockSelectionVariants({ position: positionVariant });
-
               decorations.push(
                 Decoration.node(pos, pos + node.nodeSize, {
-                  class: className,
+                  class: blockSelectionClass,
                   "data-block-selected": "true",
                   "data-selection-edge": positionVariant,
                 })

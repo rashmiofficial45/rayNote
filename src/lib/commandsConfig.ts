@@ -148,14 +148,6 @@ export function getCommandHotkey(
 }
 
 /**
- * Gets the shortcut string directly for a command ID.
- */
-export function getCommandShortcut(id: string, defaultHotkey = ""): string {
-  const { hotkey, enabled } = getCommandHotkey(undefined, id, defaultHotkey);
-  return enabled ? hotkey : "";
-}
-
-/**
  * Checks if a requested shortcut conflicts with another already assigned command.
  */
 export function detectShortcutConflict(

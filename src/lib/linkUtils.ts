@@ -16,9 +16,6 @@ import { getPreferredBrowser, openInPreferredBrowser } from "./webBrowsers";
 /** Allowed URI schemes for external links */
 export const ALLOWED_EXTERNAL_SCHEMES = ["http:", "https:", "mailto:", "tel:"] as const;
 
-/** Allowed internal URI schemes for inter-note navigation */
-export const ALLOWED_INTERNAL_SCHEMES = ["raynote:", "notefast:"] as const;
-
 /** Unsafe or dangerous schemes that MUST be strictly blocked */
 export const BLOCKED_SCHEMES = [
   "javascript:",

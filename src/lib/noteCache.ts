@@ -34,7 +34,6 @@ export interface NoteCacheStats {
 
 export const MAX_ENTRIES = 25;
 export const MAX_CACHE_BYTES = 8 * 1024 * 1024; // 8 MB
-export const MAX_SINGLE_NOTE_BYTES = 2 * 1024 * 1024; // 2 MB soft ceiling for weighted caching
 
 export class NoteLRUCache {
   private cache = new Map<string, CachedNote>();

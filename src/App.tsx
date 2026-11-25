@@ -1,7 +1,6 @@
 import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { safeLocalStorageGetItem } from "./lib/storage";
 /**
  * NoteFast Main Application Controller (App.tsx)
  *
@@ -37,7 +36,15 @@ const MarkdownViewerModal = lazy(() =>
 );
 import { WindowResizeHandles } from "./components/WindowResizeHandles";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { safeLocalStorageSetItem, safeLocalStorageRemoveItem, createCoalescedWriter, readActiveNoteSnapshot, clearActiveNoteSnapshot } from "./lib/storage";
+import {
+  STORAGE_KEYS,
+  safeLocalStorageGetItem,
+  safeLocalStorageSetItem,
+  safeLocalStorageRemoveItem,
+  createCoalescedWriter,
+  readActiveNoteSnapshot,
+  clearActiveNoteSnapshot,
+} from "./lib/storage";
 import {
   getNoteTitle,
   getPreviewText,
@@ -110,7 +117,7 @@ function App() {
    */
   const [recentNotes, setRecentNotes] = useState<NoteSummary[]>(() => {
     try {
-      const cached = safeLocalStorageGetItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem(STORAGE_KEYS.CACHED_NOTES);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -132,7 +139,7 @@ function App() {
     const saved = readActiveNoteSnapshot()?.id || safeLocalStorageGetItem("notefast_active_note_id");
     if (saved) return saved;
     try {
-      const cached = safeLocalStorageGetItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem(STORAGE_KEYS.CACHED_NOTES);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id;
@@ -249,7 +256,7 @@ function App() {
   const closeFind = useCallback(() => setActivePanel((panel) => panel === "find" ? null : panel), []);
   const [isLoading, setIsLoading] = useState(() => {
     try {
-      const cached = safeLocalStorageGetItem("notefast_cached_notes");
+      const cached = safeLocalStorageGetItem(STORAGE_KEYS.CACHED_NOTES);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return false;
@@ -907,7 +914,7 @@ function App() {
         try {
           const freshRecents = await getRecentNotes(30);
           setRecentNotes(freshRecents);
-          safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+          safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(freshRecents));
         } catch {
           // Failure to refresh recents must not reject an already durable recovery (R04)
         }
@@ -946,7 +953,7 @@ function App() {
     try {
       const recents = await getRecentNotes(30);
       setRecentNotes(recents);
-      safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(recents.slice(0, 30)));
+      safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(recents.slice(0, 30)));
 
       const snapshot = readActiveNoteSnapshot();
       const savedId = snapshot?.id || safeLocalStorageGetItem("notefast_active_note_id");
@@ -1195,7 +1202,7 @@ function App() {
       setActiveNoteSummary(summary);
       const freshRecents = await getRecentNotes(30);
       setRecentNotes(freshRecents);
-      safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+      safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(freshRecents));
       handleSelectNote(note.id, summary);
       showToast("New note created", <Plus size={14} />);
     } catch (err) {
@@ -1245,7 +1252,7 @@ function App() {
       setActiveNoteSummary(newSummary);
       const freshRecents = await getRecentNotes(30);
       setRecentNotes(freshRecents);
-      safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+      safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(freshRecents));
       handleSelectNote(note.id, newSummary);
       showToast("Note duplicated", <Copy size={14} />);
     } catch (err) {
@@ -1332,7 +1339,7 @@ function App() {
   const cachedNotesWriterRef = useRef(
     createCoalescedWriter(() => {
       if (pendingCachedNotesJsonRef.current !== null) {
-        safeLocalStorageSetItem("notefast_cached_notes", pendingCachedNotesJsonRef.current);
+        safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, pendingCachedNotesJsonRef.current);
       }
     }, 16)
   );
@@ -1490,7 +1497,7 @@ function App() {
           return recentNotes.filter(note => note.id !== id);
         });
         setRecentNotes(freshRecents);
-        safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+        safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(freshRecents));
 
         if (activeNoteId === id) {
           if (freshRecents.length > 0) {
@@ -1545,7 +1552,7 @@ function App() {
       clearCachedRecentSearchResults();
       cachedNotesWriterRef.current.cancel();
       pendingCachedNotesJsonRef.current = null;
-      safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(remaining));
+      safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(remaining));
       if (!activeNoteId || deleted.has(activeNoteId)) {
         setDiscardedNoteId(activeNoteId);
         if (remaining.length) handleSelectNote(remaining[0].id, remaining[0]);
@@ -1681,7 +1688,7 @@ function App() {
         setActiveNoteSummary((prev) => (prev && prev.id === id ? { ...prev, is_pinned: isPinned } : prev));
         const freshRecents = await getRecentNotes(30);
         setRecentNotes(freshRecents);
-        safeLocalStorageSetItem("notefast_cached_notes", JSON.stringify(freshRecents));
+        safeLocalStorageSetItem(STORAGE_KEYS.CACHED_NOTES, JSON.stringify(freshRecents));
         showToast(
           isPinned ? "Note pinned to top" : "Note unpinned",
           <Pin size={14} />

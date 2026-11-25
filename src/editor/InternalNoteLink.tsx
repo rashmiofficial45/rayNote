@@ -16,7 +16,7 @@ import {
   useRef,
 } from "react";
 import { FileText, Pin } from "lucide-react";
-import { safeLocalStorageGetItem } from "../lib/storage";
+import { STORAGE_KEYS, safeLocalStorageGetItem } from "../lib/storage";
 import { getAllNotes } from "../lib/db";
 import { computeSlashMenuPlacementAndHeight } from "./SlashCommand";
 import { createInternalNoteUrl } from "../lib/linkUtils";
@@ -47,7 +47,7 @@ let cachedNotesMemory: InternalNoteItem[] = [];
 export function getCachedNotes(): InternalNoteItem[] {
   if (cachedNotesMemory.length > 0) return cachedNotesMemory;
   try {
-    const raw = safeLocalStorageGetItem("notefast_cached_notes");
+    const raw = safeLocalStorageGetItem(STORAGE_KEYS.CACHED_NOTES);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {

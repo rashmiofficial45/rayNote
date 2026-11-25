@@ -1,7 +1,7 @@
 import { ResourceUsage } from "./components/ResourceUsage";
 import { WebBrowserSetting } from "./components/WebBrowserSetting";
 import { GlassClaritySlider } from "./components/GlassClaritySlider";
-import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
+import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, type ZoomMode } from "./lib/zoom";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestEditorFlush } from "./lib/editorFlush";
 import { requestClearAllNotes } from "./lib/noteDeletion";
@@ -121,14 +121,10 @@ export default function SettingsApp() {
   const [fontFamily, setFontFamily] = useState<string>(getStoredFont);
   const [textOpacity, setTextOpacity] = useState<number>(getStoredTextOpacity);
 
-  // Zoom State
-  const [zoomMode, setZoomMode] = useState<ZoomMode>(() =>
-    safeLocalStorageGetItem(ZOOM_MODE_KEY) === "fullscreen" ? "fullscreen" : "windowed");
   const [zoomLevels, setZoomLevels] = useState(() => ({
     windowed: readZoom("windowed"),
     fullscreen: readZoom("fullscreen"),
   }));
-  const zoomLevel = zoomLevels[zoomMode];
 
   // Toggles State
   const [showMenuBar, setShowMenuBar] = useState<boolean>(() => {
@@ -182,7 +178,6 @@ export default function SettingsApp() {
       onTextOpacityChange: setTextOpacity,
       onZoomChange: (value, mode) => setZoomLevels((levels) =>
         levels[mode] === value ? levels : { ...levels, [mode]: value }),
-      onZoomModeChange: setZoomMode,
       onMenuBarChange: setShowMenuBar,
       onEscLosesFocusChange: setEscLosesFocus,
       onCommandsConfigChange: setCommands,
@@ -484,11 +479,11 @@ export default function SettingsApp() {
   };
 
   // Zoom handlers
-  const handleZoom = (level: number) => {
+  const handleZoom = (mode: ZoomMode, level: number) => {
     const clamped = Math.max(0.6, Math.min(2.0, Math.round(level * 10) / 10));
-    setZoomLevels((levels) => ({ ...levels, [zoomMode]: clamped }));
-    safeLocalStorageSetItem(ZOOM_KEYS[zoomMode], String(clamped));
-    broadcastSync({ type: "zoom", mode: zoomMode, value: clamped });
+    setZoomLevels((levels) => ({ ...levels, [mode]: clamped }));
+    safeLocalStorageSetItem(ZOOM_KEYS[mode], String(clamped));
+    broadcastSync({ type: "zoom", mode, value: clamped });
   };
 
   // Toggle handlers
@@ -799,52 +794,59 @@ export default function SettingsApp() {
                 </div>
               </div>
 
-              <div className="settings-card-divider" />
+              {(["windowed", "fullscreen"] as const).map((mode) => {
+                const title = mode === "fullscreen" ? "Full Screen Zoom" : "Windowed Zoom";
+                const level = zoomLevels[mode];
 
-
-
-              {/* Zoom Level */}
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Zoom</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Adjust note zoom for {zoomMode === "fullscreen" ? "fullscreen" : "windowed"} mode.
-                  </div>
-                </div>
-                <div className="settings-row-action">
-                  <div className="settings-zoom-stepper">
-                    <button
-                      type="button"
-                      className="settings-stepper-btn"
-                      onClick={() => handleZoom(DEFAULT_ZOOM)}
-                      title="Reset Zoom to 120%"
-                    >
-                      <RotateCcw size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="settings-stepper-btn"
-                      onClick={() => handleZoom(zoomLevel - 0.1)}
-                      disabled={zoomLevel <= 0.6}
-                      title="Zoom Out"
-                    >
-                      <Minus size={13} />
-                    </button>
-                    <span className="settings-zoom-display">
-                      {Math.round(zoomLevel * 100)}%
-                    </span>
-                    <button
-                      type="button"
-                      className="settings-stepper-btn"
-                      onClick={() => handleZoom(zoomLevel + 0.1)}
-                      disabled={zoomLevel >= 2.0}
-                      title="Zoom In"
-                    >
-                      <Plus size={13} />
-                    </button>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <React.Fragment key={mode}>
+                    <div className="settings-card-divider" />
+                    <div className="settings-row">
+                      <div className="settings-row-text">
+                        <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]" id={`zoom-${mode}`}>
+                          {title}
+                        </div>
+                        <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                          {mode === "fullscreen" ? "Adjust note zoom in full screen." : "Adjust note zoom in a regular window."}
+                        </div>
+                      </div>
+                      <div className="settings-row-action">
+                        <div className="settings-zoom-stepper" role="group" aria-labelledby={`zoom-${mode}`}>
+                          <button
+                            type="button"
+                            className="settings-stepper-btn"
+                            onClick={() => handleZoom(mode, DEFAULT_ZOOM)}
+                            title="Reset Zoom to 120%"
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="settings-stepper-btn"
+                            onClick={() => handleZoom(mode, level - 0.1)}
+                            disabled={level <= 0.6}
+                            title="Zoom Out"
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <output className="settings-zoom-display">
+                            {Math.round(level * 100)}%
+                          </output>
+                          <button
+                            type="button"
+                            className="settings-stepper-btn"
+                            onClick={() => handleZoom(mode, level + 0.1)}
+                            disabled={level >= 2}
+                            title="Zoom In"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })}
             </div>
           </div>
         )}

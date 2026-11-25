@@ -26,13 +26,6 @@ export const STORAGE_KEYS = {
   ALIASES: "raynote_custom_aliases",
 } as const;
 
-export function isProtectedRecoveryKey(key: string): boolean {
-  return (
-    key.startsWith("notefast_active_note") ||
-    key.startsWith("notefast_recovered_note_id")
-  );
-}
-
 export function safeLocalStorageSetItem(key: string, value: string): boolean {
   if (typeof window === "undefined") return false;
   try {

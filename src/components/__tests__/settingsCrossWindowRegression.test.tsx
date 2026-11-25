@@ -7,10 +7,11 @@ import { getExtensions } from '../../editor/extensions';
 import { BottomToolbar } from '../BottomToolbar';
 import SettingsApp from '../../SettingsApp';
 import { listenToSettingsSync } from '../../lib/settingsSync';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { getPreferredBrowser } from '../../lib/webBrowsers';
 import { getStoredGlassClarity } from '../../lib/theme';
+import { ZOOM_KEYS } from '../../lib/zoom';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ notes_count: 0, size_bytes: 0, db_path: '/tmp/disposable.db' }), isTauri: () => true }));
 vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn().mockResolvedValue(undefined), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onFocusChanged: vi.fn().mockResolvedValue(() => {}) }) }));
@@ -56,6 +57,37 @@ describe('Cross-window preference controls', () => {
       vi.unstubAllGlobals();
     }
   });
+  it('shows, saves, and syncs windowed and full screen zoom independently', async () => {
+    localStorage.setItem(ZOOM_KEYS.windowed, '1.4');
+    localStorage.setItem(ZOOM_KEYS.fullscreen, '1.8');
+    await act(async () => root.render(<SettingsApp />));
+
+    const steppers = host.querySelectorAll<HTMLElement>('.settings-zoom-stepper');
+    expect(Array.from(steppers, (stepper) => stepper.getAttribute('aria-labelledby'))).toEqual([
+      'zoom-windowed', 'zoom-fullscreen',
+    ]);
+    const [windowed, fullscreen] = Array.from(steppers);
+    const percentage = (stepper: HTMLElement) => stepper.querySelector('output')?.textContent?.trim();
+    expect(percentage(windowed)).toBe('140%');
+    expect(percentage(fullscreen)).toBe('180%');
+
+    await act(async () => fullscreen.querySelector<HTMLButtonElement>('[title="Zoom In"]')!.click());
+    expect(percentage(fullscreen)).toBe('190%');
+    expect(percentage(windowed)).toBe('140%');
+    expect(localStorage.getItem(ZOOM_KEYS.fullscreen)).toBe('1.9');
+    expect(localStorage.getItem(ZOOM_KEYS.windowed)).toBe('1.4');
+    expect(emit).toHaveBeenCalledWith('notefast://settings-sync', expect.objectContaining({
+      type: 'zoom', mode: 'fullscreen', value: 1.9,
+    }));
+
+    await deliver({ type: 'zoom', mode: 'windowed', value: 1.3 });
+    expect(percentage(windowed)).toBe('130%');
+    expect(percentage(fullscreen)).toBe('190%');
+    await act(async () => fullscreen.querySelector<HTMLButtonElement>('[title="Reset Zoom to 120%"]')!.click());
+    expect(percentage(fullscreen)).toBe('120%');
+    expect(percentage(windowed)).toBe('130%');
+  });
+
   it('previews glass clarity immediately and ignores out-of-order updates from another window', async () => {
     await act(async () => root.render(<SettingsApp />));
     const picker = host.querySelector<HTMLInputElement>('.glass-clarity-slider')!;
