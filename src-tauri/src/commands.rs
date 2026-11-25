@@ -714,6 +714,9 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .build()
     .map_err(|e| e.to_string())?;
 
+    #[cfg(target_os = "macos")]
+    crate::install_window_glass(&settings_window);
+
     let _ = settings_window.show();
     let _ = settings_window.set_focus();
 

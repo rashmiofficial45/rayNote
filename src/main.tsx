@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { initFrameProbe } from "./lib/frameProbe";
+import { applyGlassClarity, getStoredGlassClarity } from "./lib/theme";
+
+applyGlassClarity(getStoredGlassClarity());
 
 if (import.meta.env.DEV) {
   initFrameProbe();

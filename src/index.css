@@ -103,7 +103,7 @@
   --color-accent-muted: rgba(14, 165, 233, 0.15);
   --color-accent-border: rgba(14, 165, 233, 0.28);
   --color-accent-glow: rgba(14, 165, 233, 0.25);
-  --color-accent-text: #0284C7;
+  --color-accent-text: #0369A1;
   --accent-rgb: 14, 165, 233;
 }
 
@@ -149,7 +149,7 @@
   --accent-rgb: 236, 72, 153;
 }
 
-/* ── iOS 26 Liquid Glass Design System: Solid Opaque Themes (No Desktop Transparency) ─ */
+/* ── Liquid Glass Design System ─ */
 :root,
 .dark,
 [data-theme="dark"],
@@ -157,6 +157,13 @@
   color-scheme: dark;
   --app-bg: #16161a;
   --app-bg-rgb: 22, 22, 26;
+  --window-glass-transmission: 0.32;
+  --glass-surface-rgb: 21 23 30;
+  --glass-surface-highlight: rgb(255 255 255 / 5%);
+  /* Menu tint shares the window backdrop, so focus never swaps the material. */
+  --glass-surface-opacity: calc(97% - var(--app-glass-clarity, 0%) * 0.09);
+  --glass-surface-tint: rgb(var(--glass-surface-rgb) / var(--glass-surface-opacity));
+  --steady-glass-surface: linear-gradient(160deg, var(--glass-surface-highlight), transparent 55%), var(--glass-surface-tint);
   --app-bg-glass: #16161a;
   --liquid-card-bg: #16161a;
   --app-border: rgba(255, 255, 255, 0.10);
@@ -205,14 +212,11 @@
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.35);
 
   /* ── Liquid Glass Unified Design System Tokens (Dark) ── */
-  --glass-menu-bg: rgba(24, 24, 30, 0.42);
-  --glass-menu-blur: blur(32px) saturate(210%);
   --glass-menu-border: rgba(255, 255, 255, 0.16);
   --glass-menu-shadow: 0 16px 42px -4px rgba(0, 0, 0, 0.52), 0 4px 12px 0 rgba(0, 0, 0, 0.25);
   --glass-menu-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.28);
   --glass-item-hover-bg: color-mix(in srgb, var(--color-accent) 24%, rgba(255, 255, 255, 0.10));
   --glass-item-selected-bg: color-mix(in srgb, var(--color-accent) 28%, rgba(255, 255, 255, 0.14));
-  --glass-panel-bg: rgba(24, 24, 30, 0.48);
   --glass-panel-border: rgba(255, 255, 255, 0.14);
   --glass-panel-shadow: 0 20px 50px -6px rgba(0, 0, 0, 0.6), inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
   --glass-control-bg: rgba(255, 255, 255, 0.08);
@@ -230,6 +234,12 @@
   color-scheme: light;
   --app-bg: #f8fafc;
   --app-bg-rgb: 248, 250, 252;
+  --window-glass-transmission: 0.30;
+  --glass-surface-rgb: 240 245 252;
+  --glass-surface-highlight: rgb(255 255 255 / 48%);
+  --glass-surface-opacity: calc(98% - var(--app-glass-clarity, 0%) * 0.08);
+  --glass-surface-tint: rgb(var(--glass-surface-rgb) / var(--glass-surface-opacity));
+  --steady-glass-surface: linear-gradient(160deg, var(--glass-surface-highlight), transparent 55%), var(--glass-surface-tint);
   --app-bg-glass: #f8fafc;
   --liquid-card-bg: #ffffff;
   --app-border: rgba(0, 0, 0, 0.10);
@@ -278,14 +288,11 @@
   --scrollbar-thumb-hover: rgba(0, 0, 0, 0.35);
 
   /* ── Liquid Glass Unified Design System Tokens (Light) ── */
-  --glass-menu-bg: rgba(255, 255, 255, 0.45);
-  --glass-menu-blur: blur(32px) saturate(210%);
   --glass-menu-border: rgba(255, 255, 255, 0.75);
   --glass-menu-shadow: 0 14px 34px -4px rgba(0, 0, 0, 0.14), 0 4px 12px 0 rgba(0, 0, 0, 0.06);
   --glass-menu-highlight: inset 0 1px 1px 0 rgba(255, 255, 255, 0.98);
   --glass-item-hover-bg: color-mix(in srgb, var(--color-accent) 18%, rgba(0, 0, 0, 0.04));
   --glass-item-selected-bg: color-mix(in srgb, var(--color-accent) 22%, rgba(0, 0, 0, 0.06));
-  --glass-panel-bg: rgba(255, 255, 255, 0.50);
   --glass-panel-border: rgba(255, 255, 255, 0.60);
   --glass-panel-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.12), inset 0 1px 1px 0 rgba(255, 255, 255, 0.98);
   --glass-control-bg: rgba(255, 255, 255, 0.50);
@@ -386,8 +393,6 @@ html, body, #root {
   border-radius: 9999px;
   box-shadow: var(--btn-liquid-shadow);
   color: var(--text-muted);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
   cursor: pointer;
   transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
@@ -412,19 +417,37 @@ html, body, #root {
   box-shadow: 0 0 14px var(--color-accent-glow), inset 0 1px 1px 0 rgba(255, 255, 255, 0.35) !important;
 }
 
-/* ── App Shell — iOS 26 Liquid Glass Container ─────────── */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root[data-resolved-theme] {
+    --glass-surface-opacity: 100%;
+  }
+}
+
+/* The slider tints the single native backdrop behind the editor and Settings. */
+.app-shell,
+.settings-window-root {
+  --window-clarity: var(--app-glass-clarity, 0%);
+  --window-tint: calc(100% - var(--window-clarity) * var(--window-glass-transmission));
+  --window-edge-tint: var(--window-tint);
+  --glass-ink-strength: calc(var(--window-clarity) * 0.64);
+  --window-text-opacity: max(var(--app-text-opacity, 100%), var(--window-clarity));
+  --text-primary: color-mix(in srgb, var(--text-primary-base) var(--window-text-opacity), var(--app-bg));
+  --text-secondary: color-mix(in srgb, var(--text-secondary-base) var(--window-text-opacity), var(--app-bg));
+  background: rgba(var(--app-bg-rgb), var(--window-tint));
+}
+
+/* ── App Shell ────────────────────────────────────────── */
 .app-shell {
   height: 100vh;
   width: 100vw;
   display: flex;
   flex-direction: column;
-  background: var(--app-bg);
   border-radius: 28px;
   border: 1.5px solid var(--app-border);
   overflow: hidden;
   position: relative;
   contain: layout size;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
+  box-shadow: var(--app-inner-highlight);
   color: var(--text-primary);
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
@@ -507,12 +530,12 @@ html, body, #root {
 
   background: linear-gradient(
     180deg,
-    rgba(var(--app-bg-rgb), 1) 0px,
-    rgba(var(--app-bg-rgb), 1) 24px,
-    rgba(var(--app-bg-rgb), 0.95) 38px,
-    rgba(var(--app-bg-rgb), 0.85) 42px,
-    rgba(var(--app-bg-rgb), 0.75) 46px,
-    rgba(var(--app-bg-rgb), 0.38) 49px,
+    rgba(var(--app-bg-rgb), var(--window-edge-tint)) 0px,
+    rgba(var(--app-bg-rgb), var(--window-edge-tint)) 24px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.95)) 38px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.85)) 42px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.75)) 46px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.38)) 49px,
     rgba(var(--app-bg-rgb), 0) 52px
   );
 
@@ -530,11 +553,11 @@ html, body, #root {
   z-index: 15;
   background: linear-gradient(
     to top,
-    rgba(var(--app-bg-rgb), 1) 0%,
-    rgba(var(--app-bg-rgb), 0.96) 17%,
-    rgba(var(--app-bg-rgb), 0.75) 39%,
-    rgba(var(--app-bg-rgb), 0.38) 66%,
-    rgba(var(--app-bg-rgb), 0.10) 86%,
+    rgba(var(--app-bg-rgb), var(--window-edge-tint)) 0%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.96)) 17%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.75)) 39%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.38)) 66%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.10)) 86%,
     rgba(var(--app-bg-rgb), 0) 100%
   );
   border-bottom-left-radius: 28px;
@@ -644,24 +667,13 @@ html, body, #root {
   border-radius: 9999px;
   padding: var(--title-action-padding);
   gap: var(--title-action-gap);
-  background: var(--glass-menu-bg);
-  -webkit-backdrop-filter: var(--glass-menu-blur);
-  backdrop-filter: var(--glass-menu-blur);
+  background: var(--steady-glass-surface);
   box-shadow: var(--glass-menu-highlight), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.10);
   -webkit-app-region: no-drag;
   cursor: default;
   opacity: 0;
   pointer-events: none;
   transform: translateY(-2px);
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  @media not (prefers-reduced-transparency: reduce) {
-    .title-bar-right {
-      background: color-mix(in srgb, var(--glass-menu-bg) 55%, transparent);
-    }
-  }
 }
 
 /* Reveal menubar options and red close button when cursor enters the page */
@@ -833,9 +845,7 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
   top: calc(100% + 6px);
   right: 0;
   min-width: 175px;
-  background: var(--surface-glass-elevated);
-  backdrop-filter: blur(32px) saturate(210%);
-  -webkit-backdrop-filter: blur(32px) saturate(210%);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--surface-glass-border);
   border-radius: 18px;
   padding: 5px;
@@ -927,6 +937,10 @@ body:has(.command-overlay, .smart-search-overlay) .fullscreen-btn {
 }
 
 .tiptap {
+  --editor-link-fg: color-mix(in srgb, var(--text-primary-base) var(--glass-ink-strength, 0%), var(--color-accent-text, #8b7af7));
+  --editor-marker-fg: color-mix(in srgb, var(--editor-link-fg) var(--window-clarity, 0%), var(--color-accent));
+  --editor-placeholder-fg: color-mix(in srgb, var(--text-primary-base) var(--glass-ink-strength, 0%), var(--placeholder));
+  --editor-muted-fg: color-mix(in srgb, var(--text-primary-base) var(--glass-ink-strength, 0%), var(--text-muted));
   outline: none;
   min-height: auto;
   padding-top: 50px;
@@ -1050,7 +1064,7 @@ html[data-smooth-caret="false"] .tiptap {
   position: absolute;
   left: 0;
   top: 0;
-  color: var(--placeholder);
+  color: var(--editor-placeholder-fg);
   pointer-events: none;
   font-style: normal;
   line-height: inherit;
@@ -1064,7 +1078,7 @@ html[data-smooth-caret="false"] .tiptap {
   position: absolute;
   left: 0;
   top: 0;
-  color: var(--placeholder);
+  color: var(--editor-placeholder-fg);
   pointer-events: none;
   font-style: normal;
   line-height: inherit;
@@ -1187,12 +1201,12 @@ html[data-smooth-caret="false"] .tiptap {
 }
 
 .tiptap ul:not([data-type="taskList"]) li::marker {
-  color: var(--color-accent);
+  color: var(--editor-marker-fg);
   font-size: 1.05em;
 }
 
 .tiptap ol li::marker {
-  color: var(--color-accent);
+  color: var(--editor-marker-fg);
   font-weight: 600;
 }
 
@@ -1452,7 +1466,7 @@ html[data-smooth-caret="false"] .tiptap {
   min-width: 0;
   max-width: calc(100vw - 16px);
   padding: 7px;
-  background: color-mix(in srgb, var(--glass-menu-bg) 72%, var(--app-bg));
+  background: color-mix(in srgb, var(--glass-surface-tint) 72%, var(--app-bg));
   border-radius: 24px;
   overflow: hidden;
   contain: none;
@@ -1707,23 +1721,20 @@ pre.notefast-code-block:hover {
   align-items: center;
 }
 
-/* Apply the toolbar glass to its own layer so the picker can sample code behind it. */
+/* The toolbar tint sits below its controls. */
 .floating-code-block-toolbar::before {
   content: "";
   position: absolute;
   inset: -1px;
   z-index: -1;
   pointer-events: none;
-  background: var(--surface-glass-elevated, rgba(22, 22, 26, 0.85));
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--surface-glass-border, rgba(255, 255, 255, 0.08));
   border-radius: inherit;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.28);
 }
 
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .floating-code-block-toolbar::before {
-  background: rgba(255, 255, 255, 0.92);
   border-color: rgba(0, 0, 0, 0.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
@@ -1794,7 +1805,7 @@ pre.notefast-code-block:hover {
   font-style: italic;
   font-synthesis: style;
 }
-.tiptap s { text-decoration: line-through; color: var(--text-muted); }
+.tiptap s { text-decoration: line-through; color: var(--editor-muted-fg); }
 
 .tiptap mark {
   background: var(--color-accent-muted);
@@ -1855,7 +1866,7 @@ pre.notefast-code-block:hover {
 .tiptap s a,
 .tiptap del a,
 .tiptap strike a {
-  color: var(--color-accent-text, #8b7af7);
+  color: var(--editor-link-fg, var(--color-accent-text, #8b7af7));
   text-decoration: underline;
   text-decoration-color: var(--color-accent-muted, rgba(108, 92, 231, 0.45));
   text-underline-offset: 3px;
@@ -1869,7 +1880,6 @@ pre.notefast-code-block:hover {
 
 .tiptap a:hover,
 .editor-link:hover {
-  color: var(--color-accent, #6C5CE7);
   text-decoration-color: var(--color-accent, #6C5CE7);
 }
 
@@ -1914,9 +1924,9 @@ pre.notefast-code-block:hover {
   height: 104px;
   background: linear-gradient(
     to top,
-    rgba(var(--app-bg-rgb), 1),
-    rgba(var(--app-bg-rgb), 0.55) 17%,
-    rgba(var(--app-bg-rgb), 0.22) 38%,
+    rgba(var(--app-bg-rgb), var(--window-edge-tint)),
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.55)) 17%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.22)) 38%,
     rgba(var(--app-bg-rgb), 0) 100%
   );
 }
@@ -1945,24 +1955,11 @@ pre.notefast-code-block:hover {
   border: 1px solid var(--surface-glass-border);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.12), var(--app-inner-highlight);
   cursor: pointer;
-  opacity: 0.95;
   pointer-events: auto;
-  transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.format-corner-btn:hover,
-.format-corner-btn.is-active {
-  opacity: 1;
 }
 
 .format-corner-btn:hover {
-  background: var(--btn-liquid-bg-hover);
-  color: var(--text-primary);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), var(--app-inner-highlight);
-}
-
-.format-corner-btn:active {
-  background: var(--btn-liquid-bg-hover);
+  color: var(--color-accent-text);
 }
 
 .format-corner-btn .format-indicator-dot {
@@ -1986,8 +1983,6 @@ pre.notefast-code-block:hover {
   --editor-footer-inset: clamp(8px, 2.6vw, 14px);
   --editor-footer-bottom: 10px;
   --editor-footer-height: 46px;
-  --format-panel-glass: rgb(13 15 20 / 38%);
-  --format-panel-backdrop: blur(12px) brightness(85%) saturate(155%);
   --format-panel-rim: rgb(227 237 255 / 24%);
   --format-panel-section-line: rgb(227 237 255 / 17%);
   --format-panel-reflection: rgb(255 255 255 / 14%);
@@ -1997,7 +1992,7 @@ pre.notefast-code-block:hover {
 .format-dock-strip,
 .format-dock-options,
 .format-corner-btn {
-  background: var(--surface-glass-elevated);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--format-panel-rim);
   box-shadow: inset 0 1px 1px var(--format-panel-reflection), inset 0 -1px 1px rgb(0 0 0 / 16%), var(--format-panel-shadow);
 }
@@ -2067,27 +2062,15 @@ pre.notefast-code-block:hover {
 .light .editor-wrapper,
 [data-theme="light"] .editor-wrapper,
 [data-resolved-theme="light"] .editor-wrapper {
-  --format-panel-glass: linear-gradient(155deg, rgb(255 255 255 / 23%), transparent 67%), rgb(245 249 255 / 26%);
-  --format-panel-backdrop: blur(7px) saturate(180%);
   --format-panel-rim: rgb(62 79 104 / 30%);
   --format-panel-section-line: rgb(62 79 104 / 20%);
   --format-panel-reflection: rgb(255 255 255 / 78%);
   --format-panel-shadow: 0 12px 30px rgb(35 54 78 / 20%);
 }
 
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
-    background: var(--format-panel-glass);
-    -webkit-backdrop-filter: var(--format-panel-backdrop);
-    backdrop-filter: var(--format-panel-backdrop);
-  }
-}
-
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   :is(.format-dock-strip, .format-dock-options, .format-corner-btn) {
     background: var(--surface-glass-elevated);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
@@ -2291,8 +2274,6 @@ pre.notefast-code-block:hover {
   position: fixed;
   inset: 0;
   background: var(--overlay-dim);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
   z-index: 100;
   display: flex;
   align-items: flex-start;
@@ -2309,12 +2290,15 @@ body:has(.command-overlay, .smart-search-overlay) .title-bar-right > .title-bar-
 }
 
 body:has(.command-overlay) .close-btn-x,
-body:has(.command-overlay) .format-corner-btn,
 body:has(.command-overlay) .doc-tick-slider-wrapper,
 body:has(.command-overlay) .editor-status-footer {
   opacity: 0 !important;
   pointer-events: none !important;
   transition: opacity 0.15s ease;
+}
+
+body:has(.command-overlay) .format-corner-btn {
+  visibility: hidden;
 }
 
 .command-palette-overlay,
@@ -2325,8 +2309,6 @@ body:has(.command-overlay) .editor-status-footer {
 .command-overlay:has(.shortcuts-modal-container) {
   padding-top: 24px;
   background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
   animation: none !important;
 }
 
@@ -2335,7 +2317,7 @@ body:has(.command-overlay) .editor-status-footer {
 .shortcuts-modal-container {
   width: min(420px, calc(100% - 24px));
   max-height: min(480px, calc(100dvh - 36px));
-  background: var(--picker-solid);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--picker-rim);
   border-radius: 28px;
   box-shadow: inset 0 1.5px 0 var(--picker-edge-light),
@@ -2352,9 +2334,6 @@ body:has(.command-overlay) .editor-status-footer {
 .command-palette,
 .smart-search-modal,
 .shortcuts-modal-container {
-  --picker-solid: rgba(18, 19, 24, 0.88);
-  --picker-frost: rgba(18, 19, 24, 0.08);
-  --picker-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.03) 30%, transparent 60%);
   --picker-rim: rgba(255, 255, 255, 0.18);
   --picker-edge-light: rgba(255, 255, 255, 0.45);
   --picker-shadow: 0 24px 60px -8px rgba(0, 0, 0, 0.55), 0 6px 18px rgba(0, 0, 0, 0.22);
@@ -2364,9 +2343,6 @@ body:has(.command-overlay) .editor-status-footer {
 
 /* ── Unified Liquid Glass Tokens (Light Theme) ── */
 :is([data-theme="light"], [data-resolved-theme="light"]) :is(.command-palette, .smart-search-modal, .shortcuts-modal-container, .trash-dialog) {
-  --picker-solid: rgba(255, 255, 255, 0.90);
-  --picker-frost: rgba(255, 255, 255, 0.08);
-  --picker-sheen: linear-gradient(145deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.20) 32%, transparent 60%);
   --picker-rim: rgba(255, 255, 255, 0.85);
   --picker-edge-light: #ffffff;
   --picker-shadow: 0 24px 50px -8px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.04);
@@ -2377,25 +2353,6 @@ body:has(.command-overlay) .editor-status-footer {
 .smart-search-modal {
   height: 410px;
   min-height: 410px;
-}
-
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .command-palette,
-  .smart-search-modal {
-    background-color: var(--picker-frost);
-    background-image: var(--picker-sheen);
-    backdrop-filter: blur(14px) saturate(180%);
-    -webkit-backdrop-filter: blur(14px) saturate(180%);
-  }
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .command-palette,
-  .smart-search-modal {
-    background: var(--picker-solid);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 
 .command-search,
@@ -2607,9 +2564,7 @@ body:has(.command-overlay) .editor-status-footer {
 }
 
 .slash-command-menu {
-  background: var(--glass-menu-bg);
-  backdrop-filter: var(--glass-menu-blur);
-  -webkit-backdrop-filter: var(--glass-menu-blur);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--glass-menu-border);
   border-radius: var(--glass-radius-menu);
   box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
@@ -3339,7 +3294,7 @@ body:has(.command-overlay) .editor-status-footer {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  background: var(--surface-glass-elevated);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--glass-menu-border);
   border-radius: 18px;
   padding: 6px 12px;
@@ -3350,20 +3305,9 @@ body:has(.command-overlay) .editor-status-footer {
   max-width: calc(100% - var(--slider-gutter-width) - 14px);
 }
 
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .find-bar-container {
-    background: var(--glass-menu-bg);
-    background: color-mix(in srgb, var(--glass-menu-bg) 78%, transparent);
-    -webkit-backdrop-filter: blur(8px) saturate(165%);
-    backdrop-filter: blur(8px) saturate(165%);
-  }
-}
-
 @media (prefers-reduced-transparency: reduce) {
   .find-bar-container {
     background: var(--surface-glass-elevated);
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
   }
 }
 
@@ -3486,8 +3430,6 @@ body:has(.command-overlay) .editor-status-footer {
   z-index: 1000;
   padding: 7px 16px;
   background: var(--surface-glass-elevated);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
   border: 1px solid var(--surface-glass-border);
   border-radius: 9999px;
   box-shadow: var(--surface-glass-inner), var(--surface-glass-shadow);
@@ -3500,8 +3442,6 @@ body:has(.command-overlay) .editor-status-footer {
 .command-overlay:has(> .shortcuts-modal-container),
 .command-overlay:has(.shortcuts-modal-container) {
   padding: 24px 0 12px;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
   background: transparent !important;
   animation: none !important;
 }
@@ -3511,7 +3451,7 @@ body:has(.command-overlay) .editor-status-footer {
   width: min(390px, calc(100% - 24px));
   height: 350px;
   max-height: min(350px, calc(100dvh - 50px));
-  background: var(--picker-solid);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--picker-rim);
   border-radius: 24px;
   box-shadow: inset 0 1.5px 0 var(--picker-edge-light),
@@ -3522,15 +3462,6 @@ body:has(.command-overlay) .editor-status-footer {
   display: flex;
   flex-direction: column;
   animation: overlayIn 0.12s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .shortcuts-modal-container {
-    background-color: var(--picker-frost) !important;
-    background-image: var(--picker-sheen) !important;
-    backdrop-filter: blur(14px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(14px) saturate(180%) !important;
-  }
 }
 
 .shortcuts-modal-header {
@@ -3654,12 +3585,6 @@ body:has(.command-overlay) .editor-status-footer {
   background: transparent;
   color: var(--text-muted);
   font-size: 10.5px;
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .shortcuts-modal-container {
-    background: var(--modal-bg);
-  }
 }
 
 /* ── Character Count (Subtle iOS Status Bottom Center) ────── */
@@ -3882,7 +3807,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border: 1px solid var(--glass-panel-border);
   border-radius: 20px;
   color: #fff;
-  background: #262a34;
+  background: linear-gradient(150deg, rgb(153 173 206 / 17%), transparent 70%), rgb(16 20 29 / 88%);
   box-shadow: var(--glass-menu-highlight), 0 4px 14px rgb(0 0 0 / 18%);
 }
 
@@ -3963,20 +3888,11 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--color-accent);
 }
 
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .image-action-glass {
-    background: linear-gradient(155deg, rgb(122 138 164 / 26%), transparent 80%), rgb(16 20 29 / 44%);
-    -webkit-backdrop-filter: blur(4px) brightness(.42) saturate(135%);
-    backdrop-filter: blur(4px) brightness(.42) saturate(135%);
-    border-color: rgb(255 255 255 / 36%);
-    box-shadow: inset 0 1px 2px rgb(255 255 255 / 32%), 0 3px 12px rgb(0 0 0 / 24%);
-  }
-}
 .image-action-glass button { background: transparent; border: 0; }
 .image-action-glass button:hover { background: rgb(255 255 255 / 16%); }
 .image-action-glass button[aria-pressed="true"] { background: rgb(0 99 166 / 55%); }
 @media (prefers-reduced-transparency: reduce) {
-  .image-action-glass { background: #262a34; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .image-action-glass { background: #262a34; }
 }
 
 /* ── Table Styling ────────────────────────────────────── */
@@ -4093,15 +4009,14 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   height: 100vh;
   width: 100vw;
   overflow: hidden;
-  background: var(--app-bg);
   color: var(--text-primary);
   user-select: none;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
     "Segoe UI", "Apple Color Emoji", sans-serif;
   border-radius: 28px;
   border: 1.5px solid var(--app-border);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45), var(--app-inner-highlight);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  box-shadow: var(--app-inner-highlight);
+  transition: border-color 0.2s ease;
   overscroll-behavior: none !important;
 }
 
@@ -4114,9 +4029,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   height: 52px;
   min-height: 52px;
   border-bottom: 1px solid var(--separator);
-  background: var(--glass-panel-bg);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  background: var(--steady-glass-surface);
   border-top-left-radius: 28px;
   border-top-right-radius: 28px;
   flex-shrink: 0;
@@ -4318,9 +4231,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* Grouped Cards (macOS Raycast standard) */
 .settings-card {
-  background: var(--glass-panel-bg);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--glass-panel-border);
   border-radius: 20px;
   overflow: hidden;
@@ -4549,8 +4460,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
   border-radius: 9999px;
   padding: 3px 4px;
   gap: 4px;
@@ -4604,6 +4513,100 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   text-align: center;
 }
 
+/* Liquid Glass clarity slider */
+.glass-clarity-control {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 13px;
+}
+
+.settings-glass-clarity {
+  padding: 13px 18px;
+}
+
+/* Controls beside the live sliders use a fixed material without backdrop resampling. */
+.settings-window-root :is(.liquid-btn, .settings-opacity-control) {
+}
+
+.format-dock-options .glass-clarity-control {
+  padding: 8px 6px 2px;
+  margin-top: 6px;
+  border-top: 1px solid var(--format-panel-section-line);
+}
+
+.glass-clarity-header,
+.glass-clarity-header label,
+.glass-clarity-scale {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.glass-clarity-header,
+.glass-clarity-scale {
+  justify-content: space-between;
+}
+
+.glass-clarity-header label {
+  font-weight: 600;
+}
+
+.glass-clarity-header label svg {
+  color: var(--text-muted-base);
+}
+
+.glass-clarity-value,
+.glass-clarity-scale {
+  color: var(--text-muted-base);
+  font-size: 11px;
+}
+
+.glass-clarity-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.glass-clarity-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 26px;
+  margin: 0;
+  cursor: pointer;
+  background: transparent;
+  border-radius: 999px;
+}
+
+.glass-clarity-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    to right,
+    var(--color-accent) var(--app-glass-clarity, 0%),
+    color-mix(in srgb, var(--text-primary-base) 20%, transparent) var(--app-glass-clarity, 0%)
+  );
+}
+
+.glass-clarity-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 20px;
+  height: 15px;
+  margin-top: -5px;
+  border-radius: 999px;
+  border: 1px solid var(--btn-liquid-border);
+  background: var(--text-primary-base);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 28%);
+}
+
+.glass-clarity-slider:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* Text Opacity Range Slider (Liquid Glass Style) */
 .settings-opacity-control {
   display: inline-flex;
@@ -4611,8 +4614,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
   border-radius: 9999px;
   padding: 3px 6px 3px 4px;
   gap: 8px;
@@ -4844,8 +4845,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--glass-control-bg);
   border: 1px solid var(--glass-control-border);
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
   border-radius: 7px;
   color: var(--text-secondary);
   font-weight: 500;
@@ -4929,8 +4928,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
   color: var(--text-muted);
   cursor: pointer;
   border-radius: 6px;
@@ -5003,8 +5000,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border: 1px solid var(--btn-liquid-border);
   box-shadow: var(--btn-liquid-shadow);
   border-radius: 8px;
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
   position: relative;
 }
 
@@ -5106,8 +5101,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--glass-control-bg);
   border: 1px solid var(--glass-control-border);
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
   border-radius: 6px;
   color: var(--text-secondary);
   font-size: 11px;
@@ -5212,8 +5205,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border: 1px solid var(--btn-liquid-border);
   border-radius: 9999px;
   box-shadow: var(--btn-liquid-shadow);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
   color: var(--text-primary);
   font-size: 12px;
   font-weight: 500;
@@ -5266,8 +5257,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border: 1px solid rgba(239, 68, 68, 0.32);
   border-radius: 9999px;
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(239, 68, 68, 0.1);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
   color: #ef4444;
   font-size: 12px;
   font-weight: 600;
@@ -5356,12 +5345,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 .md-viewer-modal {
   width: min(92vw, 760px);
   height: min(86vh, 700px);
-  background: var(--modal-bg);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--modal-border);
   border-radius: 20px;
   box-shadow: var(--modal-shadow), 0 24px 60px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(36px) saturate(220%);
-  -webkit-backdrop-filter: blur(36px) saturate(220%);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -5906,8 +5893,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   position: absolute;
   inset: 0;
   background: rgba(var(--accent-rgb, 108, 92, 231), 0.18);
-  backdrop-filter: blur(12px) saturate(180%);
-  -webkit-backdrop-filter: blur(12px) saturate(180%);
   border: 2.5px dashed var(--color-accent);
   border-radius: 28px;
   z-index: 999;
@@ -5922,12 +5907,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .drop-prompt-modal {
   width: min(92vw, 420px);
-  background: var(--modal-bg);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--modal-border);
   border-radius: 20px;
   box-shadow: var(--modal-shadow), 0 20px 50px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(32px) saturate(210%);
-  -webkit-backdrop-filter: blur(32px) saturate(210%);
   padding: 20px 22px;
   display: flex;
   flex-direction: column;
@@ -6320,8 +6303,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   justify-content: center;
   padding-top: 24px;
   background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   animation: none;
 }
 
@@ -6486,9 +6467,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   z-index: 10000;
   min-width: 178px;
   max-width: 228px;
-  background: var(--glass-menu-bg);
-  backdrop-filter: var(--glass-menu-blur);
-  -webkit-backdrop-filter: var(--glass-menu-blur);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--glass-menu-border);
   border-radius: var(--glass-radius-menu);
   box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
@@ -6653,9 +6632,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   z-index: 10002;
   min-width: 176px;
   max-width: 220px;
-  background: var(--glass-menu-bg);
-  backdrop-filter: var(--glass-menu-blur);
-  -webkit-backdrop-filter: var(--glass-menu-blur);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--glass-menu-border);
   border-radius: var(--glass-radius-menu);
   box-shadow: var(--glass-menu-shadow), var(--glass-menu-highlight);
@@ -6684,35 +6661,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 /* ── Accessibility & Reduced Constraints ─────────────────── */
-@media (prefers-reduced-transparency: reduce) {
-  :root,
-  .dark,
-  [data-theme="dark"],
-  [data-resolved-theme="dark"] {
-    --glass-menu-bg: #1c1c22;
-    --glass-menu-blur: none;
-    --glass-panel-bg: #1c1c22;
-  }
-  .light,
-  [data-theme="light"],
-  [data-resolved-theme="light"] {
-    --glass-menu-bg: #f9f9fb;
-    --glass-menu-blur: none;
-    --glass-panel-bg: #f9f9fb;
-  }
-  .editor-context-menu,
-  .editor-context-submenu,
-  .slash-command-menu,
-  .code-lang-liquid-menu,
-  .format-dock-strip,
-  .format-dock-options,
-  .command-palette,
-  .smart-search-modal,
-  .shortcuts-modal-container,
-  .settings-card,
-  .settings-header-bar {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .app-shell,
+  .settings-window-root {
+    --window-clarity: 0%;
   }
 }
 
@@ -6732,10 +6684,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 
 
-/* Trash uses a single frosted surface above the editor. */
+/* Trash uses the same glass tint as the other panels. */
 .trash-dialog {
   --trash-inset: clamp(8px, 3dvh, 20px);
-  --trash-tint: rgb(21 23 31 / 31%);
   --trash-reflection: rgb(255 255 255 / 20%);
   --trash-rim: rgb(255 255 255 / 39%);
   position: fixed;
@@ -6748,7 +6699,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   overflow: hidden;
   border: 1px solid var(--trash-rim);
   border-radius: 32px;
-  background: var(--picker-solid);
+  background: var(--steady-glass-surface);
   box-shadow: inset 0 1px 0 var(--picker-edge-light),
               inset 0 -1px 0 var(--trash-reflection),
               0 12px 36px -12px rgb(0 0 0 / 30%);
@@ -6756,7 +6707,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 :is([data-theme="light"], [data-resolved-theme="light"]) .trash-dialog {
-  --trash-tint: rgb(247 249 252 / 36%);
   --trash-reflection: rgb(255 255 255 / 55%);
   --trash-rim: rgb(255 255 255 / 85%);
 }
@@ -6770,19 +6720,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: transparent;
 }
 
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .trash-dialog {
-    background: radial-gradient(ellipse at 12% 0%, var(--trash-reflection), transparent 58%), var(--trash-tint);
-    backdrop-filter: blur(var(--trash-blur, 16px)) saturate(170%);
-    -webkit-backdrop-filter: blur(var(--trash-blur, 16px)) saturate(170%);
-  }
-}
-
 @media (prefers-reduced-transparency: reduce) {
   .trash-dialog {
     background: var(--app-bg);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 }
 
@@ -6854,13 +6794,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .move-trash-dialog {
   --trash-inset: clamp(24px, 10dvh, 44px);
-  --trash-tint: rgb(22 25 34 / 23%);
   --trash-reflection: rgb(255 255 255 / 17%);
-  --trash-blur: 12px;
 }
 
 :is([data-theme="light"], [data-resolved-theme="light"]) .move-trash-dialog {
-  --trash-tint: rgb(247 249 252 / 25%);
   --trash-reflection: rgb(255 255 255 / 37%);
 }
 
@@ -7208,8 +7145,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   color: #f6f8fc;
   background: rgba(22, 23, 29, .48);
   border-bottom: 1px solid rgba(255, 255, 255, .14);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
 }
 .crop-aspect { position: relative; justify-self: start; }
 .crop-heading, .crop-actions { display: flex; align-items: center; gap: 10px; }
@@ -7227,8 +7162,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   color: #f5f7fb;
   background: linear-gradient(145deg, rgba(255,255,255,.14), rgba(255,255,255,.035));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 4px 14px rgba(0,0,0,.14);
-  -webkit-backdrop-filter: blur(7px) saturate(150%);
-  backdrop-filter: blur(7px) saturate(150%);
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
@@ -7251,8 +7184,6 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border-radius: 20px;
   background: rgba(35,37,45,.78);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 14px 35px rgba(0,0,0,.35);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  backdrop-filter: blur(20px) saturate(160%);
 }
 .crop-aspect-option { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 38px; padding: 0 12px; border: 0; border-radius: 13px; background: transparent; color: #f2f5fb; font-size: 14px; text-align: left; cursor: pointer; }
 .crop-aspect-option:hover { background: rgba(255,255,255,.12); }
@@ -7271,13 +7202,13 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* Inset crop sheet: preserve a clear view of the note underneath. */
 .crop-overlay { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: stretch; justify-content: stretch; padding: clamp(12px, calc((100vh - 400px) / 2), 200px) clamp(12px, calc((100vw - 640px) / 2), 200px); background: rgba(0, 0, 0, .06); }
-.crop-panel { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.32); border-radius: 26px; background: rgba(30,32,39,.35); box-shadow: 0 22px 65px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.25); -webkit-backdrop-filter: blur(20px) saturate(145%); backdrop-filter: blur(20px) saturate(145%); user-select: none; }
+.crop-panel { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; overflow: hidden; border: 1px solid rgba(255,255,255,.32); border-radius: 26px; background: var(--steady-glass-surface); box-shadow: 0 22px 65px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.25); user-select: none; }
 .crop-canvas { position: relative; display: flex; flex: 1 1 0; align-items: center; justify-content: center; min-height: 0; min-width: 0; overflow: hidden; padding: 24px; }
 .crop-image-stage { position: relative; flex: none; clip-path: inset(-8px); }
-.crop-header { background: rgba(25,27,34,.25); -webkit-backdrop-filter: none; backdrop-filter: none; }
-.crop-control { background: rgba(255,255,255,.10); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.crop-header { background: rgba(25,27,34,.25); }
+.crop-control { background: rgba(255,255,255,.10); }
 .crop-save { background: rgba(0,126,239,.78); }
-:is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-panel { color: #111827; background: rgba(244,248,252,.38); border-color: rgba(255,255,255,.72); box-shadow: 0 22px 65px rgba(28,45,65,.22), inset 0 1px 0 rgba(255,255,255,.8); }
+:is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-panel { color: #111827; border-color: rgba(255,255,255,.72); box-shadow: 0 22px 65px rgba(28,45,65,.22), inset 0 1px 0 rgba(255,255,255,.8); }
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-header { color: #111827; background: rgba(255,255,255,.23); border-color: rgba(255,255,255,.5); }
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-control { color: #172133; background: rgba(255,255,255,.30); border-color: rgba(255,255,255,.65); }
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-control:hover { background: rgba(255,255,255,.55); }
@@ -7286,7 +7217,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-aspect-option { color: #182235; }
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-aspect-option:hover { background: rgba(20,70,120,.10); }
 :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-aspect-option.is-selected { color: #0068a9; background: rgba(0,143,234,.16); }
-@media (prefers-reduced-transparency: reduce) { .crop-panel { background: #292c35; backdrop-filter: none; -webkit-backdrop-filter: none; } :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-panel { background: #eef2f7; } }
+@media (prefers-reduced-transparency: reduce) { .crop-panel { background: #292c35; } :is(.light, [data-theme="light"], [data-resolved-theme="light"]) .crop-panel { background: #eef2f7; } }
 
 /* The windowed editor keeps its image action compact. */
 .image-action-glass.image-action-compact { inset: 6px 6px auto auto; padding: 2px; border-radius: 999px; }
@@ -7299,17 +7230,13 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   z-index: 10005;
 }
 :is(.raynote-link-popover, .internal-note-picker) {
-  --link-glass: rgba(14, 17, 25, .52);
-  --link-sheen: rgba(220, 234, 255, .16);
   --link-edge: rgba(255, 255, 255, .26);
   --link-field: rgba(255, 255, 255, .07);
   --link-text: #f7f8fb;
   --link-muted: #d8e0ec;
   color: var(--link-text);
 }
-[data-theme="light"] :is(.raynote-link-popover, .internal-note-picker) {
-  --link-glass: rgba(250, 252, 255, .56);
-  --link-sheen: rgba(255, 255, 255, .28);
+:is([data-theme="light"], [data-resolved-theme="light"]) :is(.raynote-link-popover, .internal-note-picker) {
   --link-edge: rgba(65, 82, 105, .24);
   --link-field: rgba(58, 75, 99, .05);
   --link-text: #172233;
@@ -7318,11 +7245,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 .link-preview-glass, .link-editor-glass, .internal-note-picker {
   box-sizing: border-box;
   color: var(--link-text);
-  background: linear-gradient(155deg, var(--link-sheen), transparent 65%), var(--link-glass);
+  background: var(--steady-glass-surface);
   border: 1px solid var(--link-edge);
   box-shadow: 0 12px 36px rgba(0, 0, 0, .22), inset 0 1px 0 rgba(255, 255, 255, .32);
-  -webkit-backdrop-filter: blur(5px) saturate(155%);
-  backdrop-filter: blur(5px) saturate(155%);
 }
 .link-preview-glass { display: flex; align-items: center; gap: 8px; width: min(380px, calc(100vw - 24px)); padding: 6px; border-radius: 22px; }
 .link-preview-label { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; padding-left: 8px; font-size: 12px; }
@@ -7358,13 +7283,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 .link-editor-footer button[data-action="apply"] { background: var(--color-accent); color: white; }
 .link-editor-footer button[data-action="apply"]:hover { filter: brightness(1.1); }
 @media (prefers-reduced-transparency: reduce) {
-  .link-preview-glass, .link-editor-glass, .internal-note-picker { background: var(--surface-glass-elevated); -webkit-backdrop-filter: none; backdrop-filter: none; }
-}
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .link-preview-glass, .link-editor-glass, .internal-note-picker { background: var(--surface-glass-elevated); }
 }
-
-
 .internal-note-picker {
   display: flex;
   flex-direction: column;

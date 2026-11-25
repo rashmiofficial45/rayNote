@@ -75,7 +75,7 @@ import { broadcastSync } from "./settingsSync";
  * Applies the requested theme mode ('dark', 'light', 'system') to the document root element:
  * - Toggles `.dark` and `.light` CSS classes.
  * - Sets dataset attributes (`data-theme-mode`, `data-resolved-theme`).
- * - Updates synchronously so glass surfaces keep sampling the live backdrop.
+ * - Updates surface colors synchronously in the current window.
  */
 export function applyThemeMode(mode: ThemeMode): void {
   if (typeof window === "undefined") return;
@@ -209,6 +209,38 @@ export function setStoredTextOpacity(opacity: number): void {
   window.dispatchEvent(new CustomEvent("notefast_text_opacity_changed", { detail: { opacity: clamped } }));
 }
 
+const GLASS_CLARITY_KEY = "raynote_glass_clarity";
+let latestGlassChange = 0;
+
+export function getStoredGlassClarity(): number {
+  const value = Number(safeLocalStorageGetItem(GLASS_CLARITY_KEY));
+  return Number.isInteger(value) && value >= 0 && value <= 100 ? value : 0;
+}
+
+export function applyGlassClarity(value: number, changedAt?: number): void {
+  if (typeof window === "undefined" || !Number.isFinite(value)) return;
+  if (changedAt !== undefined) {
+    if (!Number.isFinite(changedAt) || changedAt <= latestGlassChange) return;
+    latestGlassChange = changedAt;
+  }
+  const clarity = Math.min(100, Math.max(0, Math.round(value)));
+  const root = document.documentElement;
+  if (root.dataset.glassClarity === String(clarity)) return;
+  root.dataset.glassClarity = String(clarity);
+  root.style.setProperty("--app-glass-clarity", `${clarity}%`);
+  window.dispatchEvent(new CustomEvent("raynote:glass-clarity", { detail: clarity }));
+}
+
+export function setStoredGlassClarity(value: number): void {
+  if (typeof window === "undefined" || !Number.isFinite(value)) return;
+  const clarity = Math.min(100, Math.max(0, Math.round(value)));
+  // The same update can arrive over both the native and webview buses.
+  const changedAt = Math.max(latestGlassChange + 0.001, performance.timeOrigin + performance.now());
+  applyGlassClarity(clarity, changedAt);
+  safeLocalStorageSetItem(GLASS_CLARITY_KEY, String(clarity));
+  broadcastSync({ type: "glass_clarity", value: clarity, changedAt });
+}
+
 /**
  * Initializes theme on application mount:
  * - Hydrates theme mode, accent color, typography, and text opacity settings from localStorage.
@@ -221,6 +253,7 @@ export function initTheme(): () => void {
   applyAccent(getStoredAccent());
   applyFont(getStoredFont());
   applyTextOpacity(getStoredTextOpacity());
+  applyGlassClarity(getStoredGlassClarity());
   try {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => { if (getStoredThemeMode() === "system") applyThemeMode("system"); };

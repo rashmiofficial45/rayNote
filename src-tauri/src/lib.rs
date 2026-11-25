@@ -9,12 +9,65 @@ use resource_usage::get_resource_sample;
 use database::Database;
 use commands::*;
 use tauri::Manager;
+
 #[cfg(target_os = "macos")]
 use tauri::Emitter;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 #[cfg(target_os = "macos")]
 use tauri_nspanel::{tauri_panel, WebviewWindowExt};
+
+#[cfg(target_os = "macos")]
+pub(crate) fn install_window_glass(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+    use objc2_app_kit::{
+        NSAutoresizingMaskOptions, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
+        NSVisualEffectState, NSVisualEffectView, NSWindow, NSWindowOrderingMode,
+    };
+    use tauri_nspanel::objc2_foundation::MainThreadMarker;
+
+    let window = window.clone();
+    let _ = window.clone().run_on_main_thread(move || {
+        let Some(mtm) = MainThreadMarker::new() else { return };
+        let Ok(ptr) = window.ns_window() else { return };
+        let Some(window) = (unsafe { ptr.cast::<NSWindow>().as_ref() }) else { return };
+        let Some(content) = window.contentView() else { return };
+
+        // NSGlassEffectView has no active-state override. Keep the behind-window
+        // material active, and blend in just enough blur to soften the live backdrop.
+        let backdrop = NSVisualEffectView::initWithFrame(mtm.alloc(), content.bounds());
+        backdrop.setMaterial(NSVisualEffectMaterial::WindowBackground);
+        backdrop.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
+        backdrop.setState(NSVisualEffectState::Active);
+        backdrop.setAlphaValue(0.22);
+        backdrop.setAutoresizingMask(
+            NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
+        );
+        backdrop.setWantsLayer(true);
+        unsafe {
+            let layer: *mut AnyObject = msg_send![&*backdrop, layer];
+            if let Some(layer) = layer.as_ref() {
+                let _: () = msg_send![layer, setCornerRadius: 28.0_f64];
+                let _: () = msg_send![layer, setMasksToBounds: true];
+            }
+        }
+        content.addSubview_positioned_relativeTo(&backdrop, NSWindowOrderingMode::Below, None::<&NSView>);
+    });
+}
+
+#[cfg(target_os = "macos")]
+unsafe fn focus_panel_content(panel: &objc2::runtime::AnyObject) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    let content: *mut AnyObject = msg_send![panel, contentView];
+    if !content.is_null() {
+        let subviews: *mut AnyObject = msg_send![content, subviews];
+        // The backdrop sits below the webview, so focus the frontmost subview.
+        let front: *mut AnyObject = msg_send![subviews, lastObject];
+        let target = if front.is_null() { content } else { front };
+        let _: bool = msg_send![panel, makeFirstResponder: target];
+    }
+}
 
 #[cfg(target_os = "macos")]
 tauri_panel! {
@@ -106,17 +159,7 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
 
         // Make the web view the first responder so typing reaches the editor
         if key_now {
-            let content_view: *mut AnyObject = msg_send![ns_win, contentView];
-            if !content_view.is_null() {
-                let subviews: *mut AnyObject = msg_send![content_view, subviews];
-                let count: usize = msg_send![subviews, count];
-                let target: *mut AnyObject = if count > 0 {
-                    msg_send![subviews, objectAtIndex: 0usize]
-                } else {
-                    content_view
-                };
-                let _: bool = msg_send![ns_win, makeFirstResponder: target];
-            }
+            focus_panel_content(ns_win);
         }
     }
 
@@ -350,17 +393,7 @@ fn setup_macos_panel(app: &tauri::App) {
         if let Some(ns_panel) = ns_window_ptr.as_ref() {
             let _: () = msg_send![ns_panel, orderFrontRegardless];
             let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
-            let content_view: *mut AnyObject = msg_send![ns_panel, contentView];
-            if !content_view.is_null() {
-                let subviews: *mut AnyObject = msg_send![content_view, subviews];
-                let count: usize = msg_send![subviews, count];
-                if count > 0 {
-                    let first_sub: *mut AnyObject = msg_send![subviews, objectAtIndex: 0usize];
-                    let _: () = msg_send![ns_panel, makeFirstResponder: first_sub];
-                } else {
-                    let _: () = msg_send![ns_panel, makeFirstResponder: content_view];
-                }
-            }
+            focus_panel_content(ns_panel);
         }
     }
 
@@ -473,17 +506,7 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
                         let _: () = msg_send![ns_panel, setFloatingPanel: is_always_on_top];
                         let _: () = msg_send![ns_panel, orderFrontRegardless];
                         let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
-                        let content_view: *mut AnyObject = msg_send![ns_panel, contentView];
-                        if !content_view.is_null() {
-                            let subviews: *mut AnyObject = msg_send![content_view, subviews];
-                            let count: usize = msg_send![subviews, count];
-                            if count > 0 {
-                                let first_sub: *mut AnyObject = msg_send![subviews, objectAtIndex: 0usize];
-                                let _: () = msg_send![ns_panel, makeFirstResponder: first_sub];
-                            } else {
-                                let _: () = msg_send![ns_panel, makeFirstResponder: content_view];
-                            }
-                        }
+                        focus_panel_content(ns_panel);
                     }
                 }
             }
@@ -658,6 +681,7 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 setup_macos_panel(app);
                 if let Some(window) = app.get_webview_window("main") {
+                    install_window_glass(&window);
                     watch_panel_leave(window);
                 }
                 start_hover_focus_watcher(app.handle().clone());

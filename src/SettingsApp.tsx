@@ -1,5 +1,6 @@
 import { ResourceUsage } from "./components/ResourceUsage";
 import { WebBrowserSetting } from "./components/WebBrowserSetting";
+import { GlassClaritySlider } from "./components/GlassClaritySlider";
 import { DEFAULT_ZOOM, readZoom, ZOOM_KEYS, ZOOM_MODE_KEY, type ZoomMode } from "./lib/zoom";
 import { safeLocalStorageGetItem, safeLocalStorageSetItem } from "./lib/storage";
 import { requestEditorFlush } from "./lib/editorFlush";
@@ -816,6 +817,10 @@ export default function SettingsApp() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="settings-card settings-glass-clarity">
+              <GlassClaritySlider />
             </div>
 
             <WebBrowserSetting />

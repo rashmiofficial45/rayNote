@@ -10,6 +10,7 @@ import { listenToSettingsSync } from '../../lib/settingsSync';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { getPreferredBrowser } from '../../lib/webBrowsers';
+import { getStoredGlassClarity } from '../../lib/theme';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ notes_count: 0, size_bytes: 0, db_path: '/tmp/disposable.db' }) }));
 vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn().mockResolvedValue(undefined), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onFocusChanged: vi.fn().mockResolvedValue(() => {}) }) }));
@@ -31,6 +32,26 @@ async function drawToolbar() {
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
 }
 describe('Cross-window preference controls', () => {
+  it('previews glass clarity immediately and ignores out-of-order updates from another window', async () => {
+    await act(async () => root.render(<SettingsApp />));
+    const picker = host.querySelector<HTMLInputElement>('.glass-clarity-slider')!;
+    expect(picker.value).toBe('0');
+    await act(async () => {
+      const setNativeValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setNativeValue.call(picker, '100');
+      picker.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(document.documentElement.style.getPropertyValue('--app-glass-clarity')).toBe('100%');
+    expect(getStoredGlassClarity()).toBe(100);
+
+    // The native bus can deliver an older value after the webview bus.
+    const changedAt = Date.now() + 10;
+    await deliver({ type: 'glass_clarity', value: 63, changedAt });
+    await deliver({ type: 'glass_clarity', value: 29, changedAt: changedAt - 1 });
+    expect(picker.value).toBe('63');
+    expect(document.documentElement.style.getPropertyValue('--app-glass-clarity')).toBe('63%');
+  });
+
   it('updates the browser picker when macOS reports added and removed browsers', async () => {
     const native = vi.mocked(invoke);
     const stockResponse = native.getMockImplementation()!;

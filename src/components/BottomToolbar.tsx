@@ -1,6 +1,7 @@
 import { listenToSettingsSync } from "../lib/settingsSync";
 import { getStoredCommandsConfig, useCommandsConfig, getCommandHotkey } from "../lib/commandsConfig";
 import { Editor, useEditorState } from "@tiptap/react";
+import { GlassClaritySlider } from "./GlassClaritySlider";
 import "@tiptap/extension-underline";
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import {
@@ -504,6 +505,7 @@ export function BottomToolbar({ editor }: BottomToolbarProps) {
                       ))}
                     </div>
                   )}
+                  <GlassClaritySlider />
                 </>
               )}
             </div>

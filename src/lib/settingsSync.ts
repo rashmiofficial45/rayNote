@@ -7,6 +7,7 @@ import {
   applyAccent,
   applyFont,
   applyTextOpacity,
+  applyGlassClarity,
 } from "./theme";
 
 export type SettingsSyncPayload =
@@ -14,6 +15,7 @@ export type SettingsSyncPayload =
   | { type: "accent"; value: AccentColor }
   | { type: "font"; value: string }
   | { type: "text_opacity"; value: number }
+  | { type: "glass_clarity"; value: number; changedAt: number }
   | { type: "zoom"; mode: ZoomMode; value: number }
   | { type: "zoom_mode"; value: ZoomMode }
   | { type: "esc_loses_focus"; value: boolean }
@@ -114,6 +116,9 @@ export function listenToSettingsSync(callbacks?: SettingsSyncCallbacks): () => v
       case "text_opacity":
         applyTextOpacity(payload.value);
         callbacks?.onTextOpacityChange?.(payload.value);
+        break;
+      case "glass_clarity":
+        applyGlassClarity(payload.value, payload.changedAt);
         break;
       case "zoom":
         if (isValidZoom(payload.value)) callbacks?.onZoomChange?.(payload.value, payload.mode);
