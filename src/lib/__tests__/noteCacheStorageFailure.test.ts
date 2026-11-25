@@ -18,6 +18,16 @@ describe('Cache eviction under storage failure', () => {
 });
 
 describe('Atomic recovery snapshots', () => {
+  it('recovers a 200,000-character pending draft until SQLite confirms the save', () => {
+    const cache = new NoteLRUCache();
+    const content = 'a'.repeat(200_000);
+    cache.persistActiveToLocalStorage('long', content, 'v1', true);
+    expect(new NoteLRUCache().get('long')).toMatchObject({ content, unsaved: true });
+    cache.persistActiveToLocalStorage('long', content, 'v2', false);
+    expect(new NoteLRUCache().get('long')).toBeUndefined();
+    expect(localStorage.getItem('notefast_active_note_id')).toBe('long');
+  });
+
   it('hydrates a coherent snapshot when a legacy content mirror write fails', () => {
     const cache = new NoteLRUCache();
     cache.persistActiveToLocalStorage('old', 'old content', 'old-version', false);

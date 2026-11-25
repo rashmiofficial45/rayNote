@@ -1,21 +1,25 @@
 import { useEffect, useRef } from "react";
 import { Trash2 } from "lucide-react";
 
-interface TrashConfirmationProps {
-  title: string;
-  permanent?: boolean;
+interface TrashConfirmationActions {
   busy?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-export function TrashConfirmation({ title, permanent = false, busy = false, onCancel, onConfirm }: TrashConfirmationProps) {
+type ConfirmNoteProps = TrashConfirmationActions & { title: string; permanent?: boolean };
+type TrashConfirmationProps = TrashConfirmationActions & (
+  | { title: string; permanent?: boolean; count?: never }
+  | { count: number; title?: never; permanent?: never }
+);
+
+export function TrashConfirmation({ title, count, permanent = false, busy = false, onCancel, onConfirm }: TrashConfirmationProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const label = permanent ? "Delete Permanently" : "Move to Trash";
+  const label = count !== undefined ? "Empty Trash" : permanent ? "Delete Permanently" : "Move to Trash";
 
   useEffect(() => {
-    cancelRef.current?.focus();
-  }, []);
+    if (!busy) cancelRef.current?.focus();
+  }, [busy]);
 
   return (
     <>
@@ -24,14 +28,16 @@ export function TrashConfirmation({ title, permanent = false, busy = false, onCa
       </header>
       <div className="trash-confirmation">
         <p id="trash-confirm-description">
-          {permanent
+          {count !== undefined
+            ? <>Permanently delete <strong>{count} {count === 1 ? "note" : "notes"}</strong> from Trash? This can’t be undone.</>
+            : permanent
             ? <>Permanently delete <strong>{title}</strong>? This can’t be undone.</>
             : <>Move <strong>{title}</strong> to Trash? You can restore it later.</>}
         </p>
         <div className="trash-actions">
           <button ref={cancelRef} type="button" disabled={busy} onClick={onCancel}>Cancel</button>
           <button type="button" disabled={busy}
-            className={`trash-destructive${permanent ? "" : " move-trash-confirm"}`}
+            className={`trash-destructive${permanent || count !== undefined ? "" : " move-trash-confirm"}`}
             onClick={onConfirm}>{label}</button>
         </div>
       </div>
@@ -39,7 +45,7 @@ export function TrashConfirmation({ title, permanent = false, busy = false, onCa
   );
 }
 
-export function MoveToTrashDialog(props: TrashConfirmationProps) {
+export function MoveToTrashDialog(props: ConfirmNoteProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {

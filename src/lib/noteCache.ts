@@ -11,7 +11,7 @@
  * - Recency-Preserving: Every `get()` promotes the entry to the front of the LRU queue.
  */
 
-import { safeLocalStorageSetItem, clearActiveNoteSnapshot, readActiveNoteSnapshot, writeActiveNoteSnapshot } from "./storage";
+import { FAST_BOOT_CONTENT_LIMIT, safeLocalStorageSetItem, clearActiveNoteSnapshot, readActiveNoteSnapshot, writeActiveNoteSnapshot } from "./storage";
 
 export interface CachedNote {
   id: string;
@@ -69,7 +69,7 @@ export class NoteLRUCache {
     // A target selection must never replace the outgoing document's pending recovery.
     const previous = readActiveNoteSnapshot();
     if (previous?.unsaved && previous.id !== id) return;
-    if (content && content.length <= 65536) {
+    if (unsaved || (content && content.length <= FAST_BOOT_CONTENT_LIMIT)) {
       writeActiveNoteSnapshot({ id, content, baseUpdatedAt: baseUpdatedAt || "", unsaved });
     } else {
       clearActiveNoteSnapshot();

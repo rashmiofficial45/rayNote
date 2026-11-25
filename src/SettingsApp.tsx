@@ -19,14 +19,14 @@ import {
   Check,
   FolderOpen,
   FileDown,
+  FileText,
   Trash2,
-  Moon,
-  Sun,
-  Monitor,
   Sparkles,
   Search,
   X,
   Command,
+  Bold,
+  Pencil,
 } from "lucide-react";
 import {
   ThemeMode,
@@ -73,13 +73,43 @@ import {
 } from "./lib/commandsConfig";
 
 const SETTINGS_PANES = {
-  general: { label: "General", icon: Sliders },
-  commands: { label: "Commands", icon: Keyboard },
-  storage: { label: "Storage", icon: Database },
-  about: { label: "About", icon: Info },
+  general: { label: "General", icon: Sliders, tone: "bg-slate-500" },
+  commands: { label: "Commands", icon: Keyboard, tone: "bg-indigo-600" },
+  storage: { label: "Storage", icon: Database, tone: "bg-teal-700" },
+  about: { label: "About", icon: Info, tone: "bg-blue-600" },
 } as const;
 
 type SettingsPane = keyof typeof SETTINGS_PANES;
+
+const APPEARANCE_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+] as const;
+
+function AppearancePreview({ mode }: { mode: ThemeMode }) {
+  return (
+    <span className="settings-theme-preview relative block w-full overflow-hidden rounded-lg aspect-[1.8] border border-black/15" aria-hidden="true">
+      {mode !== "dark" && <span className="settings-theme-sketch settings-theme-sketch-light" />}
+      {mode !== "light" && (
+        <span className={`settings-theme-sketch settings-theme-sketch-dark ${mode === "system" ? "[clip-path:inset(0_0_0_50%)]" : ""}`} />
+      )}
+    </span>
+  );
+}
+
+const databaseSizeFormatter = new Intl.NumberFormat(undefined, {
+  style: "unit",
+  unit: "megabyte",
+  maximumFractionDigits: 1,
+});
+
+const COMMAND_SECTIONS = [
+  { title: "Application & Window Commands", category: "commands", icon: Command },
+  { title: "Text Formatting", category: "formatting", icon: Bold },
+  { title: "Document Editing", category: "editing", icon: Pencil },
+  { title: "Extensions & Features", category: "extensions", icon: Sparkles },
+] as const;
 
 const ALIAS_ID_MAP: Record<string, string> = {
   create: "new-note",
@@ -563,6 +593,18 @@ export default function SettingsApp() {
     }
   };
 
+  const query = aliasSearch.trim().toLowerCase();
+  const commandSections = activePane === "commands" ? COMMAND_SECTIONS.map((section) => ({
+    ...section,
+    matches: commands.filter((command) => {
+      if (command.category !== section.category) return false;
+      const altId = ALIAS_ID_MAP[command.id];
+      const alias = aliases[command.id] || (altId ? aliases[altId] : "") || "";
+      return !query || [command.title, command.hotkey, alias, section.title]
+        .some((value) => value.toLowerCase().includes(query));
+    }),
+  })).filter((section) => section.matches.length > 0) : [];
+
   return (
     <div className="settings-window-root">
       <header ref={headerRef} className="settings-header-bar" data-tauri-drag-region>
@@ -574,16 +616,21 @@ export default function SettingsApp() {
             title="Close Settings (⌘W)"
             aria-label="Close Settings"
           >
-            <X size={11} strokeWidth={2.8} aria-hidden="true" />
+            <span className="settings-close-dot"><X size={11} strokeWidth={2.8} aria-hidden="true" /></span>
           </button>
-          <span data-tauri-drag-region>Settings</span>
+          <span className="flex min-w-0 items-center gap-1.5" data-tauri-drag-region>
+            <img src="/app-icon.png" className="size-6 shrink-0 pointer-events-none" alt="" />
+            <span data-tauri-drag-region>rayNote</span>
+          </span>
         </div>
-        <h1 id="settings-pane-title" data-tauri-drag-region>{SETTINGS_PANES[activePane].label}</h1>
+        <div className="settings-pane-heading" data-tauri-drag-region>
+          <h1 id="settings-pane-title" data-tauri-drag-region>{SETTINGS_PANES[activePane].label}</h1>
+        </div>
       </header>
 
       <nav className="settings-sidebar" aria-label="Settings sections">
         {(Object.keys(SETTINGS_PANES) as SettingsPane[]).map(pane => {
-          const { label, icon: Icon } = SETTINGS_PANES[pane];
+          const { label, icon: Icon, tone } = SETTINGS_PANES[pane];
           return (
             <button
               key={pane}
@@ -592,7 +639,7 @@ export default function SettingsApp() {
               aria-current={activePane === pane ? "page" : undefined}
               onClick={() => handlePaneChange(pane)}
             >
-              <span className="settings-sidebar-icon"><Icon size={17} strokeWidth={2.6} aria-hidden="true" /></span>
+              <span className={`settings-sidebar-icon ${tone}`}><Icon size={13} strokeWidth={2.35} aria-hidden="true" /></span>
               {label}
             </button>
           );
@@ -601,7 +648,7 @@ export default function SettingsApp() {
 
       <main ref={contentRef} className="settings-body-content" aria-labelledby="settings-pane-title">
         {actionMessage && (
-          <div className="settings-action-banner">
+          <div className="settings-action-banner" role="status">
             <span>{actionMessage}</span>
           </div>
         )}
@@ -609,42 +656,26 @@ export default function SettingsApp() {
         {/* ─── PANE 1: GENERAL ─── */}
         {activePane === "general" && (
           <div className="settings-pane-content">
-            {/* Appearance Card */}
+            <h2 className="settings-section-title">Appearance</h2>
             <div className="settings-card">
-              {/* Appearance Mode */}
-              <div className="settings-row">
+              <div className="settings-row settings-appearance-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Appearance</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Choose between Dark, Light, or automatic macOS system appearance.
-                  </div>
+                  <div className="settings-row-title" id="settings-color-mode">Color Mode</div>
                 </div>
-                <div className="settings-row-action">
-                  <div className="settings-segmented-group">
-                    <button
-                      type="button"
-                      className={`settings-seg-btn ${themeMode === "dark" ? "is-active" : ""}`}
-                      onClick={() => handleThemeModeChange("dark")}
-                    >
-                      <Moon size={12} />
-                      <span>Dark</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`settings-seg-btn ${themeMode === "light" ? "is-active" : ""}`}
-                      onClick={() => handleThemeModeChange("light")}
-                    >
-                      <Sun size={12} />
-                      <span>Light</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`settings-seg-btn ${themeMode === "system" ? "is-active" : ""}`}
-                      onClick={() => handleThemeModeChange("system")}
-                    >
-                      <Monitor size={12} />
-                      <span>System</span>
-                    </button>
+                <div className="settings-row-action w-full">
+                  <div className="grid w-full max-w-[26rem] grid-cols-3 gap-3" role="group" aria-labelledby="settings-color-mode">
+                    {APPEARANCE_OPTIONS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={themeMode === value}
+                        className="settings-theme-choice group flex min-w-0 flex-col items-center gap-1.5 rounded-lg text-xs font-medium"
+                        onClick={() => handleThemeModeChange(value)}
+                      >
+                        <AppearancePreview mode={value} />
+                        <span>{label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -654,8 +685,8 @@ export default function SettingsApp() {
               {/* Accent Palette (6 Liquid Glass Themes) */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Accent Theme</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                  <div className="settings-row-title">Accent Theme</div>
+                  <div className="settings-row-desc">
                     Choose the accent color for rayNote controls.
                   </div>
                 </div>
@@ -668,6 +699,7 @@ export default function SettingsApp() {
                         className={`settings-accent-dot-btn ${accent === opt.id ? "is-selected" : ""}`}
                         onClick={() => handleAccentChange(opt.id)}
                         title={opt.name}
+                        aria-pressed={accent === opt.id}
                       >
                         <span
                           className="settings-accent-dot"
@@ -685,14 +717,15 @@ export default function SettingsApp() {
               {/* Font Family Selection */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Editor Typography</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Select your preferred writing font with full Apple Color Emoji fallback.
+                  <div className="settings-row-title">Editor Typography</div>
+                  <div className="settings-row-desc">
+                    Choose the font used in notes.
                   </div>
                 </div>
                 <div className="settings-row-action">
                   <select
                     className="settings-select-input"
+                    aria-label="Editor Typography"
                     value={fontFamily}
                     onChange={(e) => handleFontChange(e.target.value)}
                   >
@@ -710,9 +743,9 @@ export default function SettingsApp() {
               {/* Text Opacity Slider */}
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Text Opacity</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Reduce eye strain by softening text contrast across the app.
+                  <div className="settings-row-title">Text Opacity</div>
+                  <div className="settings-row-desc">
+                    Adjust how strongly note text stands out.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -744,56 +777,11 @@ export default function SettingsApp() {
               </div>
             </div>
 
-            <div className="settings-card settings-glass-clarity">
-              <GlassClaritySlider label="Note Window Liquid Glass" description="Adjusts the transparency of the note window." />
-            </div>
-
-            <WebBrowserSetting />
-
-            {/* Window & Zoom Card (Raycast Style) */}
+            <h2 className="settings-section-title">Note Window</h2>
             <div className="settings-card">
-              {/* Show Menu Bar Icon */}
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Show Menu Bar Icon</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Display the rayNote icon in the macOS menu bar for quick notes, settings, and options.
-                  </div>
-                </div>
-                <div className="settings-row-action">
-                  <label className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={showMenuBar}
-                      onChange={handleToggleMenuBar}
-                    />
-                    <span className="settings-slider" />
-                  </label>
-                </div>
+              <div className="settings-glass-clarity">
+                <GlassClaritySlider label="Note Window Liquid Glass" description="Adjusts the transparency of the note window." />
               </div>
-
-              <div className="settings-card-divider" />
-
-              {/* Escape Key Loses Focus */}
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Escape Key Loses Focus</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    When enabled, pressing Escape in Notes makes the window lose focus instead of hiding.
-                  </div>
-                </div>
-                <div className="settings-row-action">
-                  <label className="settings-switch">
-                    <input
-                      type="checkbox"
-                      checked={escLosesFocus}
-                      onChange={handleToggleEscLosesFocus}
-                    />
-                    <span className="settings-slider" />
-                  </label>
-                </div>
-              </div>
-
               {(["windowed", "fullscreen"] as const).map((mode) => {
                 const title = mode === "fullscreen" ? "Full Screen Zoom" : "Windowed Zoom";
                 const level = zoomLevels[mode];
@@ -803,10 +791,10 @@ export default function SettingsApp() {
                     <div className="settings-card-divider" />
                     <div className="settings-row">
                       <div className="settings-row-text">
-                        <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]" id={`zoom-${mode}`}>
+                        <div className="settings-row-title" id={`zoom-${mode}`}>
                           {title}
                         </div>
-                        <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                        <div className="settings-row-desc">
                           {mode === "fullscreen" ? "Adjust note zoom in full screen." : "Adjust note zoom in a regular window."}
                         </div>
                       </div>
@@ -848,6 +836,54 @@ export default function SettingsApp() {
                 );
               })}
             </div>
+
+            <h2 className="settings-section-title">Behavior</h2>
+            <div className="settings-card">
+              {/* Show Menu Bar Icon */}
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <div className="settings-row-title">Show Menu Bar Icon</div>
+                  <div className="settings-row-desc">
+                    Display the rayNote icon in the macOS menu bar for quick notes, settings, and options.
+                  </div>
+                </div>
+                <div className="settings-row-action">
+                  <label className="settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={showMenuBar}
+                      aria-label="Show Menu Bar Icon"
+                      onChange={handleToggleMenuBar}
+                    />
+                    <span className="settings-slider" />
+                  </label>
+                </div>
+              </div>
+
+              <div className="settings-card-divider" />
+
+              {/* Escape Key Loses Focus */}
+              <div className="settings-row">
+                <div className="settings-row-text">
+                  <div className="settings-row-title">Escape Key Loses Focus</div>
+                  <div className="settings-row-desc">
+                    When enabled, pressing Escape in Notes makes the window lose focus instead of hiding.
+                  </div>
+                </div>
+                <div className="settings-row-action">
+                  <label className="settings-switch">
+                    <input
+                      type="checkbox"
+                      checked={escLosesFocus}
+                      aria-label="Escape Key Loses Focus"
+                      onChange={handleToggleEscLosesFocus}
+                    />
+                    <span className="settings-slider" />
+                  </label>
+                </div>
+              </div>
+            </div>
+            <WebBrowserSetting />
           </div>
         )}
 
@@ -860,6 +896,7 @@ export default function SettingsApp() {
                 <input
                   type="text"
                   placeholder="Filter commands, aliases, or shortcuts…"
+                  aria-label="Filter commands, aliases, or shortcuts"
                   value={aliasSearch}
                   onChange={(e) => setAliasSearch(e.target.value)}
                   className="settings-aliases-search-input"
@@ -892,193 +929,181 @@ export default function SettingsApp() {
             <div className="settings-aliases-hint-bar">
               <Command size={12} className="settings-aliases-hint-icon" />
               <span>
-                Click <strong>Alias</strong> or <strong>Add Hotkey</strong> to customize. Use the checkbox on the right to toggle shortcuts on or off.
+                Select an alias or shortcut to edit it. The checkmark turns a shortcut on or off.
               </span>
             </div>
 
-            {[
-              { title: "Application & Window Commands", category: "commands" as const, symbol: "⌘", iconBg: "linear-gradient(145deg, #0284c7, #0369a1)" },
-              { title: "Text Formatting", category: "formatting" as const, symbol: "B", iconBg: "linear-gradient(145deg, #e11d48, #be123c)" },
-              { title: "Document Editing", category: "editing" as const, symbol: "E", iconBg: "linear-gradient(145deg, #059669, #047857)" },
-              { title: "Extensions & Features", category: "extensions" as const, symbol: "✨", iconBg: "linear-gradient(145deg, #7c3aed, #6d28d9)" },
-            ].map(({ title, category, symbol, iconBg }, secIdx) => {
-              const filtered = commands.filter((cmd) => {
-                if (cmd.category !== category) return false;
-                const q = aliasSearch.trim().toLowerCase();
-                if (!q) return true;
-                const altId = ALIAS_ID_MAP[cmd.id];
-                const cmdAlias = aliases[cmd.id] || (altId ? aliases[altId] : "") || "";
-                return (
-                  cmd.title.toLowerCase().includes(q) ||
-                  cmd.hotkey.toLowerCase().includes(q) ||
-                  cmdAlias.toLowerCase().includes(q) ||
-                  title.toLowerCase().includes(q)
-                );
-              });
+            {commandSections.length === 0 && (
+              <div className="settings-card settings-empty" role="status">
+                <Search size={21} aria-hidden="true" />
+                <h2>No matching commands</h2>
+                <p>Try a command name, alias, or shortcut.</p>
+                <button type="button" className="settings-action-btn" onClick={() => setAliasSearch("")}>Clear Filter</button>
+              </div>
+            )}
+            {commandSections.map(({ title, category, icon: Icon, matches }) => (
+              <section key={category} className="settings-command-section" aria-labelledby={`commands-${category}`}>
+                <h2 className="settings-section-title" id={`commands-${category}`}>{title}</h2>
+                <div className="settings-card commands-table-card">
+                  {matches.map((cmd, idx, arr) => {
+                    const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
+                    const isCustomHotkey = cmd.hotkey !== defaultHotkey;
+                    const isRecording = recordingCommandId === cmd.id;
+                    const altId = ALIAS_ID_MAP[cmd.id];
+                    const currentAlias = aliases[cmd.id] || (altId ? aliases[altId] : "") || "";
+                    const isEditingAlias = editingAliasId === cmd.id;
 
-              if (filtered.length === 0) return null;
+                    return (
+                      <React.Fragment key={cmd.id}>
+                        <div className={`settings-command-row ${!cmd.enabled ? "is-disabled" : ""}`}>
+                          {/* 1. Left: Icon + Command Title */}
+                          <div className="settings-cmd-left min-w-0 flex-1">
+                            <span className="settings-cmd-icon"><Icon size={14} aria-hidden="true" /></span>
+                            <span className="settings-cmd-title">{cmd.title}</span>
+                          </div>
 
-              return (
-                <div key={category} className="settings-command-section" style={{ marginTop: secIdx === 0 ? 0 : 20 }}>
-                  <div className="settings-section-header" style={{ marginBottom: 8 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {title}
-                    </h3>
-                  </div>
-                  <div className="settings-card commands-table-card">
-                    {filtered.map((cmd, idx, arr) => {
-                      const defaultHotkey = DEFAULT_COMMANDS.find((d) => d.id === cmd.id)?.hotkey || "";
-                      const isCustomHotkey = cmd.hotkey !== defaultHotkey;
-                      const isRecording = recordingCommandId === cmd.id;
-                      const altId = ALIAS_ID_MAP[cmd.id];
-                      const currentAlias = aliases[cmd.id] || (altId ? aliases[altId] : "") || "";
-                      const isEditingAlias = editingAliasId === cmd.id;
-
-                      return (
-                        <React.Fragment key={cmd.id}>
-                          <div className={`settings-command-row ${!cmd.enabled ? "is-disabled" : ""}`}>
-                            {/* 1. Left: Icon + Command Title */}
-                            <div className="settings-cmd-left min-w-0 flex-1">
-                              <div className="settings-cmd-icon" style={{ background: iconBg }}>
-                                {category === "extensions" ? (
-                                  <Sparkles size={12} />
-                                ) : (
-                                  <span className="settings-cmd-icon-symbol">{symbol}</span>
-                                )}
-                              </div>
-                              <span className="settings-cmd-title truncate">{cmd.title}</span>
-                            </div>
-
-                            {/* 2. Right: Alias + Hotkey + Checkbox */}
-                            <div className="settings-cmd-right flex-shrink-0">
-                              {/* Alias Column */}
-                              <div className="settings-cmd-col-alias">
-                                {isEditingAlias ? (
-                                  <div className="settings-alias-inline-editor">
-                                    <input
-                                      ref={aliasInputRef}
-                                      type="text"
-                                      value={editingAliasValue}
-                                      onChange={(e) => setEditingAliasValue(e.target.value)}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Enter") {
-                                          e.preventDefault();
-                                          handleSaveAlias(cmd.id, editingAliasValue);
-                                        } else if (e.key === "Escape") {
-                                          e.preventDefault();
-                                          setEditingAliasId(null);
-                                        }
-                                      }}
-                                      onBlur={() => handleSaveAlias(cmd.id, editingAliasValue)}
-                                      placeholder="alias…"
-                                      className="settings-alias-input"
-                                      spellCheck={false}
-                                      autoComplete="off"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="settings-alias-display-group">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleStartEditAlias(cmd.id)}
-                                      className={`settings-alias-cell-btn ${currentAlias ? "has-alias" : "is-empty"}`}
-                                      title={currentAlias ? `Alias: ${currentAlias} (click to edit)` : "Click to set alias"}
-                                    >
-                                      {currentAlias ? (
-                                        <span className="settings-alias-cell-val">{currentAlias}</span>
-                                      ) : (
-                                        <span className="settings-alias-cell-placeholder">Alias</span>
-                                      )}
-                                    </button>
-                                    {currentAlias && (
-                                      <button
-                                        type="button"
-                                        className="settings-alias-clear-btn"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleClearAlias(cmd.id);
-                                        }}
-                                        title="Remove alias"
-                                      >
-                                        <X size={10} />
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Hotkey Column */}
-                              <div className="settings-cmd-col-hotkey">
-                                <div className="settings-cmd-kbd-wrapper">
+                          {/* 2. Right: Alias + Hotkey + Checkbox */}
+                          <div className="settings-cmd-right flex-shrink-0">
+                            {/* Alias Column */}
+                            <div className="settings-cmd-col-alias">
+                              {isEditingAlias ? (
+                                <div className="settings-alias-inline-editor">
+                                  <input
+                                    ref={aliasInputRef}
+                                    type="text"
+                                    value={editingAliasValue}
+                                    onChange={(e) => setEditingAliasValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleSaveAlias(cmd.id, editingAliasValue);
+                                      } else if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        setEditingAliasId(null);
+                                      }
+                                    }}
+                                    onBlur={() => handleSaveAlias(cmd.id, editingAliasValue)}
+                                    placeholder="alias…"
+                                    className="settings-alias-input"
+                                    spellCheck={false}
+                                    autoComplete="off"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="settings-alias-display-group">
                                   <button
                                     type="button"
-                                    className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""} ${!cmd.hotkey ? "is-empty" : ""}`}
-                                    onClick={() => startRecording(cmd.id)}
-                                    onDoubleClick={(e) => {
-                                      e.stopPropagation();
-                                      startRecording(cmd.id);
-                                    }}
-                                    title={cmd.hotkey ? "Click or double-click to record shortcut" : "Click to add shortcut"}
+                                    onClick={() => handleStartEditAlias(cmd.id)}
+                                    className={`settings-alias-cell-btn ${currentAlias ? "has-alias" : "is-empty"}`}
+                                    title={currentAlias ? `Alias: ${currentAlias} (click to edit)` : "Click to set alias"}
                                   >
-                                    {isRecording ? (
-                                      <span className="flex items-center gap-1.5">
-                                        <span className="recording-pulse-dot" />
-                                        <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
-                                      </span>
-                                    ) : cmd.hotkey ? (
-                                      cmd.hotkey
+                                    {currentAlias ? (
+                                      <span className="settings-alias-cell-val">{currentAlias}</span>
                                     ) : (
-                                      <span className="settings-cmd-hotkey-placeholder">Add Hotkey</span>
+                                      <span className="settings-alias-cell-placeholder">Alias</span>
                                     )}
                                   </button>
-                                  {isCustomHotkey && !isRecording && (
+                                  {currentAlias && (
                                     <button
                                       type="button"
-                                      className="settings-cmd-reset-btn"
+                                      className="settings-alias-clear-btn"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        handleResetHotkey(cmd.id);
+                                        handleClearAlias(cmd.id);
                                       }}
-                                      title="Reset to default shortcut"
+                                      title="Remove alias"
                                     >
-                                      <RotateCcw size={11} />
+                                      <X size={10} />
                                     </button>
                                   )}
                                 </div>
-                              </div>
-
-                              {/* Checkbox Column */}
-                              <button
-                                type="button"
-                                className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
-                                onClick={() => handleToggleCommand(cmd.id)}
-                                aria-label={`Toggle ${cmd.title}`}
-                                title={cmd.enabled ? "Shortcut enabled (click to turn off)" : "Shortcut disabled (click to turn on)"}
-                              >
-                                {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
-                              </button>
+                              )}
                             </div>
+
+                            {/* Hotkey Column */}
+                            <div className="settings-cmd-col-hotkey">
+                              <div className="settings-cmd-kbd-wrapper">
+                                <button
+                                  type="button"
+                                  className={`settings-cmd-kbd ${isRecording ? "is-recording" : ""} ${!cmd.hotkey ? "is-empty" : ""}`}
+                                  onClick={() => startRecording(cmd.id)}
+                                  onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    startRecording(cmd.id);
+                                  }}
+                                  title={cmd.hotkey ? "Click or double-click to record shortcut" : "Click to add shortcut"}
+                                >
+                                  {isRecording ? (
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="recording-pulse-dot" />
+                                      <span>{recordedModifiers ? `${recordedModifiers}…` : "Press keys…"}</span>
+                                    </span>
+                                  ) : cmd.hotkey ? (
+                                    cmd.hotkey
+                                  ) : (
+                                    <span className="settings-cmd-hotkey-placeholder">Add Hotkey</span>
+                                  )}
+                                </button>
+                                {isCustomHotkey && !isRecording && (
+                                  <button
+                                    type="button"
+                                    className="settings-cmd-reset-btn"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleResetHotkey(cmd.id);
+                                    }}
+                                    title="Reset to default shortcut"
+                                  >
+                                    <RotateCcw size={11} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Checkbox Column */}
+                            <button
+                              type="button"
+                              className={`settings-cmd-checkbox ${cmd.enabled ? "is-checked" : ""}`}
+                              onClick={() => handleToggleCommand(cmd.id)}
+                              aria-label={`Toggle ${cmd.title}`}
+                              aria-pressed={cmd.enabled}
+                              title={cmd.enabled ? "Shortcut enabled (click to turn off)" : "Shortcut disabled (click to turn on)"}
+                            >
+                              {cmd.enabled && <Check size={12} strokeWidth={2.5} />}
+                            </button>
                           </div>
-                          {idx < arr.length - 1 && <div className="settings-card-divider" />}
-                        </React.Fragment>
-                      );
-                    })}
-                  </div>
+                        </div>
+                        {idx < arr.length - 1 && <div className="settings-card-divider" />}
+                      </React.Fragment>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </section>
+            ))}
           </div>
         )}
 
-        {/* ─── PANE 4: STORAGE & DATA ─── */}
+        {/* Storage */}
         {activePane === "storage" && (
           <div className="settings-pane-content">
+            <h2 className="settings-section-title">On This Mac</h2>
+            <dl className="settings-card settings-storage-stats">
+              <div>
+                <dt><FileText size={15} aria-hidden="true" />Total Notes</dt>
+                <dd>{storageStats?.notes_count.toLocaleString() ?? "—"}</dd>
+              </div>
+              <div>
+                <dt><Database size={15} aria-hidden="true" />Database Size</dt>
+                <dd>{storageStats ? databaseSizeFormatter.format(storageStats.size_bytes / 1_000_000) : "—"}</dd>
+              </div>
+            </dl>
+            <h2 className="settings-section-title">Files & Export</h2>
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">SQLite Database Storage</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    All notes are stored strictly locally in high-performance SQLite WAL mode.
+                  <div className="settings-row-title">SQLite Database Storage</div>
+                  <div className="settings-row-desc">
+                    Reveal the folder that holds your local rayNote database.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -1097,23 +1122,9 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Total Notes</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">Active notes currently stored.</div>
-                </div>
-                <div className="settings-row-action">
-                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">
-                    {storageStats ? `${storageStats.notes_count} notes` : "Loading..."}
-                  </span>
-                </div>
-              </div>
-
-              <div className="settings-card-divider" />
-
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Export All Notes</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Download every note as a clean GitHub-Flavored Markdown (.md) file.
+                  <div className="settings-row-title">Export All Notes</div>
+                  <div className="settings-row-desc">
+                    Save each note as a Markdown (.md) file.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -1129,12 +1140,12 @@ export default function SettingsApp() {
               </div>
             </div>
 
-            {/* Danger Zone */}
+            <h2 className="settings-section-title">Manage Notes</h2>
             <div className="settings-card danger-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title danger-title text-[13.5px] [font-weight:600]">Danger Zone</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
+                  <div className="settings-row-title danger-title">Danger Zone</div>
+                  <div className="settings-row-desc">
                     Move all notes to Trash. You can restore them from Actions → Open Trash.
                   </div>
                 </div>
@@ -1188,20 +1199,20 @@ export default function SettingsApp() {
         {activePane === "about" && (
           <div className="settings-pane-content">
             <div className="settings-card settings-about">
-              <img src="/app-icon.png" alt="" width={44} height={44} />
+              <img src="/app-icon.png" alt="" width={76} height={76} />
               <div>
                 <h2>rayNote</h2>
-                <p>Version 0.1.0 · macOS Apple Silicon (Universal)</p>
+                <p>Version 0.1.0</p>
+                <p className="settings-about-platform">macOS Apple Silicon (Universal)</p>
               </div>
             </div>
             <ResourceUsage />
             <div className="settings-card">
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Architecture</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Ultra-lightweight: 1 primary NSPanel WebView during normal editing.
-                    Settings runs on a standard macOS NSWindow on demand and destroys cleanly on close.
+                  <div className="settings-row-title">Architecture</div>
+                  <div className="settings-row-desc">
+                    Notes are stored locally in SQLite. The note editor and Settings run in separate macOS windows.
                   </div>
                 </div>
               </div>
@@ -1210,9 +1221,9 @@ export default function SettingsApp() {
 
               <div className="settings-row">
                 <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Tech Stack</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Tauri 2 • Rust • SQLite (WAL mode) • React 19 • TipTap Editor • Liquid Glass Design
+                  <div className="settings-row-title">Tech Stack</div>
+                  <div className="settings-row-desc">
+                    Tauri 2, Rust, SQLite, React 19, and TipTap
                   </div>
                 </div>
               </div>

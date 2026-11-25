@@ -103,16 +103,64 @@ export function mountMermaidPreview(container: HTMLElement, source: string): () 
     }
   };
 
+  // Start uncached layout shortly before the diagram enters view. Once drawn,
+  // its DOM and dimensions survive scrolling in either direction.
+  let started = false;
+  const start = () => {
+    if (started) return;
+    started = true;
+    void render();
+  };
   let dark = document.documentElement.dataset.resolvedTheme === "dark";
   const theme = new MutationObserver(() => {
     const nextDark = document.documentElement.dataset.resolvedTheme === "dark";
     if (nextDark === dark) return;
     dark = nextDark;
-    void render();
+    if (started) void render();
   });
   theme.observe(document.documentElement, { attributeFilter: ["data-resolved-theme"] });
-  void render();
+  const cached = renderedDiagrams.has((dark ? "dark:" : "light:") + source);
+  let proximity: IntersectionObserver | undefined;
+  let pendingStart: ReturnType<typeof setTimeout> | undefined;
+  let scrollRoot: Element | Document | undefined;
+  const stopWaiting = () => {
+    clearTimeout(pendingStart);
+    scrollRoot?.removeEventListener("scroll", scheduleStart);
+  };
+  function scheduleStart() {
+    clearTimeout(pendingStart);
+    pendingStart = setTimeout(() => {
+      stopWaiting();
+      proximity?.disconnect();
+      start();
+    }, 140);
+  }
+  if (cached || typeof IntersectionObserver === "undefined") {
+    start();
+  } else {
+    status.textContent = "Rendering diagram…";
+    // ProseMirror constructs node views while detached. Resolve the scrolling
+    // viewport after it has inserted the preview into the editor.
+    queueMicrotask(() => {
+      if (started) return;
+      const root = container.closest("[data-scroll-container]");
+      scrollRoot = root ?? document;
+      proximity = new IntersectionObserver(entries => {
+        stopWaiting();
+        if (entries[entries.length - 1]?.isIntersecting) {
+          // A tall diagram can stay inside the prefetch area for a whole swipe.
+          // Start layout after the viewport settles, even in that case.
+          scrollRoot?.addEventListener("scroll", scheduleStart, { passive: true });
+          scheduleStart();
+        }
+      }, { root, rootMargin: "1000px 0px" });
+      proximity.observe(container);
+    });
+  }
   return () => {
+    started = true;
+    stopWaiting();
+    proximity?.disconnect();
     revision++;
     releaseRender?.();
     releaseRender = undefined;

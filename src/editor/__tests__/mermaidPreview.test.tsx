@@ -126,6 +126,51 @@ describe("Mermaid fences", () => {
     }
   });
 
+  it("defers distant diagrams and keeps the rendered image when it leaves view", async () => {
+    const callbacks: IntersectionObserverCallback[] = [];
+    const disconnect = vi.fn();
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: IntersectionObserverCallback) { callbacks.push(callback); }
+      observe() {}
+      disconnect = disconnect;
+    });
+    const host = document.createElement("div");
+    const code = "flowchart LR\nNear --> Visible";
+    const close = mountMermaidPreview(host, code);
+    try {
+      await Promise.resolve();
+      const notify = (isIntersecting: boolean) => callbacks[0](
+        [{ isIntersecting } as IntersectionObserverEntry], {} as IntersectionObserver,
+      );
+      notify(false);
+      expect(host.querySelector('[role="img"]')).toBeNull();
+      expect(vi.mocked(mermaid.render).mock.calls.some(([, source]) => source === code)).toBe(false);
+      vi.useFakeTimers();
+      try {
+        notify(true);
+        for (let i = 0; i < 4; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+          document.dispatchEvent(new Event("scroll"));
+        }
+        expect(vi.mocked(mermaid.render).mock.calls.some(([, source]) => source === code)).toBe(false);
+        notify(false);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(vi.mocked(mermaid.render).mock.calls.some(([, source]) => source === code)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
+      notify(true);
+      await vi.waitFor(() => expect(host.querySelector('[role="img"]')).not.toBeNull());
+      const image = host.firstElementChild;
+      notify(false);
+      expect(host.firstElementChild).toBe(image);
+      expect(disconnect).toHaveBeenCalled();
+    } finally {
+      close();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("shares layout work between duplicate diagrams and reuses the completed result on reopen", async () => {
     const first = document.createElement("div");
     const second = document.createElement("div");

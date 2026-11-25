@@ -2049,3 +2049,51 @@ fn audit_fix_cyrillic_exact_title_ranks_before_prefix_at_limit_one() {
     assert_eq!(results[0].id, "exact");
     assert_eq!(results[0].match_type, "exact_title");
 }
+
+#[test]
+fn bulk_trash_preserves_search_and_limits_permanent_delete_to_confirmed_ids() {
+    let dir = std::env::temp_dir().join(format!("raynote_bulk_trash_{}", uuid::Uuid::new_v4()));
+    let db = Database::new(dir.clone()).unwrap();
+    db.writer.lock().unwrap().execute_batch(
+        "INSERT INTO notes (id, title, content, search_text, is_pinned, created_at, updated_at) VALUES
+         ('a', 'First note', 'First body', 'quartz', 1, '2026-01-01', '2026-01-01'),
+         ('b', 'Second note', 'Second body', 'beacon', 0, '2026-01-01', '2026-01-01'),
+         ('c', 'Active note', 'Active body', 'active', 0, '2026-01-01', '2026-01-01');",
+    ).unwrap();
+    db.delete_note("a").unwrap();
+    db.delete_note("b").unwrap();
+
+    // A conflicting ID aborts the entire restore, including the removal from Trash.
+    db.writer.lock().unwrap().execute(
+        "INSERT INTO notes (id, title, created_at, updated_at)
+         VALUES ('b', 'Conflicting note', '2026-01-01', '2026-01-01')",
+        [],
+    ).unwrap();
+    assert!(db.restore_all_trashed_notes().is_err());
+    assert_eq!(db.list_trashed_notes().unwrap().len(), 2);
+    assert!(db.get_note("a").unwrap().is_none());
+    db.writer.lock().unwrap().execute("DELETE FROM notes WHERE id = 'b'", []).unwrap();
+    db.invalidate_cache();
+
+    assert_eq!(db.get_recent_summaries(30).unwrap().len(), 1);
+    assert_eq!(db.restore_all_trashed_notes().unwrap(), 2);
+    assert!(db.list_trashed_notes().unwrap().is_empty());
+    let restored = db.get_note("a").unwrap().unwrap();
+    assert_eq!(restored.content, "First body");
+    assert!(restored.is_pinned);
+    assert_eq!(db.get_recent_summaries(30).unwrap().len(), 3);
+    assert_eq!(db.search_documents("quartz", 5).unwrap()[0].id, "a");
+
+    db.delete_note("a").unwrap();
+    db.delete_note("b").unwrap();
+    let confirmed: Vec<_> = db.list_trashed_notes().unwrap().into_iter().map(|note| note.id).collect();
+    db.delete_note("c").unwrap();
+    assert_eq!(db.purge_trashed_notes(&confirmed).unwrap(), 2);
+    let remaining = db.list_trashed_notes().unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].id, "c");
+    assert_eq!(db.purge_trashed_notes(&confirmed).unwrap(), 0);
+
+    drop(db);
+    std::fs::remove_dir_all(dir).unwrap();
+}

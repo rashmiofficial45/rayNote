@@ -136,6 +136,7 @@ export interface ActiveNoteSnapshot {
   unsaved: boolean;
 }
 
+export const FAST_BOOT_CONTENT_LIMIT = 65_536;
 const ACTIVE_SNAPSHOT_KEY = "notefast_active_note_snapshot";
 
 /** One atomic record owns recovery; legacy keys remain mirrors for compatibility. */
@@ -163,7 +164,13 @@ export function readActiveNoteSnapshot(): ActiveNoteSnapshot | null {
 export function writeActiveNoteSnapshot(snapshot: ActiveNoteSnapshot): boolean {
   if (!safeLocalStorageSetItem(ACTIVE_SNAPSHOT_KEY, JSON.stringify(snapshot))) return false;
   safeLocalStorageSetItem(STORAGE_KEYS.ACTIVE_NOTE_ID, snapshot.id);
-  safeLocalStorageSetItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT, snapshot.content);
+  // Large drafts need just one durable copy. A duplicate competes for the
+  // same storage quota and makes each autosave block the editor for longer.
+  if (snapshot.content.length <= FAST_BOOT_CONTENT_LIMIT) {
+    safeLocalStorageSetItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT, snapshot.content);
+  } else {
+    safeLocalStorageRemoveItem(STORAGE_KEYS.ACTIVE_NOTE_CONTENT);
+  }
   safeLocalStorageSetItem("notefast_active_note_base_updated_at", snapshot.baseUpdatedAt);
   safeLocalStorageSetItem("notefast_active_note_unsaved", String(snapshot.unsaved));
   return true;

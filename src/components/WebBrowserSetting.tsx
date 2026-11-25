@@ -95,10 +95,10 @@ export function WebBrowserSetting() {
     <div className="settings-card">
       <div className="settings-row">
         <div className="settings-row-text">
-          <label id="web-browser-label" htmlFor="web-browser" className="settings-row-title block text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">
+          <label id="web-browser-label" htmlFor="web-browser" className="settings-row-title block">
             Web Browser
           </label>
-          <div id="web-browser-description" className="settings-row-desc text-[12px] text-[color:var(--text-muted)]" aria-live="polite">
+          <div id="web-browser-description" className="settings-row-desc" aria-live="polite">
             {description}
           </div>
         </div>

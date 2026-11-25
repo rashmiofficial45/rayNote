@@ -26,7 +26,7 @@ export function incrementalCodeHighlight(
     const result: Decoration[] = [];
     codeBlocksBetween(doc, from, to, (block, pos) => {
       const language = block.attrs.language || defaultLanguage;
-      if (!block.content.size || isMermaidLanguage(language)) return;
+      if (!block.content.size || isMermaidLanguage(language) || /^(?:text|plaintext|txt)$/i.test(language ?? "")) return;
       const tree = language && lowlight.registered(language)
         ? lowlight.highlight(language, block.textContent)
         : lowlight.highlightAuto(block.textContent);

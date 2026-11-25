@@ -230,6 +230,24 @@ pub async fn purge_trashed_note(db: State<'_, Arc<Database>>, id: String) -> Res
 }
 
 #[tauri::command]
+pub async fn restore_all_trashed_notes(db: State<'_, Arc<Database>>) -> Result<usize, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        db.restore_all_trashed_notes().map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn purge_trashed_notes(db: State<'_, Arc<Database>>, ids: Vec<String>) -> Result<usize, String> {
+    let db = db.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || db.purge_trashed_notes(&ids).map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub async fn toggle_pin(db: State<'_, Arc<Database>>, id: String) -> Result<bool, String> {
     let db = db.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {

@@ -756,6 +756,8 @@ pub fn run() {
             list_trashed_notes,
             restore_trashed_note,
             purge_trashed_note,
+            restore_all_trashed_notes,
+            purge_trashed_notes,
             toggle_pin,
             get_adjacent_note,
             start_native_drag,

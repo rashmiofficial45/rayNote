@@ -217,7 +217,7 @@ impl Database {
             if let Some(legacy_path) = legacy_path {
                 let source = Connection::open_with_flags(&legacy_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
                 let staging = app_dir.join(format!("raynote-migration-{}.db", uuid::Uuid::new_v4()));
-                if let Err(error) = source.backup(rusqlite::DatabaseName::Main, &staging, None) {
+                if let Err(error) = source.backup(rusqlite::MAIN_DB, &staging, None::<fn(_)>) {
                     let _ = std::fs::remove_file(&staging);
                     return Err(error);
                 }
@@ -671,6 +671,10 @@ impl Database {
 
         let norm_query = normalize_query(trimmed_query);
         let all_notes = self.get_all_notes_arc()?;
+        let limit = limit.min(all_notes.len());
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
 
         // 2. Non-empty query with no alphanumeric FTS tokens (emoji, symbols, quotes only)
         if norm_query.is_empty() {
@@ -785,7 +789,7 @@ impl Database {
                      LIMIT ?2",
                 );
                 if let Ok(mut prepared) = stmt {
-                    let fts_rows = prepared.query_map(params![clean_fts, limit * 2], |row| {
+                    let fts_rows = prepared.query_map(params![clean_fts, (limit * 2) as i64], |row| {
                         Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, f64>(2)?))
                     });
                     if let Ok(rows) = fts_rows {
@@ -1297,6 +1301,38 @@ impl Database {
             return Err(rusqlite::Error::QueryReturnedNoRows);
         }
         Ok(())
+    }
+
+    pub fn restore_all_trashed_notes(&self) -> Result<usize> {
+        let mut conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = conn.transaction()?;
+        let restored = tx.execute(
+            "INSERT INTO notes (id, title, content, preview, search_text, created_at, updated_at, is_pinned)
+             SELECT id, title, content, preview, search_text, created_at, updated_at, is_pinned
+             FROM trashed_notes",
+            [],
+        )?;
+        tx.execute("DELETE FROM trashed_notes", [])?;
+        tx.commit()?;
+        if restored > 0 {
+            self.invalidate_cache();
+        }
+        Ok(restored)
+    }
+
+    /// Permanently deletes only the notes included in the confirmation.
+    pub fn purge_trashed_notes(&self, ids: &[String]) -> Result<usize> {
+        let mut conn = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = conn.transaction()?;
+        let mut deleted = 0;
+        {
+            let mut delete = tx.prepare("DELETE FROM trashed_notes WHERE id = ?1")?;
+            for id in ids {
+                deleted += delete.execute(params![id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(deleted)
     }
 
     /// Toggles the is_pinned boolean flag for a note and updates meta_cache in-place with re-sorting.

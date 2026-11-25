@@ -3634,7 +3634,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   .editor-char-count, .editor-resource-usage { font-size: 13px; }
 }
 
-.settings-resources { padding: 14px 16px; }
+.settings-resources { padding: 17px 18px; }
 .settings-resources h2 { font-size: 14px; font-weight: 650; }
 .settings-resources p { margin-top: 4px; color: var(--text-muted); font-size: 12px; }
 .settings-resources dl {
@@ -3644,7 +3644,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   margin-top: 12px;
 }
 .settings-resources dl > div {
-  padding: 8px 10px;
+  padding: 11px 12px;
+  background: var(--settings-control);
   border: 1px solid var(--separator);
   border-radius: 10px;
 }
@@ -3901,6 +3902,12 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   .image-action-glass { background: #262a34; }
 }
 
+/* Bound WebKit layout and repaint work to each horizontally scrollable block.
+   Keep natural heights and keep the contents painted throughout vertical scrolling. */
+.tiptap :is(.tableWrapper, pre) {
+  contain: layout paint;
+}
+
 /* ── Table Styling ────────────────────────────────────── */
 .tiptap .tableWrapper {
   overflow-x: auto;
@@ -4008,18 +4015,19 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* ── Settings window ─────────────────────────────────── */
 .settings-window-root {
-  --settings-canvas: #232326;
-  --settings-sidebar: #1e2027;
-  --settings-group: #292b34;
-  --settings-control: #343740;
-  --settings-control-hover: #414551;
-  --settings-divider: #414450;
-  --settings-canvas-opacity: 83%;
-  --settings-sidebar-opacity: 33%;
-  --settings-edge: rgb(219 230 255 / 16%);
-  --settings-sheen: rgb(219 230 255 / 4%);
-  --settings-sidebar-width: clamp(148px, 24vw, 180px);
-  --settings-pane-inset: clamp(16px, 3.2vw, 28px);
+  --settings-canvas: #202024;
+  --settings-sidebar: #323238;
+  --settings-group: #2a2a2f;
+  --settings-control: #333338;
+  --settings-control-hover: #3e3e45;
+  --settings-divider: #414147;
+  --settings-canvas-opacity: 86%;
+  --settings-sidebar-opacity: 35%;
+  --settings-edge: rgb(221 232 249 / 18%);
+  --settings-sheen: rgb(232 232 245 / 5%);
+  --settings-danger: #fca5a5;
+  --settings-sidebar-width: clamp(140px, 24vw, 180px);
+  --settings-pane-inset: clamp(15px, 3.3vw, 28px);
   --btn-liquid-bg: var(--settings-control);
   --btn-liquid-bg-hover: var(--settings-control-hover);
   --btn-liquid-border: var(--settings-divider);
@@ -4028,16 +4036,16 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   --glass-control-bg: var(--settings-control);
   --glass-control-border: var(--settings-divider);
   --separator: var(--settings-divider);
+  --text-primary: var(--text-primary-base);
+  --text-secondary: var(--text-secondary-base);
+  --text-muted: var(--text-muted-base);
 
-  display: grid;
+  @apply grid size-full overflow-hidden select-none;
   grid-template: 58px minmax(0, 1fr) / var(--settings-sidebar-width) minmax(0, 1fr);
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-  background: linear-gradient(155deg, var(--settings-sheen), transparent 40%),
+  /* The native Settings window supplies the backdrop behind this fixed tint. */
+  background: radial-gradient(ellipse at 0 0, var(--settings-sheen), transparent 62%),
     color-mix(in srgb, var(--settings-canvas) var(--settings-canvas-opacity), transparent);
-  color: var(--text-primary-base);
-  user-select: none;
+  color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   border: 1px solid var(--settings-edge);
   border-radius: 22px;
@@ -4045,171 +4053,157 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 [data-resolved-theme="light"] .settings-window-root {
-  --settings-canvas: #f4f6fa;
-  --settings-sidebar: #dce3ef;
-  --settings-group: #ffffff;
-  --settings-control: #eeeef2;
-  --settings-control-hover: #e4e4e9;
-  --settings-divider: #dcdce2;
-  --settings-canvas-opacity: 87%;
-  --settings-sidebar-opacity: 45%;
-  --settings-edge: rgb(106 124 156 / 26%);
-  --settings-sheen: rgb(255 255 255 / 22%);
+  --settings-canvas: #f4f4f6;
+  --settings-sidebar: #ffffff;
+  --settings-group: #fafafb;
+  --settings-control: #ebebee;
+  --settings-control-hover: #e0e0e5;
+  --settings-divider: #dedee4;
+  --settings-canvas-opacity: 90%;
+  --settings-sidebar-opacity: 54%;
+  --settings-edge: rgb(91 109 141 / 27%);
+  --settings-sheen: rgb(255 255 255 / 52%);
+  --settings-danger: #a52222;
 }
 
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   :root[data-resolved-theme] .settings-window-root {
     --settings-canvas-opacity: 100%;
     --settings-sidebar-opacity: 100%;
+    --settings-edge: var(--text-muted);
   }
 }
 
 .settings-header-bar {
-  grid-column: 1 / -1;
-  display: grid;
+  @apply col-span-full grid;
   grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
-  border-bottom: 1px solid var(--settings-divider);
   -webkit-app-region: drag;
 }
 
-.settings-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-inline: 16px;
+.settings-header-left,
+.settings-sidebar {
   background: color-mix(in srgb, var(--settings-sidebar) var(--settings-sidebar-opacity), transparent);
-  border-inline-end: 1px solid var(--settings-divider);
-  font-size: 13px;
-  font-weight: 600;
+  border-inline-end: 1px solid var(--settings-edge);
+}
+
+.settings-header-left {
+  @apply flex items-center pl-1 text-sm font-semibold;
 }
 
 .settings-close-button {
   display: grid;
   place-items: center;
   flex: none;
-  width: 18px;
-  height: 18px;
-  border: 1px solid rgb(0 0 0 / 12%);
+  width: 44px;
+  height: 44px;
+  border: 0;
   border-radius: 50%;
-  background: #ff5f57;
-  color: #530b08;
+  background: transparent;
   cursor: pointer;
   -webkit-app-region: no-drag;
 }
 
-.settings-close-button svg { visibility: hidden; }
-.settings-close-button:is(:hover, :focus-visible) svg { visibility: visible; }
+.settings-close-dot {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ff5f57;
+  color: #530b08;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 12%);
+  pointer-events: none;
+}
 
-.settings-header-bar h1 {
-  align-self: center;
+.settings-close-dot svg { opacity: 0; }
+.settings-close-button:is(:hover, :focus-visible) svg { opacity: 1; }
+
+.settings-pane-heading {
+  @apply flex min-w-0 items-center;
   padding-inline: var(--settings-pane-inset);
-  font-size: 19px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-  line-height: 1.25;
+  border-bottom: 1px solid var(--settings-divider);
+}
+
+.settings-pane-heading h1 {
+  @apply text-[19px] leading-tight font-semibold tracking-tight;
 }
 
 .settings-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 14px 10px;
-  background: color-mix(in srgb, var(--settings-sidebar) var(--settings-sidebar-opacity), transparent);
-  border-inline-end: 1px solid var(--settings-divider);
+  @apply flex min-h-0 flex-col gap-1 overflow-y-auto px-2.5 pt-1 pb-3;
 }
 
 .settings-sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 8px;
-  min-height: 42px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  @apply flex min-h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-1.5 text-start text-[13px] font-medium transition-colors duration-150;
   background: transparent;
-  color: var(--text-secondary-base);
-  font-size: 13px;
-  font-weight: 550;
-  text-align: start;
-  cursor: pointer;
+  color: var(--text-secondary);
 }
 
 .settings-sidebar-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: var(--settings-control);
+  @apply grid size-[21px] shrink-0 place-items-center rounded-[6px] text-white;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 16%);
 }
 
 .settings-sidebar-item[aria-current="page"] {
-  background: color-mix(in srgb, var(--color-accent) 16%, var(--settings-group));
-  border-color: var(--color-accent-border);
-  color: var(--color-accent-text);
+  background: color-mix(in srgb, var(--color-accent) 18%, var(--settings-group));
+  color: var(--text-primary);
   font-weight: 650;
-}
-
-.settings-sidebar-item[aria-current="page"] .settings-sidebar-icon {
-  background: color-mix(in srgb, var(--color-accent) 24%, var(--settings-group));
 }
 
 .settings-sidebar-item:not([aria-current]):hover { background: var(--settings-control); }
 .settings-sidebar-item:active { background: var(--settings-control-hover); }
-.settings-window-root button:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
+
+.settings-window-root :is(button, select, input):focus-visible,
+.settings-switch:has(input:focus-visible) .settings-slider {
+  outline: 2px solid var(--color-accent-text);
+  outline-offset: 2px;
 }
 
 .settings-body-content {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 20px var(--settings-pane-inset) 28px;
+  @apply min-h-0 min-w-0 overflow-auto overscroll-contain;
+  padding: 15px var(--settings-pane-inset) 24px;
   container-type: inline-size;
 }
 
-.settings-about {
+.settings-card.settings-about {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px;
+  gap: 20px;
+  padding: 24px;
+  background: radial-gradient(ellipse at 4% 0, var(--settings-sheen), transparent 72%), var(--settings-group);
 }
 
-.settings-about h2 { font-size: 16px; font-weight: 650; }
-.settings-about p { font-size: 12px; color: var(--text-muted); }
+.settings-about img { flex: none; object-fit: contain; }
+.settings-about h2 { font-size: 27px; font-weight: 700; letter-spacing: -0.035em; }
+.settings-about p { font-size: 13px; color: var(--text-muted); }
+.settings-about .settings-about-platform { margin-top: 6px; }
+
+.settings-pane-content {
+  @apply mx-auto flex max-w-[820px] flex-col gap-2.5;
+}
+
+.settings-section-title {
+  @apply mt-2 ml-0.5 text-[13px] font-semibold;
+  color: var(--text-secondary);
+}
+
+.settings-pane-content > .settings-section-title:first-child { margin-top: 0; }
 
 .settings-action-banner {
-  padding: 8px 16px;
-  background: var(--surface-glass-elevated);
-  border: 1px solid var(--color-accent);
+  max-width: 820px;
+  padding: 10px 14px;
+  margin: 0 auto 12px;
+  border: 1px solid var(--color-accent-border);
   border-radius: 12px;
-  margin-bottom: 16px;
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--settings-group));
   color: var(--color-accent-text);
-  font-size: 12.5px;
-  font-weight: 500;
-  animation: slideUp 0.15s ease-out;
-}
-
-/* Pane Container */
-.settings-pane-content {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  font-size: 13px;
+  font-weight: 550;
 }
 
 .settings-card {
+  @apply w-full overflow-hidden rounded-xl border;
+  border-color: var(--settings-divider);
   background: var(--settings-group);
-  border: 1px solid var(--settings-divider);
-  border-radius: 14px;
-  overflow: hidden;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .settings-card-divider {
@@ -4219,13 +4213,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 13px 18px;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
+  @apply flex w-full items-center justify-between gap-3 px-3.5 py-2.5;
 }
 
 .settings-row-text {
@@ -4234,12 +4222,15 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-row-title {
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  color: var(--text-primary);
+  @apply text-[13px] font-semibold;
 }
 
 .settings-row-desc {
-  line-height: 1.4;
-  word-break: break-word;
+  color: var(--text-muted);
+  @apply text-xs leading-snug;
+  overflow-wrap: anywhere;
 }
 
 .settings-row-action {
@@ -4263,55 +4254,59 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
     flex-wrap: wrap;
   }
 
-  .settings-segmented-group {
-    width: 100%;
-  }
-
-  .settings-seg-btn {
-    flex: 1;
-    justify-content: center;
-  }
 }
 
-/* Segmented Theme Mode Control */
-.settings-segmented-group {
-  display: flex;
-  align-items: center;
-  background: var(--btn-liquid-bg);
-  border: 1px solid var(--btn-liquid-border);
-  padding: 2.5px;
-  border-radius: 9999px;
-  gap: 2px;
+.settings-row.settings-appearance-row {
+  @apply flex-col items-start gap-2 py-3;
 }
 
-.settings-seg-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 500;
+.settings-theme-choice {
   color: var(--text-muted);
-  background: transparent;
-  border: none;
-  border-radius: 9999px;
-  cursor: pointer;
-  transition: all 0.12s ease;
 }
 
-.settings-seg-btn:hover:not(.is-active) {
+.settings-theme-choice:hover,
+.settings-theme-choice[aria-pressed="true"] {
   color: var(--text-primary);
 }
 
-.settings-seg-btn.is-active {
-  background: var(--settings-group);
-  color: var(--color-accent-text);
-  box-shadow: 0 0 0 1px var(--settings-divider);
+.settings-theme-choice[aria-pressed="true"] .settings-theme-preview {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+/* A miniature rayNote window used as the visual label for each mode. */
+.settings-theme-sketch {
+  @apply absolute inset-0;
+  background:
+    linear-gradient(var(--preview-ink), var(--preview-ink)) 53% 52% / 33% 7%,
+    linear-gradient(var(--preview-muted), var(--preview-muted)) 61% 68% / 47% 5%,
+    linear-gradient(var(--preview-muted), var(--preview-muted)) 51% 79% / 30% 5%,
+    linear-gradient(var(--preview-accent), var(--preview-accent)) 50% 26% / 62% 3%,
+    linear-gradient(var(--preview-sheet), var(--preview-sheet)) center / 78% 76%,
+    var(--preview-background);
+  background-repeat: no-repeat;
+}
+
+.settings-theme-sketch-light {
+  --preview-background: #e2eaf6;
+  --preview-sheet: #fbfcff;
+  --preview-ink: #374151;
+  --preview-muted: #bac5d5;
+  --preview-accent: #8eabcf;
+}
+
+.settings-theme-sketch-dark {
+  --preview-background: #181d29;
+  --preview-sheet: #272e3b;
+  --preview-ink: #dce4ef;
+  --preview-muted: #657386;
+  --preview-accent: #5b86c1;
 }
 
 /* Accent Palette Grid in Settings */
 .settings-accent-palette-grid {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 7px;
 }
@@ -4324,9 +4319,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 2px;
-  outline: none;
-  transition: transform 0.1s ease;
+  padding: 4px 2px;
+  min-width: 36px;
+  min-height: 40px;
+  border-radius: 8px;
 }
 
 .settings-accent-dot-btn:hover {
@@ -4348,7 +4344,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-accent-name {
-  font-size: 9.5px;
+  font-size: 10.5px;
   color: var(--text-muted);
 }
 
@@ -4362,6 +4358,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   border-radius: 9999px;
+  min-height: 38px;
   padding: 5px 12px;
   color: var(--text-primary);
   font-size: 12px;
@@ -4389,11 +4386,11 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .browser-picker-trigger {
-  min-height: 34px;
+  min-height: 38px;
   max-width: min(212px, 100%);
   padding: 4px 9px;
   border: 1px solid var(--settings-divider);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--settings-control);
 }
 
@@ -4518,8 +4515,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-stepper-btn {
-  width: 24px;
-  height: 24px;
+  min-width: 32px;
+  min-height: 32px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -4556,7 +4553,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-zoom-display {
-  font-size: 12px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--text-primary);
   min-width: 44px;
@@ -4577,10 +4575,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   padding: 13px 18px;
 }
 
-.settings-glass-clarity .settings-row-desc {
-  color: var(--text-muted);
-  font-size: 12px;
-}
+.settings-glass-clarity .glass-clarity-header label { font-size: 14px; }
 
 .format-dock-options .glass-clarity-control {
   padding: 8px 6px 2px;
@@ -4731,15 +4726,20 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   padding-right: 4px;
 }
 
-/* Section Header */
-.settings-section-header h2 {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.settings-command-section > h2 { margin-bottom: 8px; }
+
+.settings-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  text-align: center;
 }
+
+.settings-empty > svg,
+.settings-empty p { color: var(--text-muted); }
+.settings-empty h2 { font-weight: 650; }
+.settings-empty p { font-size: 13px; }
 
 /* Commands Table Card */
 .commands-table-card {
@@ -4751,24 +4751,17 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  gap: 16px;
-  min-height: 44px;
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  @apply min-h-10 gap-3 px-3 py-1.5;
+  transition: background-color 140ms ease;
 }
 
-.settings-command-row.is-disabled {
-  opacity: 0.42;
-  filter: grayscale(0.5);
-}
-
-.settings-command-row.is-disabled:hover {
-  opacity: 0.75;
-  filter: grayscale(0);
+.settings-command-row.is-disabled .settings-cmd-title,
+.settings-command-row.is-disabled .settings-cmd-icon {
+  color: var(--text-muted);
 }
 
 .settings-command-row:hover {
-  background: var(--btn-liquid-bg);
+  background: var(--settings-control);
 }
 
 .settings-cmd-left {
@@ -4780,32 +4773,22 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-cmd-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: linear-gradient(145deg, #ff5555, #d62828);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.settings-cmd-icon-symbol {
-  font-size: 11.5px;
-  font-weight: 800;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--settings-control);
+  color: var(--text-secondary);
 }
 
 .settings-cmd-title {
-  font-size: 13.5px;
-  font-weight: 500;
   color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
+  font-size: 13.5px;
+  font-weight: 550;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .settings-cmd-right {
@@ -4817,7 +4800,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* Alias Column */
 .settings-cmd-col-alias {
-  min-width: 80px;
+  width: 104px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -4842,8 +4825,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-alias-cell-btn.is-empty {
-  color: var(--text-subtle);
-  opacity: 0.65;
+  color: var(--text-muted);
 }
 
 .settings-alias-cell-btn.is-empty:hover {
@@ -4865,6 +4847,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-alias-cell-val {
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -4876,7 +4862,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* Hotkey Column */
 .settings-cmd-col-hotkey {
-  min-width: 105px;
+  width: 124px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
@@ -4916,8 +4902,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   background: transparent;
   border-color: transparent;
   box-shadow: none;
-  color: var(--text-subtle);
-  opacity: 0.65;
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: 400;
 }
@@ -5034,23 +5019,24 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 /* ── Settings: Aliases Pane ─────────────────────────────── */
 .settings-aliases-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
 }
 
 .settings-aliases-search-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
-  height: 32px;
+  flex: 1 1 208px;
+  min-width: 0;
+  min-height: 36px;
   padding: 0 10px;
   background: var(--btn-liquid-bg);
   border: 1px solid var(--btn-liquid-border);
   box-shadow: var(--btn-liquid-shadow);
-  border-radius: 8px;
+  border-radius: 9px;
   position: relative;
 }
 
@@ -5061,6 +5047,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .settings-aliases-search-input {
   flex: 1;
+  min-width: 0;
   background: transparent;
   border: none;
   outline: none;
@@ -5097,14 +5084,10 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  margin-bottom: 14px;
-  background: rgba(56, 189, 248, 0.08);
-  border: 1px solid rgba(56, 189, 248, 0.2);
-  border-radius: 8px;
-  color: var(--text-secondary);
-  font-size: 11.5px;
-  line-height: 1.4;
+  padding-inline: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .settings-aliases-hint-icon {
@@ -5232,7 +5215,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .settings-alias-input {
   height: 24px;
-  width: 110px;
+  width: 100px;
   padding: 0 8px;
   font-size: 11.5px;
   border-radius: 6px;
@@ -5245,8 +5228,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   font-weight: 500;
 }
 
-/* Action & Stat buttons — Liquid Glass */
+/* Settings actions */
 .settings-action-btn {
+  min-height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5281,11 +5265,29 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   transform: scale(0.96);
 }
 
-.settings-stat-badge {
-  padding: 4px 10px;
-  border-radius: 9999px;
-  border: 1px solid var(--btn-liquid-border);
-  box-shadow: var(--btn-liquid-shadow);
+.settings-storage-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-storage-stats > div { @apply px-3.5 py-3; }
+.settings-storage-stats > div + div { border-inline-start: 1px solid var(--settings-divider); }
+
+.settings-storage-stats dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.settings-storage-stats dd {
+  margin-top: 5px;
+  font-size: clamp(20px, 5cqi, 27px);
+  font-weight: 670;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Danger Zone — Liquid Glass */
@@ -5295,7 +5297,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .danger-title {
-  color: #ef4444;
+  color: var(--settings-danger);
 }
 
 .settings-danger-btn {
@@ -5303,12 +5305,13 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-height: 38px;
   padding: 6px 14px;
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.32);
   border-radius: 9999px;
   box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.12), 0 2px 6px rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  color: var(--settings-danger);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -5353,6 +5356,26 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   font-size: 11.5px;
   color: var(--text-muted);
   cursor: pointer;
+}
+
+@container (max-width: 440px) {
+  .settings-command-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .settings-cmd-left { flex-basis: 100%; }
+  .settings-cmd-right { justify-content: space-between; width: 100%; gap: 8px; }
+  .settings-cmd-col-alias,
+  .settings-cmd-col-hotkey { width: auto; }
+  .settings-cmd-title { white-space: normal; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-window-root *, .settings-window-root *::before {
+    transition: none !important;
+    animation: none !important;
+  }
 }
 
 /* ── Super Command & Settings Palette Styles ─────────────── */
@@ -6962,6 +6985,29 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 :is([data-theme="light"], [data-resolved-theme="light"]) .trash-dialog .trash-destructive {
   color: #a82020;
+}
+
+.trash-bulk-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 5px 4px 0;
+  padding: 10px 6px 2px;
+  border-top: 1px solid var(--picker-control-border);
+}
+
+.trash-bulk-footer > .trash-count {
+  margin-inline-end: auto;
+}
+
+.trash-dialog .trash-bulk-actions button {
+  min-height: 34px;
+  padding-inline: 10px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .trash-confirmation {

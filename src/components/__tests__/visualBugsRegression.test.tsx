@@ -50,10 +50,13 @@ describe("Visual Bugs & Theme Consistency Regressions", () => {
     const css = fs.readFileSync(cssPath, "utf8");
 
     const closeButton = css.match(/^\.settings-close-button\s*\{([^}]+)\}/m)?.[1];
-    expect(closeButton).toMatch(/background:\s*#ff5f57/);
     expect(closeButton).toMatch(/-webkit-app-region:\s*no-drag/);
-    expect(closeButton).toMatch(/width:\s*18px/);
-    expect(closeButton).toMatch(/height:\s*18px/);
+    expect(closeButton).toMatch(/width:\s*44px/);
+    const closeDot = css.match(/\.settings-close-dot\s*\{([^}]*)\}/)?.[1] || "";
+    expect(closeDot).toMatch(/background:\s*#ff5f57/);
+    expect(closeDot).toMatch(/width:\s*18px/);
+    expect(closeButton).toMatch(/height:\s*44px/);
+    expect(closeDot).toMatch(/height:\s*18px/);
   });
 
   it("Box shadow declarations in index.css contain no malformed duplicate insets", () => {

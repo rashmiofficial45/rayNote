@@ -285,6 +285,14 @@ export function purgeTrashedNote(id: string): Promise<void> {
   return invoke("purge_trashed_note", { id });
 }
 
+export function restoreAllTrashedNotes(): Promise<number> {
+  return invoke("restore_all_trashed_notes");
+}
+
+export function purgeTrashedNotes(ids: string[]): Promise<number> {
+  return invoke("purge_trashed_notes", { ids });
+}
+
 /**
  * Toggles the `is_pinned` boolean flag for a note in SQLite.
  * Returns the updated boolean state.

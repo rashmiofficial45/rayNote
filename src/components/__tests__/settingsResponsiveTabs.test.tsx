@@ -110,6 +110,25 @@ describe("Settings sidebar navigation", () => {
     expect(host.textContent).toContain("Tech Stack");
   });
 
+  it("shows a recoverable empty state when the command filter finds no matches", async () => {
+    await act(async () => root.render(<SettingsApp />));
+    await act(async () => host.querySelectorAll<HTMLButtonElement>(".settings-sidebar-item")[1].click());
+
+    const search = host.querySelector<HTMLInputElement>(".settings-aliases-search-input")!;
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setValue.call(search, "no-such-command-925");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(host.textContent).toContain("No matching commands");
+    expect(host.querySelector(".settings-command-row")).toBeNull();
+
+    const clearFilter = host.querySelector<HTMLButtonElement>(".settings-empty button")!;
+    await act(async () => clearFilter.click());
+    expect(search.value).toBe("");
+    expect(host.querySelector(".settings-command-row")).not.toBeNull();
+  });
+
   it("preserves Storage actions and confirmation flow", async () => {
     await act(async () => {
       root.render(<SettingsApp />);

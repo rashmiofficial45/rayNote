@@ -136,6 +136,21 @@ def foo():
     editor.destroy();
   });
 
+  it("renders explicitly plain-text blocks without trial-running grammars", () => {
+    const auto = vi.spyOn(lowlight, "highlightAuto");
+    const editor = new Editor({
+      extensions: getExtensions(),
+      content: '<pre><code class="language-text">SELECT * FROM notes</code></pre>',
+    });
+    try {
+      expect(editor.view.dom.querySelector("code")?.textContent).toBe("SELECT * FROM notes");
+      expect(auto).not.toHaveBeenCalled();
+    } finally {
+      editor.destroy();
+      auto.mockRestore();
+    }
+  });
+
   it("refreshes syntax when the same document is loaded after its grammar becomes available", () => {
     const language = "raynote-test-delayed-grammar";
     const content = '<h1>Test</h1><pre><code class="language-' + language + '">queuedkeyword</code></pre>';

@@ -7,9 +7,13 @@ import { Toast, type ToastData } from "./Toast";
 import {
   listTrashedNotes,
   purgeTrashedNote,
+  purgeTrashedNotes,
+  restoreAllTrashedNotes,
   restoreTrashedNote,
   type TrashedNoteSummary,
 } from "../lib/db";
+
+type TrashTarget = TrashedNoteSummary | { ids: string[] };
 
 interface TrashDialogProps {
   onClose: () => void;
@@ -24,11 +28,10 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
   const listRef = useRef<HTMLUListElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const closeRef = useRef<HTMLButtonElement>(null);
   const [notes, setNotes] = useState<TrashedNoteSummary[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
-  const [confirmation, setConfirmation] = useState<TrashedNoteSummary | null>(null);
+  const [confirmation, setConfirmation] = useState<TrashTarget | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
 
@@ -70,31 +73,49 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
 
   const handleEscape = (event: { preventDefault: () => void }) => {
     event.preventDefault();
-    if (confirmation) {
-      if (!working) cancelConfirmation();
-    } else onClose();
+    if (working) return;
+    if (confirmation) cancelConfirmation();
+    else onClose();
   };
 
-  const changeNote = async (note: TrashedNoteSummary, operation: "restore" | "purge") => {
+  const changeTrash = async (target: TrashTarget, operation: "restore" | "purge") => {
     if (working) return;
     setWorking(true);
     setError("");
+    const restoring = operation === "restore";
+    const bulk = "ids" in target;
     try {
-      if (operation === "restore") await restoreTrashedNote(note.id);
-      else await purgeTrashedNote(note.id);
-      setNotes((items) => items?.filter((item) => item.id !== note.id) ?? null);
+      let message: string;
+      if (bulk) {
+        const count = restoring
+          ? await restoreAllTrashedNotes()
+          : await purgeTrashedNotes(target.ids);
+        message = count > 0
+          ? `${count} ${count === 1 ? "note" : "notes"} ${restoring ? "restored" : "permanently deleted"}`
+          : restoring ? "No notes to restore" : "No notes to delete";
+        setQuery("");
+        setSelectedId(null);
+        setNotes(null);
+        // Refresh from SQLite so notes moved to Trash during confirmation still appear.
+        setLoadAttempt((attempt) => attempt + 1);
+      } else {
+        if (restoring) await restoreTrashedNote(target.id);
+        else await purgeTrashedNote(target.id);
+        setNotes((items) => items?.filter((item) => item.id !== target.id) ?? null);
+        message = restoring ? "Note restored" : "Note permanently deleted";
+      }
       setConfirmation(null);
-      if (operation === "restore") onShowToast("Note restored", <Check size={14} />);
-      else onShowToast("Note permanently deleted", <Trash2 size={14} />);
-      if (operation === "restore") {
+      onShowToast(message, restoring ? <Check size={14} /> : <Trash2 size={14} />);
+      if (restoring) {
         await onRestored().catch((cause) => {
           console.error("Could not refresh notes after restoring:", cause);
-          setError("Note restored. Reopen the note switcher to refresh the list.");
+          setError("Restored notes saved. Reopen the note switcher to refresh the list.");
         });
       }
     } catch (cause) {
       console.error("Could not update Trash:", cause);
-      setError(operation === "restore" ? "Could not restore this note." : "Could not permanently delete this note.");
+      if (bulk) setError(restoring ? "Could not restore all notes." : "Could not empty Trash.");
+      else setError(restoring ? "Could not restore this note." : "Could not permanently delete this note.");
     } finally {
       setWorking(false);
       requestAnimationFrame(() => searchRef.current?.focus());
@@ -106,7 +127,7 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
     return (
       <div className="trash-actions">
         <button type="button" disabled={working} aria-label={`Restore ${title}`}
-          onClick={() => void changeNote(note, "restore")}>
+          onClick={() => void changeTrash(note, "restore")}>
           <RotateCcw size={13} aria-hidden="true" /> Restore
         </button>
         <button type="button" disabled={working} className="trash-destructive"
@@ -147,7 +168,7 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
         }
       }}
       onClick={(event) => {
-        if (event.target !== event.currentTarget) return;
+        if (working || event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();
         if (event.clientX < bounds.left || event.clientX > bounds.right ||
             event.clientY < bounds.top || event.clientY > bounds.bottom) onClose();
@@ -156,9 +177,11 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
       {!confirmation && <header className="trash-header">
         <div className="trash-heading">
           <h2 id="trash-title"><Trash2 size={17} aria-hidden="true" />Trash</h2>
-          {results.length > 0 && <span className="trash-count">{results.length} {results.length === 1 ? "note" : "notes"}</span>}
+          {notes && notes.length > 0 && <span className="trash-count">
+            {searchQuery ? `${results.length} of ` : ""}{notes.length} {notes.length === 1 ? "note" : "notes"}
+          </span>}
         </div>
-        <button ref={closeRef} type="button" className="trash-close" aria-label="Close Trash" onClick={onClose}>
+        <button type="button" disabled={working} className="trash-close" aria-label="Close Trash" onClick={onClose}>
           <X size={18} aria-hidden="true" />
         </button>
       </header>}
@@ -175,8 +198,9 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
       )}
 
       {confirmation ? (
-        <TrashConfirmation title={confirmation.title || "Untitled Note"} permanent busy={working}
-          onCancel={cancelConfirmation} onConfirm={() => void changeNote(confirmation, "purge")} />
+        <TrashConfirmation
+          {...("ids" in confirmation ? { count: confirmation.ids.length } : { title: confirmation.title || "Untitled Note", permanent: true })}
+          busy={working} onCancel={cancelConfirmation} onConfirm={() => void changeTrash(confirmation, "purge")} />
       ) : loadFailed ? (
         <div className="trash-empty" role="alert">
           <p>Could not load Trash.</p>
@@ -215,6 +239,21 @@ export function TrashDialog({ onClose, onRestored, onShowToast, toast }: TrashDi
         </ul>
       )}
       {error && <p className="trash-feedback trash-error" role="alert">{error}</p>}
+      {!confirmation && notes && notes.length > 0 && (
+        <footer className="trash-bulk-footer">
+          {searchQuery && <span className="trash-count">Applies to all notes</span>}
+          <div className="trash-actions trash-bulk-actions">
+            <button type="button" disabled={working}
+              onClick={() => void changeTrash({ ids: notes.map((note) => note.id) }, "restore")}>
+              <RotateCcw size={14} aria-hidden="true" /> Restore All
+            </button>
+            <button type="button" disabled={working} className="trash-destructive"
+              onClick={() => { setError(""); setConfirmation({ ids: notes.map((note) => note.id) }); }}>
+              <Trash2 size={14} aria-hidden="true" /> Empty Trash
+            </button>
+          </div>
+        </footer>
+      )}
       <Toast toast={toast} aboveModal />
     </dialog>
   );
