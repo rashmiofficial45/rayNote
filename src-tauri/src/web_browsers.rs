@@ -3,6 +3,27 @@
 pub struct WebBrowser {
     bundle_id: String,
     name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    icon: Option<String>,
+}
+
+#[cfg(target_os = "macos")]
+fn browser_icon(path: &str) -> Option<String> {
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSWorkspace};
+    use tauri_nspanel::objc2_foundation::{
+        NSDataBase64EncodingOptions, NSDictionary, NSPoint, NSRect, NSSize, NSString,
+    };
+
+    let workspace = NSWorkspace::sharedWorkspace();
+    let icon = workspace.iconForFile(&NSString::from_str(path));
+    let mut rect = NSRect::new(NSPoint::ZERO, NSSize::new(32.0, 32.0));
+    // Request a small representation for the picker and only pass PNG data to the webview.
+    let image = unsafe { icon.CGImageForProposedRect_context_hints(&mut rect, None, None) }?;
+    use objc2::AnyThread;
+    let bitmap = NSBitmapImageRep::initWithCGImage(NSBitmapImageRep::alloc(), &image);
+    let png = unsafe { bitmap.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new()) }?;
+    let base64 = png.base64EncodedStringWithOptions(NSDataBase64EncodingOptions::empty());
+    Some(format!("data:image/png;base64,{base64}"))
 }
 
 #[cfg(target_os = "macos")]
@@ -87,7 +108,7 @@ fn registered_browsers(schemes: &[&str]) -> Vec<(WebBrowser, String)> {
                     .and_then(|name| name.to_str())
                     .unwrap_or(&bundle_id)
                     .to_owned();
-                browsers.push((WebBrowser { bundle_id, name }, path));
+                browsers.push((WebBrowser { bundle_id, name, icon: None }, path));
             }
         }
         browsers
@@ -98,12 +119,25 @@ fn registered_browsers(schemes: &[&str]) -> Vec<(WebBrowser, String)> {
 pub async fn list_web_browsers() -> Vec<WebBrowser> {
     #[cfg(target_os = "macos")]
     {
-        let mut browsers: Vec<_> = registered_browsers(&["https", "http"])
-            .into_iter()
-            .map(|(browser, _)| browser)
-            .collect();
-        browsers.sort_by_cached_key(|browser| browser.name.to_lowercase());
-        browsers
+        use std::collections::HashMap;
+        use std::sync::{Mutex, OnceLock};
+        static ICONS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+        let mut installed = registered_browsers(&["https", "http"]);
+        installed.sort_by_cached_key(|(browser, _)| browser.name.to_lowercase());
+        let mut icons = ICONS.get_or_init(Mutex::default).lock().unwrap_or_else(|e| e.into_inner());
+        icons.retain(|path, _| installed.iter().any(|(_, installed_path)| path == installed_path));
+        objc2::rc::autoreleasepool(|_| {
+            installed.into_iter().map(|(mut browser, path)| {
+                if !icons.contains_key(&path) {
+                    if let Some(icon) = browser_icon(&path) {
+                        icons.insert(path.clone(), icon);
+                    }
+                }
+                browser.icon = icons.get(&path).cloned();
+                browser
+            }).collect()
+        })
     }
     #[cfg(not(target_os = "macos"))]
     Vec::new()

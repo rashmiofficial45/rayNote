@@ -119,15 +119,22 @@ export function FloatingCodeBlockToolbar({
       return;
     }
 
+    const showBlock = (dom: HTMLElement, language: string, { top, right }: { top: number; right: number }) => {
+      const current = activeBlockRef.current;
+      // Scrolling moves the toolbar with its block. Ignore subpixel rounding when
+      // converting both rectangles back into the same content coordinates.
+      if (current?.dom === dom && current.language === language &&
+          Math.abs(current.top - top) < 0.5 && Math.abs(current.right - right) < 0.5) return;
+      setActiveBlock({ dom, language, top, right });
+    };
+
     // 1. If dropdown is open, keep current code block anchored if still valid
     if (isOpen && activeBlockRef.current?.dom) {
       const dom = activeBlockRef.current.dom;
       if (document.body.contains(dom)) {
         const coords = computePosition(dom);
         if (coords) {
-          setActiveBlock((prev) =>
-            prev ? { ...prev, top: coords.top, right: coords.right } : null
-          );
+          showBlock(dom, activeBlockRef.current.language, coords);
           return;
         }
       }
@@ -142,12 +149,7 @@ export function FloatingCodeBlockToolbar({
     if (cursorBlock && document.body.contains(cursorBlock.preEl)) {
       const coords = computePosition(cursorBlock.preEl);
       if (coords) {
-        setActiveBlock({
-          dom: cursorBlock.preEl,
-          language: cursorBlock.lang,
-          top: coords.top,
-          right: coords.right,
-        });
+        showBlock(cursorBlock.preEl, cursorBlock.lang, coords);
         return;
       }
     }
@@ -185,12 +187,7 @@ export function FloatingCodeBlockToolbar({
 
       const coords = computePosition(hoveredEl);
       if (coords) {
-        setActiveBlock({
-          dom: hoveredEl,
-          language: lang,
-          top: coords.top,
-          right: coords.right,
-        });
+        showBlock(hoveredEl, lang, coords);
         return;
       }
     }
@@ -224,8 +221,11 @@ export function FloatingCodeBlockToolbar({
 
     let rafId: number | null = null;
     const handleScrollOrResize = () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      if (rafId !== null || !editor || editor.isDestroyed) return;
+      if (!activeBlockRef.current && !hoveredPreRef.current &&
+          !editor.state.selection.$from.parent.type.spec.code) return;
       rafId = requestAnimationFrame(() => {
+        rafId = null;
         syncToolbar();
       });
     };
@@ -234,11 +234,11 @@ export function FloatingCodeBlockToolbar({
     window.addEventListener("resize", handleScrollOrResize, { passive: true });
 
     return () => {
-      if (rafId) cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       container.removeEventListener("scroll", handleScrollOrResize);
       window.removeEventListener("resize", handleScrollOrResize);
     };
-  }, [scrollContainerRef, syncToolbar]);
+  }, [editor, scrollContainerRef, syncToolbar]);
 
   // Track mouse pointer over code blocks and toolbar
   useEffect(() => {

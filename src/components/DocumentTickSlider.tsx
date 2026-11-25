@@ -19,6 +19,8 @@ export function DocumentTickSlider({
 
   const tickCount = Math.min(36, Math.max(16, Math.floor(trackHeight / 14)));
   const trackRef = useRef<HTMLDivElement>(null);
+  const maxScrollRef = useRef(0);
+  const activeIndexRef = useRef(0);
   const rafId = useRef<number | null>(null);
   const dragRafId = useRef<number | null>(null);
 
@@ -40,19 +42,32 @@ export function DocumentTickSlider({
     }
   }, []);
 
-  // Update React state only when the displayed tick changes.
   const updateScrollProgress = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    const maxScroll = scrollHeight - clientHeight;
-    const scrollable = maxScroll > 20;
-    setIsScrollable(scrollable);
-
-    const progress = maxScroll > 0 ? Math.max(0, Math.min(1, scrollTop / maxScroll)) : 0;
-    setActiveIndex(Math.round(progress * (tickCount - 1)));
+    const maxScroll = maxScrollRef.current;
+    const progress = maxScroll > 0 ? Math.max(0, Math.min(1, container.scrollTop / maxScroll)) : 0;
+    const index = Math.round(progress * (tickCount - 1));
+    if (index !== activeIndexRef.current) {
+      activeIndexRef.current = index;
+      setActiveIndex(index);
+    }
   }, [scrollContainerRef, tickCount]);
+
+  const measureScrollRange = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const maxScroll = container.scrollHeight - container.clientHeight;
+    if (maxScroll !== maxScrollRef.current) {
+      const wasScrollable = maxScrollRef.current > 20;
+      maxScrollRef.current = maxScroll;
+      const scrollable = maxScroll > 20;
+      if (scrollable !== wasScrollable) setIsScrollable(scrollable);
+    }
+    updateScrollProgress();
+  }, [scrollContainerRef, updateScrollProgress]);
 
   // Track element observer
   useEffect(() => {
@@ -93,7 +108,7 @@ export function DocumentTickSlider({
 
       observer = new ResizeObserver(() => {
         updateTrackHeight();
-        updateScrollProgress();
+        measureScrollRange();
       });
       observer.observe(container);
       if (container.firstElementChild) {
@@ -107,12 +122,12 @@ export function DocumentTickSlider({
           } catch {}
         }
         updateTrackHeight();
-        updateScrollProgress();
+        measureScrollRange();
       });
       mutationObserver.observe(container, { childList: true, subtree: false });
 
       updateTrackHeight();
-      updateScrollProgress();
+      measureScrollRange();
     };
 
     attach();
@@ -129,7 +144,7 @@ export function DocumentTickSlider({
         }
       } else {
         updateTrackHeight();
-        updateScrollProgress();
+        measureScrollRange();
       }
     };
 
@@ -160,7 +175,7 @@ export function DocumentTickSlider({
       window.removeEventListener("panel-will-hide" as any, handleVisibilityOrHide);
       window.removeEventListener("panel-did-show" as any, handleVisibilityOrHide);
     };
-  }, [scrollContainerRef, updateTrackHeight, updateScrollProgress]);
+  }, [scrollContainerRef, updateTrackHeight, updateScrollProgress, measureScrollRange]);
 
   // Generate discrete tick marks representing sections / parts of the document with big and small bars
   const ticks = useMemo(() => {

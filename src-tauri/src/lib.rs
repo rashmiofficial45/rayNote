@@ -9,6 +9,13 @@ use resource_usage::get_resource_sample;
 use database::Database;
 use commands::*;
 use tauri::Manager;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+#[derive(Default)]
+struct MainWindowReady(AtomicBool);
+
+#[derive(Default)]
+struct SettingsWindowReady(AtomicBool);
 
 #[cfg(target_os = "macos")]
 use tauri::Emitter;
@@ -18,7 +25,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use tauri_nspanel::{tauri_panel, WebviewWindowExt};
 
 #[cfg(target_os = "macos")]
-pub(crate) fn install_window_glass(window: &tauri::WebviewWindow) {
+pub(crate) fn install_window_glass(window: &tauri::WebviewWindow, radius: f64, strength: f64) {
     use objc2::{msg_send, runtime::AnyObject};
     use objc2_app_kit::{
         NSAutoresizingMaskOptions, NSView, NSVisualEffectBlendingMode, NSVisualEffectMaterial,
@@ -39,7 +46,7 @@ pub(crate) fn install_window_glass(window: &tauri::WebviewWindow) {
         backdrop.setMaterial(NSVisualEffectMaterial::WindowBackground);
         backdrop.setBlendingMode(NSVisualEffectBlendingMode::BehindWindow);
         backdrop.setState(NSVisualEffectState::Active);
-        backdrop.setAlphaValue(0.22);
+        backdrop.setAlphaValue(strength);
         backdrop.setAutoresizingMask(
             NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
         );
@@ -47,11 +54,28 @@ pub(crate) fn install_window_glass(window: &tauri::WebviewWindow) {
         unsafe {
             let layer: *mut AnyObject = msg_send![&*backdrop, layer];
             if let Some(layer) = layer.as_ref() {
-                let _: () = msg_send![layer, setCornerRadius: 28.0_f64];
+                let _: () = msg_send![layer, setCornerRadius: radius];
                 let _: () = msg_send![layer, setMasksToBounds: true];
             }
         }
         content.addSubview_positioned_relativeTo(&backdrop, NSWindowOrderingMode::Below, None::<&NSView>);
+    });
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn stage_window_for_render(window: &tauri::WebviewWindow) {
+    use objc2::{msg_send, runtime::AnyObject};
+
+    let window = window.clone();
+    let _ = window.clone().run_on_main_thread(move || {
+        let Ok(ptr) = window.ns_window() else { return };
+        let Some(window) = (unsafe { ptr.cast::<AnyObject>().as_ref() }) else { return };
+        // Keep WebKit rendering while the native window is visually hidden.
+        // Ordering it in at zero alpha avoids suspending a cold webview.
+        unsafe {
+            let _: () = msg_send![window, setAlphaValue: 0.0_f64];
+            let _: () = msg_send![window, orderFrontRegardless];
+        }
     });
 }
 
@@ -96,6 +120,7 @@ fn hover_focus_tick(app: &tauri::AppHandle) {
     use std::time::{Duration, Instant};
     use tauri::Emitter;
 
+    if !app.state::<MainWindowReady>().0.load(Ordering::Acquire) { return; }
     let Some(win) = app.get_webview_window("main") else { return };
     let Ok(ptr) = win.ns_window() else { return };
 
@@ -384,19 +409,6 @@ fn setup_macos_panel(app: &tauri::App) {
         }
     }
 
-    #[cfg(target_os = "macos")]
-    unsafe {
-        let app_class = objc2::class!(NSApplication);
-        let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
-        let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
-
-        if let Some(ns_panel) = ns_window_ptr.as_ref() {
-            let _: () = msg_send![ns_panel, orderFrontRegardless];
-            let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
-            focus_panel_content(ns_panel);
-        }
-    }
-
     #[cfg(debug_assertions)]
     unsafe {
         if let Some(ns_panel) = ns_window_ptr.as_ref() {
@@ -484,6 +496,10 @@ unsafe fn setup_macos_edit_menu() {
 }
 
 fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>) {
+    if !manager.state::<MainWindowReady>().0.load(Ordering::Acquire) {
+        return;
+    }
+
     #[cfg(target_os = "macos")]
     {
         use objc2::msg_send;
@@ -504,6 +520,7 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
                         let level: isize = if is_always_on_top { 1000 } else { 0 };
                         let _: () = msg_send![ns_panel, setLevel: level];
                         let _: () = msg_send![ns_panel, setFloatingPanel: is_always_on_top];
+                        let _: () = msg_send![ns_panel, setAlphaValue: 1.0_f64];
                         let _: () = msg_send![ns_panel, orderFrontRegardless];
                         let _: () = msg_send![ns_panel, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
                         focus_panel_content(ns_panel);
@@ -531,6 +548,23 @@ fn show_and_focus_main_panel_inner<R: tauri::Runtime>(manager: &impl Manager<R>)
     }
 }
 
+#[tauri::command]
+fn reveal_ready_window(window: tauri::WebviewWindow) {
+    match window.label() {
+        "main" => {
+            if !window.state::<MainWindowReady>().0.swap(true, Ordering::AcqRel) {
+                show_and_focus_main_panel(window.app_handle());
+            }
+        }
+        "settings" => {
+            if !window.state::<SettingsWindowReady>().0.swap(true, Ordering::AcqRel) {
+                commands::show_settings_window(&window);
+            }
+        }
+        _ => {}
+    }
+}
+
 pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
     let app_handle = manager.app_handle().clone();
     let app_clone = app_handle.clone();
@@ -542,6 +576,8 @@ pub fn show_and_focus_main_panel<R: tauri::Runtime>(manager: &impl Manager<R>) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
+        .manage(MainWindowReady::default())
+        .manage(SettingsWindowReady::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             for arg in args { commands::route_note_link(app, &arg); }
@@ -681,7 +717,8 @@ pub fn run() {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 setup_macos_panel(app);
                 if let Some(window) = app.get_webview_window("main") {
-                    install_window_glass(&window);
+                    install_window_glass(&window, 28.0, 0.22);
+                    stage_window_for_render(&window);
                     watch_panel_leave(window);
                 }
                 start_hover_focus_watcher(app.handle().clone());
@@ -730,6 +767,7 @@ pub fn run() {
             save_window_size,
             quit_app,
             open_settings_window,
+            reveal_ready_window,
             close_settings_window,
             open_app_data_folder,
             get_storage_stats,

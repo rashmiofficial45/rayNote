@@ -49,9 +49,11 @@ describe("Visual Bugs & Theme Consistency Regressions", () => {
     const cssPath = path.resolve(__dirname, "../../index.css");
     const css = fs.readFileSync(cssPath, "utf8");
 
-    // Must ensure settings header overrides base title-bar-left opacity
-    expect(css).toMatch(/\.settings-header-left\s+\.title-bar-left\s*\{[^}]*opacity:\s*1\s*!important/);
-    expect(css).toMatch(/\.settings-header-left\s+\.close-btn-x\s*\{[^}]*-webkit-app-region:\s*no-drag\s*!important/);
+    const closeButton = css.match(/^\.settings-close-button\s*\{([^}]+)\}/m)?.[1];
+    expect(closeButton).toMatch(/background:\s*#ff5f57/);
+    expect(closeButton).toMatch(/-webkit-app-region:\s*no-drag/);
+    expect(closeButton).toMatch(/width:\s*18px/);
+    expect(closeButton).toMatch(/height:\s*18px/);
   });
 
   it("Box shadow declarations in index.css contain no malformed duplicate insets", () => {

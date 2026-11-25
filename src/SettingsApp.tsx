@@ -7,6 +7,7 @@ import { requestEditorFlush } from "./lib/editorFlush";
 import { requestClearAllNotes } from "./lib/noteDeletion";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useRevealWindow } from "./lib/useRevealWindow";
 import {
   Info,
   Sliders,
@@ -71,7 +72,14 @@ import {
   detectShortcutConflict,
 } from "./lib/commandsConfig";
 
-type SettingsPane = "general" | "commands" | "storage" | "about";
+const SETTINGS_PANES = {
+  general: { label: "General", icon: Sliders },
+  commands: { label: "Commands", icon: Keyboard },
+  storage: { label: "Storage", icon: Database },
+  about: { label: "About", icon: Info },
+} as const;
+
+type SettingsPane = keyof typeof SETTINGS_PANES;
 
 const ALIAS_ID_MAP: Record<string, string> = {
   create: "new-note",
@@ -152,23 +160,19 @@ export default function SettingsApp() {
   const [clearAgreed, setClearAgreed] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Header drag ref & single red close button hover state
   const headerRef = useRef<HTMLElement>(null);
-  const tabPillsRef = useRef<HTMLDivElement>(null);
-  const [isCloseHovered, setIsCloseHovered] = useState(false);
+  const contentRef = useRef<HTMLElement>(null);
 
-  // Keep active tab scrolled into view on narrow screens
-  useEffect(() => {
-    if (!tabPillsRef.current) return;
-    const activeEl = tabPillsRef.current.querySelector(".is-active") as HTMLElement | null;
-    if (activeEl) {
-      activeEl.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
-    }
+  React.useLayoutEffect(() => {
+    if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activePane]);
 
-  // Initialize theme, storage stats, and real-time sync listeners on mount
+  // The theme and the selected pane must commit before the window is shown.
+  React.useLayoutEffect(initTheme, []);
+  useRevealWindow(true);
+
+  // Initialize storage stats and real-time sync listeners on mount
   useEffect(() => {
-    const stopTheme = initTheme();
     loadStorageStats();
 
     const stopSync = listenToSettingsSync({
@@ -186,7 +190,7 @@ export default function SettingsApp() {
         setAliases(newAliases || {});
       },
     });
-    return () => { stopTheme?.(); stopSync(); };
+    return stopSync;
   }, []);
 
   // Native window drag on mousedown for top header bar (identical to Note window)
@@ -201,8 +205,7 @@ export default function SettingsApp() {
         target.closest("input") ||
         target.closest("select") ||
         target.closest("textarea") ||
-        target.closest("label") ||
-        target.closest(".settings-tab-pill")
+        target.closest("label")
       ) {
         return;
       }
@@ -429,6 +432,7 @@ export default function SettingsApp() {
         return;
       }
       if (e.key === "Escape") {
+        if (e.target instanceof Element && e.target.closest("#web-browser-options")) return;
         e.preventDefault();
         closeSettingsWindow();
         return;
@@ -566,115 +570,41 @@ export default function SettingsApp() {
 
   return (
     <div className="settings-window-root">
-      {/* Top Header Bar with Navigation and Tabs (macOS Draggable) */}
-      <header
-        ref={headerRef}
-        className="settings-header-bar"
-        data-tauri-drag-region
-        onMouseDown={(e) => {
-          const target = e.target as HTMLElement;
-          if (!target.closest("button") && !target.closest(".settings-tab-pill")) {
-            e.preventDefault();
-            window.getSelection()?.removeAllRanges();
-          }
-        }}
-      >
-        {/* Left: Single red (⌘W) button totally similar to the note tab, plus navigation */}
+      <header ref={headerRef} className="settings-header-bar" data-tauri-drag-region>
         <div className="settings-header-left" data-tauri-drag-region>
-          <div
-            className="title-bar-left"
-            onMouseEnter={() => setIsCloseHovered(true)}
-            onMouseLeave={() => setIsCloseHovered(false)}
+          <button
+            type="button"
+            onClick={closeSettingsWindow}
+            className="settings-close-button"
+            title="Close Settings (⌘W)"
+            aria-label="Close Settings"
           >
-            <button
-              type="button"
-              onClick={closeSettingsWindow}
-              onMouseEnter={() => setIsCloseHovered(true)}
-              onMouseLeave={() => setIsCloseHovered(false)}
-              className={`close-btn-x liquid-btn ${isCloseHovered ? "is-hovered" : ""}`}
-              title="Close Settings (⌘W)"
-              aria-label="Close Settings"
-            >
-              <svg
-                width="8"
-                height="8"
-                viewBox="0 0 8 8"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="close-x-icon"
-              >
-                <path
-                  d="M1.2 1.2L6.8 6.8M6.8 1.2L1.2 6.8"
-                  stroke="#000000"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          </div>
+            <X size={11} strokeWidth={2.8} aria-hidden="true" />
+          </button>
+          <span data-tauri-drag-region>Settings</span>
         </div>
-
-        {/* Tab Pills */}
-        <div className="settings-tab-pills-container" data-tauri-drag-region>
-          <div ref={tabPillsRef} className="settings-tab-pills" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePane === "general"}
-              className={`settings-tab-pill liquid-btn ${activePane === "general" ? "is-active" : ""}`}
-              onClick={() => handlePaneChange("general")}
-            >
-              <Sliders size={12} />
-              <span>General</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePane === "commands"}
-              className={`settings-tab-pill liquid-btn ${activePane === "commands" ? "is-active" : ""}`}
-              onClick={() => handlePaneChange("commands")}
-            >
-              <Keyboard size={12} />
-              <span>Commands</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePane === "storage"}
-              className={`settings-tab-pill liquid-btn ${activePane === "storage" ? "is-active" : ""}`}
-              onClick={() => handlePaneChange("storage")}
-            >
-              <Database size={12} />
-              <span>Storage</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activePane === "about"}
-              className={`settings-tab-pill liquid-btn ${activePane === "about" ? "is-active" : ""}`}
-              onClick={() => handlePaneChange("about")}
-            >
-              <Info size={12} />
-              <span>About</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Right spacer for symmetrical centering */}
-        <div className="settings-header-right-spacer" data-tauri-drag-region />
+        <h1 id="settings-pane-title" data-tauri-drag-region>{SETTINGS_PANES[activePane].label}</h1>
       </header>
 
-      {/* Main Settings Body */}
-      <main className="settings-body-content">
-        {/* App Hero Branding (Raycast Style) */}
-        <div className="settings-hero" data-tauri-drag-region>
-          <div className="settings-hero-icon-wrapper">
-            <img src="/app-icon.png" alt="rayNote" className="settings-hero-icon-img" />
-          </div>
-          <h1 className="settings-hero-title">rayNote</h1>
-          <p className="settings-hero-subtitle text-[13.5px] [font-weight:500] text-[color:var(--text-muted)]">Raycast-inspired notes accessory for macOS.</p>
-        </div>
+      <nav className="settings-sidebar" aria-label="Settings sections">
+        {(Object.keys(SETTINGS_PANES) as SettingsPane[]).map(pane => {
+          const { label, icon: Icon } = SETTINGS_PANES[pane];
+          return (
+            <button
+              key={pane}
+              type="button"
+              className="settings-sidebar-item"
+              aria-current={activePane === pane ? "page" : undefined}
+              onClick={() => handlePaneChange(pane)}
+            >
+              <span className="settings-sidebar-icon"><Icon size={17} strokeWidth={2.6} aria-hidden="true" /></span>
+              {label}
+            </button>
+          );
+        })}
+      </nav>
 
+      <main ref={contentRef} className="settings-body-content" aria-labelledby="settings-pane-title">
         {actionMessage && (
           <div className="settings-action-banner">
             <span>{actionMessage}</span>
@@ -698,7 +628,7 @@ export default function SettingsApp() {
                   <div className="settings-segmented-group">
                     <button
                       type="button"
-                      className={`settings-seg-btn liquid-btn ${themeMode === "dark" ? "is-active" : ""}`}
+                      className={`settings-seg-btn ${themeMode === "dark" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("dark")}
                     >
                       <Moon size={12} />
@@ -706,7 +636,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className={`settings-seg-btn liquid-btn ${themeMode === "light" ? "is-active" : ""}`}
+                      className={`settings-seg-btn ${themeMode === "light" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("light")}
                     >
                       <Sun size={12} />
@@ -714,7 +644,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className={`settings-seg-btn liquid-btn ${themeMode === "system" ? "is-active" : ""}`}
+                      className={`settings-seg-btn ${themeMode === "system" ? "is-active" : ""}`}
                       onClick={() => handleThemeModeChange("system")}
                     >
                       <Monitor size={12} />
@@ -731,7 +661,7 @@ export default function SettingsApp() {
                 <div className="settings-row-text">
                   <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Accent Theme</div>
                   <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    6 liquid glass curated palettes. Dynamically illuminates aura and controls.
+                    Choose the accent color for rayNote controls.
                   </div>
                 </div>
                 <div className="settings-row-action">
@@ -794,7 +724,7 @@ export default function SettingsApp() {
                   <div className="settings-opacity-control">
                     <button
                       type="button"
-                      className="settings-stepper-btn liquid-btn"
+                      className="settings-stepper-btn"
                       onClick={() => handleTextOpacityChange(100)}
                       disabled={textOpacity === 100}
                       title="Reset Opacity to 100%"
@@ -820,7 +750,7 @@ export default function SettingsApp() {
             </div>
 
             <div className="settings-card settings-glass-clarity">
-              <GlassClaritySlider />
+              <GlassClaritySlider label="Note Window Liquid Glass" description="Adjusts the transparency of the note window." />
             </div>
 
             <WebBrowserSetting />
@@ -885,7 +815,7 @@ export default function SettingsApp() {
                   <div className="settings-zoom-stepper">
                     <button
                       type="button"
-                      className="settings-stepper-btn liquid-btn"
+                      className="settings-stepper-btn"
                       onClick={() => handleZoom(DEFAULT_ZOOM)}
                       title="Reset Zoom to 120%"
                     >
@@ -893,7 +823,7 @@ export default function SettingsApp() {
                     </button>
                     <button
                       type="button"
-                      className="settings-stepper-btn liquid-btn"
+                      className="settings-stepper-btn"
                       onClick={() => handleZoom(zoomLevel - 0.1)}
                       disabled={zoomLevel <= 0.6}
                       title="Zoom Out"
@@ -905,7 +835,7 @@ export default function SettingsApp() {
                     </span>
                     <button
                       type="button"
-                      className="settings-stepper-btn liquid-btn"
+                      className="settings-stepper-btn"
                       onClick={() => handleZoom(zoomLevel + 0.1)}
                       disabled={zoomLevel >= 2.0}
                       title="Zoom In"
@@ -948,7 +878,7 @@ export default function SettingsApp() {
 
               <button
                 type="button"
-                className="settings-action-btn liquid-btn"
+                className="settings-action-btn"
                 onClick={handleResetAllCommandsAndAliases}
                 title="Reset all command hotkeys and aliases to defaults"
               >
@@ -1102,7 +1032,7 @@ export default function SettingsApp() {
                                   {isCustomHotkey && !isRecording && (
                                     <button
                                       type="button"
-                                      className="settings-cmd-reset-btn liquid-btn"
+                                      className="settings-cmd-reset-btn"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleResetHotkey(cmd.id);
@@ -1152,7 +1082,7 @@ export default function SettingsApp() {
                 <div className="settings-row-action">
                   <button
                     type="button"
-                    className="settings-action-btn liquid-btn"
+                    className="settings-action-btn"
                     onClick={openAppDataFolder}
                   >
                     <FolderOpen size={13} />
@@ -1187,7 +1117,7 @@ export default function SettingsApp() {
                 <div className="settings-row-action">
                   <button
                     type="button"
-                    className="settings-action-btn liquid-btn"
+                    className="settings-action-btn"
                     onClick={handleExportAll}
                   >
                     <FileDown size={13} />
@@ -1210,7 +1140,7 @@ export default function SettingsApp() {
                   {!isClearing ? (
                     <button
                       type="button"
-                      className="settings-danger-btn liquid-btn"
+                      className="settings-danger-btn"
                       onClick={() => setIsClearing(true)}
                     >
                       <Trash2 size={13} />
@@ -1228,7 +1158,7 @@ export default function SettingsApp() {
                       </label>
                       <button
                         type="button"
-                        className="settings-danger-btn danger-confirm liquid-btn"
+                        className="settings-danger-btn danger-confirm"
                         disabled={!clearAgreed}
                         onClick={handleClearAllNotes}
                       >
@@ -1236,7 +1166,7 @@ export default function SettingsApp() {
                       </button>
                       <button
                         type="button"
-                        className="settings-stepper-btn liquid-btn"
+                        className="settings-stepper-btn"
                         onClick={() => {
                           setIsClearing(false);
                           setClearAgreed(false);
@@ -1252,25 +1182,18 @@ export default function SettingsApp() {
           </div>
         )}
 
-        {/* ─── PANE 4: ABOUT ─── */}
+        {/* About */}
         {activePane === "about" && (
           <div className="settings-pane-content">
+            <div className="settings-card settings-about">
+              <img src="/app-icon.png" alt="" width={44} height={44} />
+              <div>
+                <h2>rayNote</h2>
+                <p>Version 0.1.0 · macOS Apple Silicon (Universal)</p>
+              </div>
+            </div>
             <ResourceUsage />
             <div className="settings-card">
-              <div className="settings-row">
-                <div className="settings-row-text">
-                  <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">rayNote</div>
-                  <div className="settings-row-desc text-[12px] text-[color:var(--text-muted)]">
-                    Version 0.1.0 • macOS Apple Silicon (Universal)
-                  </div>
-                </div>
-                <div className="settings-row-action">
-                  <span className="settings-stat-badge text-[12px] [font-weight:600] text-[color:var(--color-accent-text)] [background:var(--color-accent-muted)]">v0.1.0</span>
-                </div>
-              </div>
-
-              <div className="settings-card-divider" />
-
               <div className="settings-row">
                 <div className="settings-row-text">
                   <div className="settings-row-title text-[13.5px] [font-weight:600] text-[color:var(--text-primary)]">Architecture</div>

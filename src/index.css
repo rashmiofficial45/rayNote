@@ -150,6 +150,12 @@
 }
 
 /* ── Liquid Glass Design System ─ */
+:root {
+  --glass-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --glass-press-duration: 120ms;
+  --glass-popover-duration: 150ms;
+}
+
 :root,
 .dark,
 [data-theme="dark"],
@@ -159,11 +165,13 @@
   --app-bg-rgb: 22, 22, 26;
   --window-glass-transmission: 0.32;
   --glass-surface-rgb: 21 23 30;
-  --glass-surface-highlight: rgb(255 255 255 / 5%);
+  --glass-surface-highlight: rgb(221 233 255 / 5%);
+  --glass-rim: inset 0 1px 1px rgb(233 241 255 / 26%),
+              inset 0 -1px 1px rgb(211 225 255 / 10%);
   /* Menu tint shares the window backdrop, so focus never swaps the material. */
   --glass-surface-opacity: calc(97% - var(--app-glass-clarity, 0%) * 0.09);
   --glass-surface-tint: rgb(var(--glass-surface-rgb) / var(--glass-surface-opacity));
-  --steady-glass-surface: linear-gradient(160deg, var(--glass-surface-highlight), transparent 55%), var(--glass-surface-tint);
+  --steady-glass-surface: radial-gradient(ellipse at 18% 0%, var(--glass-surface-highlight), transparent 68%), var(--glass-surface-tint);
   --app-bg-glass: #16161a;
   --liquid-card-bg: #16161a;
   --app-border: rgba(255, 255, 255, 0.10);
@@ -236,10 +244,12 @@
   --app-bg-rgb: 248, 250, 252;
   --window-glass-transmission: 0.30;
   --glass-surface-rgb: 240 245 252;
-  --glass-surface-highlight: rgb(255 255 255 / 48%);
+  --glass-surface-highlight: rgb(255 255 255 / 70%);
+  --glass-rim: inset 0 1px 1px rgb(255 255 255 / 90%),
+              inset 0 -1px 1px rgb(66 86 114 / 14%);
   --glass-surface-opacity: calc(98% - var(--app-glass-clarity, 0%) * 0.08);
   --glass-surface-tint: rgb(var(--glass-surface-rgb) / var(--glass-surface-opacity));
-  --steady-glass-surface: linear-gradient(160deg, var(--glass-surface-highlight), transparent 55%), var(--glass-surface-tint);
+  --steady-glass-surface: radial-gradient(ellipse at 18% 0%, var(--glass-surface-highlight), transparent 68%), var(--glass-surface-tint);
   --app-bg-glass: #f8fafc;
   --liquid-card-bg: #ffffff;
   --app-border: rgba(0, 0, 0, 0.10);
@@ -424,8 +434,7 @@ html, body, #root {
 }
 
 /* The slider tints the single native backdrop behind the editor and Settings. */
-.app-shell,
-.settings-window-root {
+.app-shell {
   --window-clarity: var(--app-glass-clarity, 0%);
   --window-tint: calc(100% - var(--window-clarity) * var(--window-glass-transmission));
   --window-edge-tint: var(--window-tint);
@@ -447,7 +456,7 @@ html, body, #root {
   overflow: hidden;
   position: relative;
   contain: layout size;
-  box-shadow: var(--app-inner-highlight);
+  box-shadow: var(--glass-rim);
   color: var(--text-primary);
   overscroll-behavior: none !important;
   overscroll-behavior-y: none !important;
@@ -523,7 +532,7 @@ html, body, #root {
   top: 0;
   left: 0;
   right: 0;
-  height: 52px;
+  height: 65px;
   pointer-events: none;
   z-index: 15;
   opacity: 1;
@@ -531,12 +540,11 @@ html, body, #root {
   background: linear-gradient(
     180deg,
     rgba(var(--app-bg-rgb), var(--window-edge-tint)) 0px,
-    rgba(var(--app-bg-rgb), var(--window-edge-tint)) 24px,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.95)) 38px,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.85)) 42px,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.75)) 46px,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.38)) 49px,
-    rgba(var(--app-bg-rgb), 0) 52px
+    rgba(var(--app-bg-rgb), var(--window-edge-tint)) 29px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.92)) 41px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.65)) 51px,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.25)) 59px,
+    rgba(var(--app-bg-rgb), 0) 65px
   );
 
   border-top-left-radius: 28px;
@@ -554,9 +562,9 @@ html, body, #root {
   background: linear-gradient(
     to top,
     rgba(var(--app-bg-rgb), var(--window-edge-tint)) 0%,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.96)) 17%,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.75)) 39%,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.38)) 66%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.76)) 17%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.50)) 39%,
+    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.28)) 66%,
     rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.10)) 86%,
     rgba(var(--app-bg-rgb), 0) 100%
   );
@@ -668,7 +676,7 @@ html, body, #root {
   padding: var(--title-action-padding);
   gap: var(--title-action-gap);
   background: var(--steady-glass-surface);
-  box-shadow: var(--glass-menu-highlight), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 2px 8px rgba(0, 0, 0, 0.10);
+  box-shadow: var(--glass-rim), 0 2px 8px rgba(0, 0, 0, 0.10);
   -webkit-app-region: no-drag;
   cursor: default;
   opacity: 0;
@@ -725,18 +733,11 @@ html, body, #root {
   color: var(--text-primary);
   cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: background-color 0.14s cubic-bezier(0.16, 1, 0.3, 1),
-              color 0.14s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .title-bar-btn:hover {
   background: var(--btn-liquid-bg-hover);
   color: var(--text-primary);
-}
-
-.title-bar-btn:active {
-  transform: scale(0.92);
 }
 
 body:not(:has(.command-overlay, .smart-search-overlay)) .title-bar-right:has(> .title-bar-btn:focus-visible) {
@@ -1920,17 +1921,6 @@ pre.notefast-code-block:hover {
   display: none;
 }
 
-.editor-wrapper:has(> .bottom-toolbar-corner-container.is-menu-open) > .app-bottom-blend {
-  height: 104px;
-  background: linear-gradient(
-    to top,
-    rgba(var(--app-bg-rgb), var(--window-edge-tint)),
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.55)) 17%,
-    rgba(var(--app-bg-rgb), calc(var(--window-edge-tint) * 0.22)) 38%,
-    rgba(var(--app-bg-rgb), 0) 100%
-  );
-}
-
 .bottom-toolbar-corner-container.is-menu-open .bottom-corner-buttons-row {
   position: absolute;
   inset: 50% 0 auto auto;
@@ -1985,7 +1975,6 @@ pre.notefast-code-block:hover {
   --editor-footer-height: 46px;
   --format-panel-rim: rgb(227 237 255 / 24%);
   --format-panel-section-line: rgb(227 237 255 / 17%);
-  --format-panel-reflection: rgb(255 255 255 / 14%);
   --format-panel-shadow: 0 3px 12px rgb(0 0 0 / 24%);
 }
 
@@ -1994,7 +1983,7 @@ pre.notefast-code-block:hover {
 .format-corner-btn {
   background: var(--steady-glass-surface);
   border: 1px solid var(--format-panel-rim);
-  box-shadow: inset 0 1px 1px var(--format-panel-reflection), inset 0 -1px 1px rgb(0 0 0 / 16%), var(--format-panel-shadow);
+  box-shadow: var(--glass-rim), var(--format-panel-shadow);
 }
 
 .format-dock-strip {
@@ -2053,6 +2042,27 @@ pre.notefast-code-block:hover {
   padding: 8px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  :is(.title-bar-btn, .format-corner-btn, .format-dock-strip .toolbar-btn, .format-dock-options .toolbar-btn) > svg:not(.format-group-chevron) {
+    transition: transform var(--glass-press-duration) var(--glass-motion-ease);
+  }
+
+  :is(.title-bar-btn, .format-corner-btn, .format-dock-strip .toolbar-btn, .format-dock-options .toolbar-btn):active > svg:not(.format-group-chevron) {
+    transform: scale(0.94);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .bottom-toolbar-corner-container:not(:has(:focus-visible)) :is(.format-dock-strip, .format-dock-options) {
+      animation: format-dock-enter var(--glass-popover-duration) var(--glass-motion-ease);
+    }
+  }
+}
+
+@keyframes format-dock-enter {
+  from { translate: 0 4px; }
+  to { translate: 0 0; }
+}
+
 @media (max-width: 510px) {
   .bottom-toolbar-corner-container.is-menu-open {
     padding-inline: 0 44px;
@@ -2064,7 +2074,6 @@ pre.notefast-code-block:hover {
 [data-resolved-theme="light"] .editor-wrapper {
   --format-panel-rim: rgb(62 79 104 / 30%);
   --format-panel-section-line: rgb(62 79 104 / 20%);
-  --format-panel-reflection: rgb(255 255 255 / 78%);
   --format-panel-shadow: 0 12px 30px rgb(35 54 78 / 20%);
 }
 
@@ -2320,10 +2329,7 @@ body:has(.command-overlay) .format-corner-btn {
   background: var(--steady-glass-surface);
   border: 1px solid var(--picker-rim);
   border-radius: 28px;
-  box-shadow: inset 0 1.5px 0 var(--picker-edge-light),
-              inset 0 0 0 1px var(--picker-rim),
-              inset 0 -1px 0 rgba(255, 255, 255, 0.10),
-              var(--picker-shadow);
+  box-shadow: var(--glass-rim), var(--picker-shadow);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -4000,213 +4006,182 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   border-radius: 12px;
 }
 
-/* ═════════════════════════════════════════════════════════════
-   RAYCAST NOTES STYLE SETTINGS WINDOW (NSWindow Architecture)
-═════════════════════════════════════════════════════════════ */
+/* ── Settings window ─────────────────────────────────── */
 .settings-window-root {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  --settings-canvas: #232326;
+  --settings-sidebar: #1e2027;
+  --settings-group: #292b34;
+  --settings-control: #343740;
+  --settings-control-hover: #414551;
+  --settings-divider: #414450;
+  --settings-canvas-opacity: 83%;
+  --settings-sidebar-opacity: 33%;
+  --settings-edge: rgb(219 230 255 / 16%);
+  --settings-sheen: rgb(219 230 255 / 4%);
+  --settings-sidebar-width: clamp(148px, 24vw, 180px);
+  --settings-pane-inset: clamp(16px, 3.2vw, 28px);
+  --btn-liquid-bg: var(--settings-control);
+  --btn-liquid-bg-hover: var(--settings-control-hover);
+  --btn-liquid-border: var(--settings-divider);
+  --btn-liquid-shadow: none;
+  --app-inner-highlight: none;
+  --glass-control-bg: var(--settings-control);
+  --glass-control-border: var(--settings-divider);
+  --separator: var(--settings-divider);
+
+  display: grid;
+  grid-template: 58px minmax(0, 1fr) / var(--settings-sidebar-width) minmax(0, 1fr);
+  height: 100%;
+  width: 100%;
   overflow: hidden;
-  color: var(--text-primary);
+  background: linear-gradient(155deg, var(--settings-sheen), transparent 40%),
+    color-mix(in srgb, var(--settings-canvas) var(--settings-canvas-opacity), transparent);
+  color: var(--text-primary-base);
   user-select: none;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI", "Apple Color Emoji", sans-serif;
-  border-radius: 28px;
-  border: 1.5px solid var(--app-border);
-  box-shadow: var(--app-inner-highlight);
-  transition: border-color 0.2s ease;
-  overscroll-behavior: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  border: 1px solid var(--settings-edge);
+  border-radius: 22px;
+  box-shadow: inset 0 1px 0 var(--settings-edge);
 }
 
-/* Header bar with custom red close button and draggable top bar */
+[data-resolved-theme="light"] .settings-window-root {
+  --settings-canvas: #f4f6fa;
+  --settings-sidebar: #dce3ef;
+  --settings-group: #ffffff;
+  --settings-control: #eeeef2;
+  --settings-control-hover: #e4e4e9;
+  --settings-divider: #dcdce2;
+  --settings-canvas-opacity: 87%;
+  --settings-sidebar-opacity: 45%;
+  --settings-edge: rgb(106 124 156 / 26%);
+  --settings-sheen: rgb(255 255 255 / 22%);
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root[data-resolved-theme] .settings-window-root {
+    --settings-canvas-opacity: 100%;
+    --settings-sidebar-opacity: 100%;
+  }
+}
+
 .settings-header-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
-  height: 52px;
-  min-height: 52px;
-  border-bottom: 1px solid var(--separator);
-  background: var(--steady-glass-surface);
-  border-top-left-radius: 28px;
-  border-top-right-radius: 28px;
-  flex-shrink: 0;
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: var(--settings-sidebar-width) minmax(0, 1fr);
+  border-bottom: 1px solid var(--settings-divider);
   -webkit-app-region: drag;
-  user-select: none;
-  position: relative;
-  gap: 10px;
 }
 
 .settings-header-left {
   display: flex;
   align-items: center;
-  -webkit-app-region: drag;
-  min-width: 32px;
-  flex-shrink: 0;
+  gap: 12px;
+  padding-inline: 16px;
+  background: color-mix(in srgb, var(--settings-sidebar) var(--settings-sidebar-opacity), transparent);
+  border-inline-end: 1px solid var(--settings-divider);
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.settings-header-left .title-bar-left {
-  position: static;
-  display: flex;
-  align-items: center;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  transform: none !important;
-}
-
-.settings-header-left .close-btn-x {
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  -webkit-app-region: no-drag !important;
-}
-
-.settings-tab-pills-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-}
-
-.settings-tab-pills {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  background: var(--glass-control-bg);
-  padding: 3px;
-  border-radius: 12px;
-  border: 1px solid var(--glass-control-border);
-  -webkit-app-region: no-drag;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.settings-tab-pills::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-tab-pill {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
+.settings-close-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgb(0 0 0 / 12%);
+  border-radius: 50%;
+  background: #ff5f57;
+  color: #530b08;
   cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
-  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
   -webkit-app-region: no-drag;
 }
 
-.settings-tab-pill:hover:not(.is-active) {
-  color: var(--text-primary);
-  background: var(--glass-item-hover-bg);
+.settings-close-button svg { visibility: hidden; }
+.settings-close-button:is(:hover, :focus-visible) svg { visibility: visible; }
+
+.settings-header-bar h1 {
+  align-self: center;
+  padding-inline: var(--settings-pane-inset);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
 }
 
-.settings-tab-pill.is-active {
-  background: var(--surface-glass-elevated);
-  color: var(--text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), var(--app-inner-highlight);
-}
-
-.settings-header-right-spacer {
-  min-width: 32px;
-  width: 32px;
-  height: 26px;
-  pointer-events: none;
-  -webkit-app-region: drag;
-  flex-shrink: 0;
-}
-
-/* Settings Body & Scrollable Content */
-.settings-body-content {
-  flex: 1;
+.settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
   overflow-y: auto;
-  padding: 24px 28px 48px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box;
+  padding: 14px 10px;
+  background: color-mix(in srgb, var(--settings-sidebar) var(--settings-sidebar-opacity), transparent);
+  border-inline-end: 1px solid var(--settings-divider);
 }
 
-@media (max-width: 540px) {
-  .settings-body-content {
-    padding: 16px 14px 36px;
-  }
-}
-
-/* App Hero Section (matching Raycast screenshot) */
-.settings-hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  margin-bottom: 24px;
-  -webkit-app-region: drag;
-  user-select: none;
-}
-
-.settings-hero-icon-wrapper {
-  margin-bottom: 12px;
-}
-
-.settings-hero-icon-img {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.28));
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  user-select: none;
-  -webkit-user-drag: none;
-}
-
-.settings-hero-icon-img:hover {
-  transform: scale(1.05) translateY(-2px);
-}
-
-.settings-hero-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 17px;
-  background: linear-gradient(145deg, #ff4d4d, #d62828);
-  box-shadow: 0 10px 24px rgba(220, 38, 38, 0.35), inset 0 1.5px 1.5px rgba(255, 255, 255, 0.35);
+.settings-sidebar-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  gap: 10px;
+  padding: 0 8px;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary-base);
+  font-size: 13px;
+  font-weight: 550;
+  text-align: start;
+  cursor: pointer;
 }
 
-.settings-hero-icon-letter {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
-  font-weight: 800;
-  font-size: 32px;
-  color: #ffffff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+.settings-sidebar-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--settings-control);
 }
 
-.settings-hero-title {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0 0 4px 0;
-  color: var(--text-primary);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+.settings-sidebar-item[aria-current="page"] {
+  background: color-mix(in srgb, var(--color-accent) 16%, var(--settings-group));
+  border-color: var(--color-accent-border);
+  color: var(--color-accent-text);
+  font-weight: 650;
 }
 
-.settings-hero-subtitle {
-  margin: 0;
+.settings-sidebar-item[aria-current="page"] .settings-sidebar-icon {
+  background: color-mix(in srgb, var(--color-accent) 24%, var(--settings-group));
 }
+
+.settings-sidebar-item:not([aria-current]):hover { background: var(--settings-control); }
+.settings-sidebar-item:active { background: var(--settings-control-hover); }
+.settings-window-root button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.settings-body-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 20px var(--settings-pane-inset) 28px;
+  container-type: inline-size;
+}
+
+.settings-about {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.settings-about h2 { font-size: 16px; font-weight: 650; }
+.settings-about p { font-size: 12px; color: var(--text-muted); }
 
 .settings-action-banner {
   padding: 8px 16px;
@@ -4223,19 +4198,16 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 /* Pane Container */
 .settings-pane-content {
   width: 100%;
-  max-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Grouped Cards (macOS Raycast standard) */
 .settings-card {
-  background: var(--steady-glass-surface);
-  border: 1px solid var(--glass-panel-border);
-  border-radius: 20px;
+  background: var(--settings-group);
+  border: 1px solid var(--settings-divider);
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: var(--glass-panel-shadow);
   width: 100%;
   box-sizing: border-box;
 }
@@ -4277,7 +4249,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   gap: 8px;
 }
 
-@media (max-width: 520px) {
+@container (max-width: 440px) {
   .settings-row {
     flex-direction: column;
     align-items: flex-start;
@@ -4332,9 +4304,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-seg-btn.is-active {
-  background: var(--color-accent);
-  color: #ffffff;
-  box-shadow: 0 0 8px var(--color-accent-glow);
+  background: var(--settings-group);
+  color: var(--color-accent-text);
+  box-shadow: 0 0 0 1px var(--settings-divider);
 }
 
 /* Accent Palette Grid in Settings */
@@ -4358,7 +4330,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 }
 
 .settings-accent-dot-btn:hover {
-  transform: scale(1.15);
+  color: var(--text-primary);
 }
 
 .settings-accent-dot {
@@ -4371,8 +4343,8 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .settings-accent-dot-btn.is-selected .settings-accent-dot {
   border-color: var(--text-primary);
-  box-shadow: 0 0 8px var(--color-accent-glow);
-  transform: scale(1.12);
+  outline: 1px solid var(--settings-divider);
+  outline-offset: 2px;
 }
 
 .settings-accent-name {
@@ -4401,6 +4373,84 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 .settings-select-input:focus {
   border-color: var(--color-accent);
+}
+
+.browser-picker-trigger,
+.browser-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  text-align: start;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.browser-picker-trigger {
+  min-height: 34px;
+  max-width: min(212px, 100%);
+  padding: 4px 9px;
+  border: 1px solid var(--settings-divider);
+  border-radius: 8px;
+  background: var(--settings-control);
+}
+
+.browser-picker-trigger:is(:hover, [aria-expanded="true"]):not(:disabled) {
+  background: var(--settings-control-hover);
+}
+
+.browser-picker-trigger > span,
+.browser-picker-option > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.browser-picker-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.browser-picker-menu {
+  position: fixed;
+  z-index: 100;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid var(--settings-divider);
+  border-radius: 12px;
+  background: var(--settings-group);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 22%);
+}
+
+.browser-picker-option {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.browser-picker-option:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--settings-control-hover);
+}
+
+.browser-picker-option[aria-checked="true"] > svg:last-child {
+  flex: none;
+  color: var(--color-accent-text);
+}
+
+.browser-picker-trigger:disabled,
+.browser-picker-option:disabled {
+  color: var(--text-muted);
+  cursor: default;
 }
 
 /* iOS / macOS Toggle Switch */
@@ -4527,8 +4577,9 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
   padding: 13px 18px;
 }
 
-/* Controls beside the live sliders use a fixed material without backdrop resampling. */
-.settings-window-root :is(.liquid-btn, .settings-opacity-control) {
+.settings-glass-clarity .settings-row-desc {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .format-dock-options .glass-clarity-control {
@@ -6662,8 +6713,7 @@ body:has(.command-overlay) .editor-status-footer .editor-resource-usage { pointe
 
 /* ── Accessibility & Reduced Constraints ─────────────────── */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .app-shell,
-  .settings-window-root {
+  .app-shell {
     --window-clarity: 0%;
   }
 }

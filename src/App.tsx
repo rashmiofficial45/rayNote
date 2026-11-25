@@ -77,6 +77,7 @@ import {
   NoteSummary,
 } from "./lib/db";
 import { initTheme } from "./lib/theme";
+import { useRevealWindow } from "./lib/useRevealWindow";
 import { registerEditorFlushHandler } from "./lib/editorFlush";
 import { registerClearAllNotesHandler } from "./lib/noteDeletion";
 import { noteCache } from "./lib/noteCache";
@@ -149,6 +150,18 @@ function App() {
   const deletingNoteRef = useRef<string | null>(null);
 
   const [isBootReady, setIsBootReady] = useState(false);
+  const [startupRouteResolved, setStartupRouteResolved] = useState(false);
+  const [initialDocument, setInitialDocument] = useState<{ id: string; loaded: boolean } | null>(null);
+  const firstViewReady = isBootReady && startupRouteResolved &&
+    (!activeNoteId || initialDocument?.id === activeNoteId);
+  const initialViewReady = useRef(false);
+  const handleInitialDocument = useCallback((id: string, loaded: boolean) => {
+    if (!initialViewReady.current) setInitialDocument({ id, loaded });
+  }, []);
+  useEffect(() => {
+    if (firstViewReady) initialViewReady.current = true;
+  }, [firstViewReady]);
+  useRevealWindow(firstViewReady);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const fullscreenPending = useRef(false);
   const fullscreenScrollAnchor = useRef<{
@@ -913,13 +926,13 @@ function App() {
     [handleSelectNote, showToast]
   );
 
-  // Load notes, initialize theme & apply always on top on mount
+  useLayoutEffect(initTheme, []);
+
+  // Load notes and apply always on top on mount
   useEffect(() => {
-    const stopTheme = initTheme();
     loadNotes();
     const savedAlwaysOnTop = safeLocalStorageGetItem("notefast_always_on_top") !== "false";
     setAlwaysOnTop(savedAlwaysOnTop).catch(console.error);
-    return stopTheme;
   }, []);
 
   /**
@@ -1040,6 +1053,8 @@ function App() {
               safeLocalStorageRemoveItem("notefast_recovered_note_id");
               if (recents.length > 0) {
                 handleSelectNote(recents[0].id, recents[0]);
+              } else {
+                setActiveNoteId(null);
               }
             }
           }
@@ -1259,9 +1274,13 @@ function App() {
   }, []);
   useEffect(() => {
     if (!isBootReady) return;
+    let disposed = false;
     invoke<string | null>("take_pending_note_link").then(id => {
-      if (id) nativeActionsRef.current.handleSelectNote(id);
-    }).catch(console.error);
+      if (!disposed && id) nativeActionsRef.current.handleSelectNote(id);
+    }).catch(console.error).finally(() => {
+      if (!disposed) setStartupRouteResolved(true);
+    });
+    return () => { disposed = true; };
   }, [isBootReady]);
 
   useEffect(() => {
@@ -2287,6 +2306,11 @@ function App() {
       )}
 
       <div className="flex-1 min-h-0 relative overflow-hidden flex flex-col">
+        {firstViewReady && activeNoteId === initialDocument?.id && !initialDocument.loaded && (
+          <p className="mx-5 mt-14 text-sm text-[var(--text-secondary)]" role="status">
+            Could not open this note. Press ⌘P to choose another note.
+          </p>
+        )}
         <NoteEditor
           key={editorReloadKey}
           noteId={activeNoteId}
@@ -2299,6 +2323,7 @@ function App() {
           onRecoverOrphan={handleRecoverOrphan}
           onSwitchFailed={handleSwitchFailed}
           onSwitchConflict={(info) => setSwitchConflict(info)}
+          onInitialDocumentSettled={initialViewReady.current ? undefined : handleInitialDocument}
           discardedNoteId={discardedNoteId}
           zoomLevel={zoomLevel}
           isFullscreen={isFullscreen}

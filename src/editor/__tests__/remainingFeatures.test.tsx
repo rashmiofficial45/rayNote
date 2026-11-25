@@ -55,39 +55,62 @@ describe('selected list clipboard structure', () => {
   expect(serializeSelectedBlocks(editor.state)?.markdownText).toContain('5. second');
  });
 
- it('updates tick indicator when content element resizes at rest (R22)', async () => {
+ it('updates scroll ticks without remeasuring the note on ordinary scroll', async () => {
   const container = document.createElement('div');
-  const content = document.createElement('div');
-  content.textContent = 'line 1';
-  container.appendChild(content);
-  document.body.appendChild(container);
+  container.appendChild(document.createElement('div'));
+  const host = document.createElement('div');
+  document.body.append(container, host);
+  const root = createRoot(host);
+  const previousActEnvironment = (globalThis as any).IS_REACT_ACT_ENVIRONMENT;
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-  let resizeCallback: any;
-  (window as any).ResizeObserver = class {
-    constructor(cb: any) { resizeCallback = cb; }
+  let resize: (() => void) | undefined;
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) { resize = callback; }
     observe() {}
     disconnect() {}
-  };
-
-  const ref = { current: container };
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => root.render(<DocumentTickSlider scrollContainerRef={ref} />));
-
-  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  expect(typeof resizeCallback).toBe('function');
-  await act(async () => {
-    Object.defineProperty(container, 'scrollHeight', { value: 1200, configurable: true });
-    Object.defineProperty(container, 'clientHeight', { value: 400, configurable: true });
-    resizeCallback([]);
   });
 
-  expect(host.querySelector('.doc-tick-slider-track')).not.toBeNull();
-  await act(async () => root.unmount());
-  host.remove();
-  container.remove();
+  let nextFrame: FrameRequestCallback | undefined;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    nextFrame = callback;
+    return 1;
+  });
+  vi.stubGlobal('cancelAnimationFrame', () => { nextFrame = undefined; });
+  let contentHeight = 1200;
+  const readContentHeight = vi.fn(() => contentHeight);
+  Object.defineProperty(container, 'scrollHeight', { get: readContentHeight });
+  Object.defineProperty(container, 'clientHeight', { value: 400 });
+
+  try {
+    await act(async () => root.render(<DocumentTickSlider scrollContainerRef={{ current: container }} />));
+    const ticks = Array.from(host.querySelectorAll('.doc-tick-item'));
+    const activeTick = () => ticks.findIndex(tick => tick.classList.contains('is-active'));
+    expect(activeTick()).toBe(0);
+
+    readContentHeight.mockClear();
+    await act(async () => {
+      container.scrollTop = 800;
+      container.dispatchEvent(new Event('scroll'));
+      nextFrame?.(0);
+    });
+    expect(activeTick()).toBe(ticks.length - 1);
+    expect(readContentHeight).not.toHaveBeenCalled();
+
+    await act(async () => {
+      contentHeight = 2000;
+      resize?.();
+    });
+    expect(activeTick()).toBe(Math.round((ticks.length - 1) / 2));
+    expect(readContentHeight).toHaveBeenCalledTimes(1);
+  } finally {
+    await act(async () => root.unmount());
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = previousActEnvironment;
+    host.remove();
+    container.remove();
+  }
  });
+
 });
 
 describe('remaining selected block and task regressions',()=>{

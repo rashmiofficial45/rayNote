@@ -2,8 +2,12 @@ import { useEffect, useId, useState } from "react";
 import { Layers2 } from "lucide-react";
 import { getStoredGlassClarity, setStoredGlassClarity } from "../lib/theme";
 
-export function GlassClaritySlider() {
+export function GlassClaritySlider({ label = "Liquid Glass", description }: {
+  label?: string;
+  description?: string;
+} = {}) {
   const inputId = useId();
+  const descriptionId = `${inputId}-description`;
   const [clarity, setClarity] = useState(() =>
     Number(document.documentElement.dataset.glassClarity ?? getStoredGlassClarity()),
   );
@@ -19,9 +23,10 @@ export function GlassClaritySlider() {
   return (
     <div className="glass-clarity-control">
       <div className="glass-clarity-header">
-        <label htmlFor={inputId}><Layers2 size={14} aria-hidden="true" /> Liquid Glass</label>
+        <label htmlFor={inputId}>{!description && <Layers2 size={14} aria-hidden="true" />}{label}</label>
         <span className="glass-clarity-value" aria-hidden="true">{clarity}%</span>
       </div>
+      {description && <p id={descriptionId} className="settings-row-desc">{description}</p>}
       <input
         id={inputId}
         type="range"
@@ -29,6 +34,7 @@ export function GlassClaritySlider() {
         min={0}
         max={100}
         value={clarity}
+        aria-describedby={description ? descriptionId : undefined}
         aria-valuetext={clarity === 0 ? "Solid" : clarity === 100 ? "Super clear" : `${clarity}% clarity`}
         onChange={(event) => setStoredGlassClarity(event.currentTarget.valueAsNumber)}
       />

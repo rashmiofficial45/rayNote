@@ -11,7 +11,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { getPreferredBrowser } from '../../lib/webBrowsers';
 import { getStoredGlassClarity } from '../../lib/theme';
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ notes_count: 0, size_bytes: 0, db_path: '/tmp/disposable.db' }) }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue({ notes_count: 0, size_bytes: 0, db_path: '/tmp/disposable.db' }), isTauri: () => true }));
 vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn().mockResolvedValue(undefined), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ onFocusChanged: vi.fn().mockResolvedValue(() => {}) }) }));
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -32,6 +32,30 @@ async function drawToolbar() {
   act(() => host.querySelector<HTMLButtonElement>('[aria-label="Appearance"]')!.click());
 }
 describe('Cross-window preference controls', () => {
+  it('reveals Settings after the saved theme and pane have committed', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    localStorage.setItem('notefast_theme_mode', 'light');
+    localStorage.setItem('notefast_settings_active_pane', 'commands');
+    const native = vi.mocked(invoke);
+    const defaultInvoke = native.getMockImplementation()!;
+    let visibleTheme: string | undefined;
+    let visiblePane: string | null | undefined;
+    native.mockImplementation((command, ...args) => {
+      if (command === 'reveal_ready_window') {
+        visibleTheme = document.documentElement.dataset.resolvedTheme;
+        visiblePane = host.querySelector('.settings-sidebar-item[aria-current="page"]')?.textContent;
+      }
+      return defaultInvoke(command, ...args);
+    });
+    try {
+      await act(async () => root.render(<SettingsApp />));
+      expect(visibleTheme).toBe('light');
+      expect(visiblePane).toContain('Commands');
+    } finally {
+      native.mockImplementation(defaultInvoke);
+      vi.unstubAllGlobals();
+    }
+  });
   it('previews glass clarity immediately and ignores out-of-order updates from another window', async () => {
     await act(async () => root.render(<SettingsApp />));
     const picker = host.querySelector<HTMLInputElement>('.glass-clarity-slider')!;
@@ -55,26 +79,38 @@ describe('Cross-window preference controls', () => {
   it('updates the browser picker when macOS reports added and removed browsers', async () => {
     const native = vi.mocked(invoke);
     const stockResponse = native.getMockImplementation()!;
-    let browsers = [{ bundleId: 'com.apple.Safari', name: 'Safari' }];
+    let browsers = [{ bundleId: 'com.apple.Safari', name: 'Safari', icon: 'data:image/png;base64,stub' }];
     native.mockImplementation((command, ...args) => command === 'list_web_browsers'
       ? Promise.resolve(browsers) as ReturnType<typeof invoke>
       : stockResponse(command, ...args));
 
     try {
       await act(async () => root.render(<SettingsApp />));
-      const picker = host.querySelector<HTMLSelectElement>('#web-browser')!;
-      expect(Array.from(picker.options, (option) => option.text)).toEqual(['System Default', 'Safari']);
+      const picker = host.querySelector<HTMLButtonElement>('#web-browser')!;
+      const items = () => Array.from(host.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'));
+      await act(async () => picker.click());
+      expect(items().map(item => item.textContent)).toEqual(['System Default', 'Safari']);
+      expect(items()[1].querySelector('img')?.getAttribute('src')).toBe(browsers[0].icon);
       await act(async () => {
-        picker.value = 'com.apple.Safari';
-        picker.dispatchEvent(new Event('change', { bubbles: true }));
+        const selected = items()[0];
+        selected.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
       });
+      expect(document.activeElement).toBe(items()[1]);
+      await act(async () => items()[1].click());
       expect(getPreferredBrowser()).toBe('com.apple.Safari');
+      expect(picker.querySelector('img')?.getAttribute('src')).toBe(browsers[0].icon);
 
-      browsers = [{ bundleId: 'org.mozilla.firefox', name: 'Firefox' }];
+      browsers = [{ bundleId: 'org.mozilla.firefox', name: 'Firefox', icon: 'data:image/png;base64,other' }];
       await act(async () => { window.dispatchEvent(new Event('focus')); });
-      expect(Array.from(picker.options, (option) => option.text)).toEqual([
+      await act(async () => picker.click());
+      expect(items().map(item => item.textContent)).toEqual([
         'System Default', 'Preferred Browser Unavailable', 'Firefox',
       ]);
+      await act(async () => {
+        document.activeElement?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      });
+      expect(items()).toHaveLength(0);
+      expect(document.activeElement).toBe(picker);
       expect(host.querySelector('#web-browser-description')?.textContent).toContain('system default');
     } finally {
       native.mockImplementation(stockResponse);

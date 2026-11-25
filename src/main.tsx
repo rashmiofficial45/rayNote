@@ -20,11 +20,9 @@ const SettingsApp = React.lazy(() => import("./SettingsApp"));
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     {isSettings ? (
-      <React.Suspense fallback={<div />}>
+      <React.Suspense fallback={null}>
         <SettingsApp />
       </React.Suspense>
-    ) : (
-      <App />
-    )}
+    ) : <App />}
   </React.StrictMode>
 );

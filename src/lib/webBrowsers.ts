@@ -6,6 +6,7 @@ const PREFERRED_BROWSER_KEY = "raynote_preferred_web_browser";
 export interface WebBrowser {
   bundleId: string;
   name: string;
+  icon?: string;
 }
 
 export function getPreferredBrowser(): string {

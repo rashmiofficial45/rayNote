@@ -157,6 +157,7 @@ interface EditorProps {
   onRecoverOrphan?: (content: string, sourceId?: string) => void | Promise<void> | any;
   onSwitchFailed?: (failedId: string, error: unknown) => void;
   onSwitchConflict?: (info: SwitchConflictInfo) => void;
+  onInitialDocumentSettled?: (noteId: string, loaded: boolean) => void;
   discardedNoteId?: string | null;
   zoomLevel?: number;
   showBlockControls?: boolean;
@@ -231,6 +232,7 @@ export function Editor({
   onRecoverOrphan,
   onSwitchFailed,
   onSwitchConflict,
+  onInitialDocumentSettled,
   discardedNoteId,
   zoomLevel,
   showBlockControls,
@@ -261,6 +263,8 @@ export function Editor({
   onSwitchFailedRef.current = onSwitchFailed;
   const onSwitchConflictRef = useRef(onSwitchConflict);
   onSwitchConflictRef.current = onSwitchConflict;
+  const onInitialDocumentSettledRef = useRef(onInitialDocumentSettled);
+  onInitialDocumentSettledRef.current = onInitialDocumentSettled;
   const discardedNoteIdRef = useRef(discardedNoteId);
   discardedNoteIdRef.current = discardedNoteId;
   const onNavigateToNoteRef = useRef(onNavigateToNote);
@@ -1173,6 +1177,9 @@ export function Editor({
         if (!cancelled && prevId) onSwitchFailedRef.current?.(prevId, error);
       } finally {
         if (!cancelled && editor && !editor.isDestroyed) {
+          if (noteId) {
+            onInitialDocumentSettledRef.current?.(noteId, currentNoteIdRef.current === noteId);
+          }
           editor.setEditable(Boolean(currentNoteIdRef.current) && !readOnlyRef.current, false);
           if (currentNoteIdRef.current === noteId && editor.isEditable) {
             const active = document.activeElement;
@@ -1202,42 +1209,61 @@ export function Editor({
     };
   }, [noteId, editor, saveNow, loadReadOnly]);
 
-  // Passive, lightweight scroll position tracking (0ms, no React state re-renders)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container || !editor) return;
 
-    const atEdge = () => container.scrollTop <= 0 ||
-      container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
+    let maxScroll = 0;
+    let guardingEdge = false;
+    const atTop = (top: number) => top <= 0;
+    const atBottom = (top: number) => top >= maxScroll - 1;
 
-    // Cancel outward trackpad gestures before WebKit starts elastic scrolling.
-    // Keep the interior of the note on the asynchronous scrolling path.
+    // WKWebView can still rubber-band a transparent window at its edges despite
+    // overscroll-behavior. Intercept only outward vertical wheel input there.
     const guardEdge = (event: WheelEvent) => {
-      if (!event.cancelable || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
-      const outward = event.deltaY < 0 ? container.scrollTop <= 0 :
-        event.deltaY > 0 && container.scrollTop + container.clientHeight >= container.scrollHeight - 1;
-      if (!outward) return;
-      for (let el = event.target instanceof Element ? event.target : null;
-        el && el !== container; el = el.parentElement) {
-        if (el.scrollHeight <= el.clientHeight || !/^(auto|scroll)$/.test(getComputedStyle(el).overflowY)) continue;
-        if (event.deltaY < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1) return;
+      const { deltaX, deltaY } = event;
+      if (!event.cancelable || event.ctrlKey || deltaY === 0 ||
+          Math.abs(deltaX) > Math.abs(deltaY)) return;
+
+      const top = container.scrollTop;
+      if (deltaY < 0 ? !atTop(top) : !atBottom(top)) return;
+
+      for (let target = event.target instanceof Element ? event.target : null;
+        target && target !== container; target = target.parentElement) {
+        const remaining = target.scrollHeight - target.clientHeight;
+        const canScroll = remaining > 0 &&
+          (deltaY < 0 ? target.scrollTop > 0 : target.scrollTop < remaining - 1);
+        if (canScroll && /^(auto|scroll|overlay)$/.test(getComputedStyle(target).overflowY)) return;
       }
       event.preventDefault();
     };
-    const syncGuard = () => {
-      if (atEdge()) container.addEventListener("wheel", guardEdge, { passive: false });
+
+    const syncEdgeGuard = (top: number) => {
+      const atEdge = atTop(top) || atBottom(top);
+      if (atEdge === guardingEdge) return;
+      guardingEdge = atEdge;
+      if (atEdge) container.addEventListener("wheel", guardEdge, { passive: false });
       else container.removeEventListener("wheel", guardEdge);
     };
-    const handleScroll = () => {
-      syncGuard();
-      if (currentNoteIdRef.current) {
-        noteCache.updateScrollTop(currentNoteIdRef.current, container.scrollTop);
-      }
+
+    const measureScrollRange = () => {
+      maxScroll = container.scrollHeight - container.clientHeight;
+      syncEdgeGuard(container.scrollTop);
     };
-    const resize = new ResizeObserver(syncGuard);
+
+    const handleScroll = () => {
+      const top = container.scrollTop;
+      syncEdgeGuard(top);
+      const activeNoteId = currentNoteIdRef.current;
+      if (activeNoteId) noteCache.updateScrollTop(activeNoteId, top);
+    };
+
+    // The content frame includes editor zoom and spacing. Resize notifications
+    // refresh the scroll range without reading document geometry on each scroll.
+    const resize = new ResizeObserver(measureScrollRange);
     resize.observe(container);
-    resize.observe(editor.view.dom);
-    syncGuard();
+    if (container.firstElementChild) resize.observe(container.firstElementChild);
+    measureScrollRange();
     container.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       resize.disconnect();
@@ -1245,7 +1271,6 @@ export function Editor({
       container.removeEventListener("scroll", handleScroll);
     };
   }, [editor]);
-
 
   // Register lightweight zero-overhead diagnostic metrics for memory profiling
   useEffect(() => {

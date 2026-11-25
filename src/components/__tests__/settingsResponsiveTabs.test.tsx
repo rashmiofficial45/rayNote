@@ -26,7 +26,7 @@ vi.mock("@tauri-apps/api/window", () => ({
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-describe("Settings Window Responsiveness & Navigation Tabs", () => {
+describe("Settings sidebar navigation", () => {
   let host: HTMLDivElement;
   let root: Root;
 
@@ -45,39 +45,43 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     localStorage.clear();
   });
 
-  it("renders all 4 navigation tabs without clipping in a fluid container", async () => {
+  it("renders all four sections in the settings sidebar", async () => {
     await act(async () => {
       root.render(<SettingsApp />);
     });
 
-    const pillsContainer = host.querySelector(".settings-tab-pills-container");
-    expect(pillsContainer).not.toBeNull();
+    const sidebar = host.querySelector(".settings-sidebar");
+    expect(sidebar).not.toBeNull();
 
-    const pills = host.querySelectorAll(".settings-tab-pill");
-    expect(pills.length).toBe(4);
+    const items = host.querySelectorAll(".settings-sidebar-item");
+    expect(items.length).toBe(4);
 
-    const tabNames = Array.from(pills).map((p) => p.textContent?.trim());
-    expect(tabNames).toEqual(["General", "Commands", "Storage", "About"]);
+    const sectionNames = Array.from(items).map((p) => p.textContent?.trim());
+    expect(sectionNames).toEqual(["General", "Commands", "Storage", "About"]);
   });
 
-  it("allows switching to each tab with active state and correct content rendered", async () => {
+  it("indicates the selected section and updates the pane heading and content", async () => {
     await act(async () => {
       root.render(<SettingsApp />);
     });
 
-    const pills = host.querySelectorAll<HTMLButtonElement>(".settings-tab-pill");
+    const items = host.querySelectorAll<HTMLButtonElement>(".settings-sidebar-item");
 
     // 1. Initial tab is General
-    expect(pills[0].classList.contains("is-active")).toBe(true);
+    expect(items[0].hasAttribute("aria-current")).toBe(true);
+    expect(host.querySelector("#settings-pane-title")?.textContent).toBe("General");
     expect(host.textContent).toContain("Appearance");
+    const clarity = host.querySelector<HTMLInputElement>(".glass-clarity-slider")!;
+    expect(clarity.labels?.[0]?.textContent).toContain("Note Window Liquid Glass");
+    expect(host.textContent).toContain("Adjusts the transparency of the note window.");
 
     // 2. Click Commands tab (unified Commands, Aliases, and Hotkeys)
     await act(async () => {
-      pills[1].click();
+      items[1].click();
     });
-    expect(pills[1].classList.contains("is-active")).toBe(true);
-    expect(pills[0].classList.contains("is-active")).toBe(false);
-    expect(host.textContent).toContain("Commands");
+    expect(items[1].hasAttribute("aria-current")).toBe(true);
+    expect(items[0].hasAttribute("aria-current")).toBe(false);
+    expect(host.querySelector("#settings-pane-title")?.textContent).toBe("Commands");
     expect(host.textContent).toContain("Application & Window Commands");
     expect(host.querySelector(".settings-aliases-search-input")).not.toBeNull();
     expect(host.textContent).toContain("Reset Defaults");
@@ -85,9 +89,9 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
 
     // 3. Click Storage tab
     await act(async () => {
-      pills[2].click();
+      items[2].click();
     });
-    expect(pills[2].classList.contains("is-active")).toBe(true);
+    expect(items[2].hasAttribute("aria-current")).toBe(true);
     expect(host.textContent).toContain("SQLite Database Storage");
     expect(host.textContent).toContain("Open in Finder");
     expect(host.textContent).toContain("Total Notes");
@@ -98,9 +102,9 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
 
     // 4. Click About tab
     await act(async () => {
-      pills[3].click();
+      items[3].click();
     });
-    expect(pills[3].classList.contains("is-active")).toBe(true);
+    expect(items[3].hasAttribute("aria-current")).toBe(true);
     expect(host.textContent).toContain("rayNote");
     expect(host.textContent).toContain("Universal");
     expect(host.textContent).toContain("Tech Stack");
@@ -112,9 +116,9 @@ describe("Settings Window Responsiveness & Navigation Tabs", () => {
     });
 
     // Switch to Storage tab (index 2)
-    const pills = host.querySelectorAll<HTMLButtonElement>(".settings-tab-pill");
+    const items = host.querySelectorAll<HTMLButtonElement>(".settings-sidebar-item");
     await act(async () => {
-      pills[2].click();
+      items[2].click();
     });
 
     // Find Move All to Trash button

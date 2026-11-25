@@ -676,36 +676,27 @@ pub fn get_drag_diagnostics(window: tauri::WebviewWindow) -> Result<serde_json::
 #[tauri::command]
 pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
+    use std::sync::atomic::Ordering;
 
+    let ready = app.state::<crate::SettingsWindowReady>();
     if let Some(win) = app.get_webview_window("settings") {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
-
-        #[cfg(target_os = "macos")]
-        unsafe {
-            use objc2::msg_send;
-            use objc2::runtime::AnyObject;
-            let app_class = objc2::class!(NSApplication);
-            let shared_app: *mut AnyObject = msg_send![app_class, sharedApplication];
-            let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
-            if let Ok(ptr) = win.ns_window() {
-                if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
-                    let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
-                }
-            }
+        // A second request during startup must not expose the empty webview.
+        if ready.0.load(Ordering::Acquire) {
+            show_settings_window(&win);
         }
         return Ok(());
     }
 
+    ready.0.store(false, Ordering::Release);
     let settings_window = tauri::WebviewWindowBuilder::new(
         &app,
         "settings",
         tauri::WebviewUrl::App("index.html?window=settings".into()),
     )
     .title("rayNote Settings")
-    .inner_size(580.0, 720.0)
-    .min_inner_size(500.0, 520.0)
+    .visible(false)
+    .inner_size(760.0, 680.0)
+    .min_inner_size(560.0, 460.0)
     .resizable(true)
     .decorations(false)
     .transparent(true)
@@ -715,8 +706,16 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
     .map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "macos")]
-    crate::install_window_glass(&settings_window);
+    {
+        crate::install_window_glass(&settings_window, 22.0, 0.70);
+        crate::stage_window_for_render(&settings_window);
+    }
 
+    Ok(())
+}
+
+pub(crate) fn show_settings_window(settings_window: &tauri::WebviewWindow) {
+    let _ = settings_window.unminimize();
     let _ = settings_window.show();
     let _ = settings_window.set_focus();
 
@@ -729,12 +728,11 @@ pub fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
         let _: () = msg_send![shared_app, activateIgnoringOtherApps: true];
         if let Ok(ptr) = settings_window.ns_window() {
             if let Some(ns_win) = (ptr as *mut AnyObject).as_ref() {
+                let _: () = msg_send![ns_win, setAlphaValue: 1.0_f64];
                 let _: () = msg_send![ns_win, makeKeyAndOrderFront: std::ptr::null_mut::<AnyObject>()];
             }
         }
     }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -767,10 +765,13 @@ pub fn set_always_on_top(app: tauri::AppHandle, always_on_top: bool) -> Result<(
                         let _: () = msg_send![ns_win, setCollectionBehavior: behavior];
                         let _: () = msg_send![ns_win, setLevel: level_isize];
                         let _: () = msg_send![ns_win, setFloatingPanel: always_on_top];
-                        if !always_on_top {
-                            let _: () = msg_send![ns_win, orderBack: std::ptr::null_mut::<AnyObject>()];
-                        } else {
-                            let _: () = msg_send![ns_win, orderFrontRegardless];
+                        if app.state::<crate::MainWindowReady>().0.load(std::sync::atomic::Ordering::Acquire)
+                            && win.is_visible().unwrap_or(false) {
+                            if always_on_top {
+                                let _: () = msg_send![ns_win, orderFrontRegardless];
+                            } else {
+                                let _: () = msg_send![ns_win, orderBack: std::ptr::null_mut::<AnyObject>()];
+                            }
                         }
                     }
                 }

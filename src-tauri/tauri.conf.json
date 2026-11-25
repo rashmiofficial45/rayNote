@@ -24,7 +24,7 @@
         "alwaysOnTop": true,
         "resizable": true,
         "shadow": true,
-        "visible": true,
+        "visible": false,
         "acceptFirstMouse": true
       }
     ],

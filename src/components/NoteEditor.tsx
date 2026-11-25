@@ -14,6 +14,7 @@ interface NoteEditorProps {
   onRecoverOrphan?: (content: string) => void;
   onSwitchFailed?: (failedId: string, error: unknown) => void;
   onSwitchConflict?: (info: SwitchConflictInfo) => void;
+  onInitialDocumentSettled?: (noteId: string, loaded: boolean) => void;
   discardedNoteId?: string | null;
   zoomLevel: number;
   showBlockControls?: boolean;
@@ -35,6 +36,7 @@ export function NoteEditor({
   onRecoverOrphan,
   onSwitchFailed,
   onSwitchConflict,
+  onInitialDocumentSettled,
   discardedNoteId,
   zoomLevel,
   showBlockControls,
@@ -88,6 +90,7 @@ export function NoteEditor({
         onRecoverOrphan={onRecoverOrphan}
         onSwitchFailed={onSwitchFailed}
         onSwitchConflict={onSwitchConflict}
+        onInitialDocumentSettled={onInitialDocumentSettled}
         discardedNoteId={discardedNoteId}
         zoomLevel={zoomLevel}
         showBlockControls={showBlockControls}

@@ -5,12 +5,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App';
 import * as db from '../../lib/db';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { noteCache } from '../../lib/noteCache';
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined), isTauri: () => true }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}), emit: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => ({ isFocused: () => Promise.resolve(true), onFocusChanged: () => Promise.resolve(() => {}), setFocus: () => Promise.resolve() }) }));
 vi.mock('../TitleBar', () => ({ TitleBar: (props: any) => <button data-open-palette onClick={props.onOpenCommandPalette}>Palette</button> }));
-vi.mock('../NoteEditor', () => ({ NoteEditor: ({ isFindOpen }: { isFindOpen: boolean }) => <textarea data-editor data-find-open={isFindOpen} /> }));
+const initialEditor = vi.hoisted(() => ({ props: null as null | {
+  noteId: string | null;
+  onInitialDocumentSettled?: (id: string, loaded: boolean) => void;
+} }));
+vi.mock('../NoteEditor', () => ({ NoteEditor: (props: NonNullable<typeof initialEditor.props> & { isFindOpen: boolean }) => {
+  initialEditor.props = props;
+  return <textarea data-editor data-find-open={props.isFindOpen} />;
+} }));
 vi.mock('../WindowResizeHandles', () => ({ WindowResizeHandles: () => null }));
 vi.mock('../SmartSearch', () => ({ SmartSearch: ({ isOpen }: { isOpen: boolean }) => isOpen ? <input data-note-switcher /> : null, clearCachedRecentSearchResults: vi.fn() }));
 vi.mock('../ShortcutsModal', () => ({ ShortcutsModal: ({ isOpen }: { isOpen: boolean }) => isOpen ? <div data-shortcuts /> : null }));
@@ -22,8 +30,19 @@ beforeEach(() => {
   vi.spyOn(db, 'setAlwaysOnTop').mockResolvedValue(); vi.spyOn(db, 'hideWindow').mockResolvedValue();
   vi.spyOn(db, 'registerExitFlushHandler').mockReturnValue(undefined); vi.spyOn(db, 'registerPanelHideHandler').mockReturnValue(undefined);
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); localStorage.clear(); noteCache.clear(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals(); localStorage.clear(); noteCache.clear(); });
 describe('App native wiring and Escape precedence', () => {
+  it('reveals the native window only after the initial document has settled', async () => {
+    vi.stubGlobal('__TAURI_INTERNALS__', {});
+    const note = { id: 'active', title: 'Active note', content: '', preview: '', created_at: '', updated_at: '', is_pinned: false };
+    vi.mocked(db.getRecentNotes).mockResolvedValue([note]);
+    vi.spyOn(db, 'getNote').mockResolvedValue(note);
+    await act(async () => root.render(<App />));
+    expect(initialEditor.props?.noteId).toBe(note.id);
+    expect(invoke).not.toHaveBeenCalledWith('reveal_ready_window');
+    await act(async () => initialEditor.props?.onInitialDocumentSettled?.(note.id, true));
+    expect(vi.mocked(invoke).mock.calls.filter(([command]) => command === 'reveal_ready_window')).toHaveLength(1);
+  });
   it('mounts the main app when WebKit storage access is denied (B33)', async () => {
     vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => { throw new DOMException('Denied', 'SecurityError'); });
     await expect(act(async () => root.render(<App />))).resolves.toBeUndefined();

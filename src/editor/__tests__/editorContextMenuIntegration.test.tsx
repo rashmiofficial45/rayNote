@@ -59,31 +59,77 @@ describe("Editor pointer interactions", () => {
     expect(editor.state.doc.child(2).textContent).toBe("Below");
   });
 
-  it("consumes only outward wheel events at the scroll boundaries", async () => {
-    await act(async () => root.render(
-      <Editor noteId="wheel-edge" initialContent="# Title" onUpdate={vi.fn()} />
-    ));
-    const container = host.querySelector<HTMLElement>("[data-scroll-container]")!;
-    Object.defineProperties(container, {
-      clientHeight: { value: 200 },
-      scrollHeight: { value: 1000 },
+  it("blocks only outward vertical wheel input at document boundaries", async () => {
+    const resizeCallbacks: ResizeObserverCallback[] = [];
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: ResizeObserverCallback) { resizeCallbacks.push(callback); }
+      observe() {}
+      disconnect() {}
     });
-    const wheel = (deltaY: number) => container.dispatchEvent(
-      new WheelEvent("wheel", { deltaY, cancelable: true, bubbles: true })
-    );
-    const scroll = (top: number) => {
-      container.scrollTop = top;
-      container.dispatchEvent(new Event("scroll"));
-    };
-    scroll(0);
-    expect(wheel(-12)).toBe(false);
-    expect(wheel(12)).toBe(true);
-    scroll(400);
-    expect(wheel(12)).toBe(true);
-    expect(wheel(-12)).toBe(true);
-    scroll(800);
-    expect(wheel(12)).toBe(false);
-    expect(wheel(-12)).toBe(true);
+
+    try {
+      await act(async () => root.render(
+        <Editor noteId="wheel-edge" initialContent="# Title" onUpdate={vi.fn()} />
+      ));
+      const container = host.querySelector<HTMLElement>("[data-scroll-container]")!;
+      let height = 1000;
+      Object.defineProperties(container, {
+        clientHeight: { value: 200 },
+        scrollHeight: { get: () => height },
+      });
+      const resize = async () => await act(async () => {
+        for (const callback of resizeCallbacks) callback([], {} as ResizeObserver);
+      });
+      await resize();
+
+      const wheel = (deltaY: number, options?: WheelEventInit, target = container) => {
+        const event = new WheelEvent("wheel", { deltaY, cancelable: true, bubbles: true, ...options });
+        // Happy DOM's WheelEvent omits MouseEvent modifier properties.
+        Object.defineProperty(event, "ctrlKey", { value: options?.ctrlKey ?? false });
+        return target.dispatchEvent(event);
+      };
+      const scroll = (top: number) => {
+        container.scrollTop = top;
+        container.dispatchEvent(new Event("scroll"));
+      };
+
+      scroll(0);
+      expect(wheel(-12)).toBe(false);
+      expect(wheel(12)).toBe(true);
+      expect(wheel(-12, { ctrlKey: true })).toBe(true);
+      expect(wheel(-12, { deltaX: 30 })).toBe(true);
+
+      const nestedScroller = document.createElement("div");
+      nestedScroller.style.overflowY = "auto";
+      Object.defineProperties(nestedScroller, {
+        clientHeight: { value: 100 },
+        scrollHeight: { value: 300 },
+      });
+      await act(async () => { container.firstElementChild!.append(nestedScroller); });
+      nestedScroller.scrollTop = 100;
+      expect(wheel(-12, {}, nestedScroller)).toBe(true);
+      nestedScroller.scrollTop = 0;
+      expect(wheel(-12, {}, nestedScroller)).toBe(false);
+
+      const addListener = vi.spyOn(container, "addEventListener");
+      const removeListener = vi.spyOn(container, "removeEventListener");
+      scroll(400);
+      expect(removeListener).toHaveBeenCalledWith("wheel", expect.any(Function));
+      expect(wheel(12)).toBe(true);
+      expect(wheel(-12)).toBe(true);
+      scroll(800);
+      expect(addListener).toHaveBeenCalledWith("wheel", expect.any(Function), { passive: false });
+      expect(wheel(12)).toBe(false);
+      expect(wheel(-12)).toBe(true);
+
+      height = 1600;
+      await resize();
+      expect(wheel(12)).toBe(true);
+      scroll(1400);
+      expect(wheel(12)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("suppresses default native context menu by calling preventDefault() on contextmenu event", async () => {
